@@ -1,0 +1,56 @@
+"""Module containing type aliases."""
+
+import numpy as np
+import numpy.typing as npt
+
+from typing import Literal
+
+
+Node = tuple[int, ...]
+"""Node index."""
+Edge = tuple[Node, Node]
+"""Edge index."""
+Coord = tuple
+"""Positional coordinate."""
+ErrorModel = Literal[
+    'code capacity',
+    'phenomenological',
+    'circuit-level',
+]
+Parametrization = Literal[
+    'standard',
+    'balanced',
+    'ion trap',
+]
+"""Affects only circuit-level error model."""
+EdgeType = Literal[
+    'S',
+    'E westmost',
+    'E bulk',
+    'E eastmost',
+    'U 3',
+    'U 4',
+    'SD',
+    'EU west corners',
+    'EU east corners',
+    'EU edge',
+    'EU centre',
+    'SEU',
+]
+"""Edge type in circuit-level decoding graph for surface code."""
+FourFloats = tuple[
+    float,
+    float,
+    float,
+    float,
+]
+"""Tuple of 4 floats."""
+FourInts = tuple[
+    int,
+    int,
+    int,
+    int,
+]
+"""Tuple of 4 integers."""
+MultiplicityVector = npt.NDArray[np.int_]
+"""Array of 4 integers."""
