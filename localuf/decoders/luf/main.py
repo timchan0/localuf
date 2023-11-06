@@ -65,7 +65,7 @@ class LUF(_BaseUF):
         """
         super().__init__(code)
         self._CONTROLLER = Controller(self)
-        self._NODES = AstrisNodes(self) if visible else ActisNodes(self, optimal)
+        self._NODES = MacarNodes(self) if visible else ActisNodes(self, optimal)
         self._VISIBLE = visible
         self._DIGRAPH_MAKER = DigraphMaker(self.NODES.dc, self.growth)
         self._DECODE_DRAWER = DecodeDrawer(self.FIG_WIDTH)
@@ -375,7 +375,7 @@ class Nodes(abc.ABC):
     def __init__(self, luf: LUF) -> None:
         """Input: `luf` the LUF object which has these nodes."""
         self._LUF = luf
-        self.dc: dict[Node, AstrisNode | ActisNode]
+        self.dc: dict[Node, MacarNode | ActisNode]
 
     @property
     def LUF(self): return self._LUF
@@ -443,7 +443,7 @@ class Nodes(abc.ABC):
         return str(self.LUF.CONTROLLER.stage)
 
 
-class AstrisNodes(Nodes):
+class MacarNodes(Nodes):
     """Collection of all LUF nodes, where controller directly connects to each node.
     
     Extends `Nodes`.
@@ -451,7 +451,7 @@ class AstrisNodes(Nodes):
 
     def __init__(self, luf: LUF) -> None:
         super().__init__(luf)
-        self._dc = {v: AstrisNode(nodes=self, index=v)
+        self._dc = {v: MacarNode(nodes=self, index=v)
                     for v in luf.CODE.NODES}
         
     @property
@@ -778,7 +778,7 @@ class _Node(abc.ABC):
         self.next_anyon = False
         self.pointer: direction = 'C'
         self.busy = False
-        self.accessibles: dict[direction, AstrisNode | ActisNode] = {}
+        self.accessibles: dict[direction, MacarNode | ActisNode] = {}
 
     def make_defect(self):
         """Make the node a defect."""
@@ -892,7 +892,7 @@ class _Node(abc.ABC):
         return str(self.cid)
 
 
-class AstrisNode(_Node):
+class MacarNode(_Node):
     """Node for LUF which directly accesses global controller.
     
     Extends `_Node`.

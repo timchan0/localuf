@@ -26,8 +26,8 @@ def test_property_attributes(test_property, luf: LUF, prop):
     test_property(luf, prop)
 
 @pytest.mark.parametrize("luf, syndrome", [
-    ("astris5F", "syndrome5F"),
-    ("astris5T", "syndrome5T"),
+    ("macar5F", "syndrome5F"),
+    ("macar5T", "syndrome5T"),
 ])
 def test_validate_draw_True(luf, syndrome, request):
     """From https://miguendes.me/how-to-use-fixtures-as-arguments-in-pytestmarkparametrize."""
@@ -49,35 +49,35 @@ def test_validate_draw_consistency(sf, syndrome, request):
     nT = lufT.validate(syndrome, draw=True)
     assert nF == nT
 
-def test_advance_physicals(astris: LUF):
-    n_nodes = len(astris.CODE.NODES)
+def test_advance_physicals(macar: LUF):
+    n_nodes = len(macar.CODE.NODES)
     with (
-        mock.patch("localuf.decoders.luf.AstrisNode.advance") as vn_advance,
+        mock.patch("localuf.decoders.luf.MacarNode.advance") as vn_advance,
         mock.patch("localuf.decoders.luf.Controller.advance") as c_advance,
     ):
-        astris._advance()
+        macar._advance()
         assert vn_advance.call_count == n_nodes
         c_advance.assert_called_once_with()
 
-def test_advance_unphysicals_growth(astris: LUF):
-    n_nodes = len(astris.CODE.NODES)
-    with mock.patch("localuf.decoders.luf.AstrisNode.update_accessibles") as ua:
-        astris._advance()
+def test_advance_unphysicals_growth(macar: LUF):
+    n_nodes = len(macar.CODE.NODES)
+    with mock.patch("localuf.decoders.luf.MacarNode.update_accessibles") as ua:
+        macar._advance()
         assert ua.call_count == n_nodes
 
-def test_advance_unphysicals_merge(astris: LUF):
-    n_nodes = len(astris.CODE.NODES)
-    astris._advance()
-    with mock.patch("localuf.decoders.luf.AstrisNode.update_after_merge_step") as step:
-        astris._advance()
+def test_advance_unphysicals_merge(macar: LUF):
+    n_nodes = len(macar.CODE.NODES)
+    macar._advance()
+    with mock.patch("localuf.decoders.luf.MacarNode.update_after_merge_step") as step:
+        macar._advance()
         assert step.call_count == n_nodes
 
-def test_advance_unphysicals_sync(astris: LUF):
-    n_nodes = len(astris.CODE.NODES)
+def test_advance_unphysicals_sync(macar: LUF):
+    n_nodes = len(macar.CODE.NODES)
     for _ in range(3):
-        astris._advance()
-    with mock.patch("localuf.decoders.luf.AstrisNode.update_after_sync_step") as uass:
-        astris._advance()
+        macar._advance()
+    with mock.patch("localuf.decoders.luf.MacarNode.update_after_sync_step") as uass:
+        macar._advance()
         assert uass.call_count == n_nodes
 
 @pytest.mark.parametrize("sf, syndrome", [

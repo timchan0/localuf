@@ -8,8 +8,8 @@ from localuf.constants import Growth
 from localuf.decoders.luf.constants import Stage
 
 @pytest.mark.parametrize("luf, syndrome", [
-    ("astris5F", "syndrome5F"),
-    ("astris5T", "syndrome5T"),
+    ("macar5F", "syndrome5F"),
+    ("macar5T", "syndrome5T"),
 ])
 def test_not_any_busy_after_growing(luf: LUF, syndrome: set[Node], request):
     luf = request.getfixturevalue(luf)
@@ -19,8 +19,8 @@ def test_not_any_busy_after_growing(luf: LUF, syndrome: set[Node], request):
     assert not any(node.busy for node in luf.NODES.dc.values())
 
 @pytest.mark.parametrize("luf, syndrome", [
-    ("astris5F", "syndrome5F"),
-    ("astris5T", "syndrome5T"),
+    ("macar5F", "syndrome5F"),
+    ("macar5T", "syndrome5T"),
 ])
 def test_not_any_busy_after_presyncing(luf: LUF, syndrome: set[Node], request):
     luf = request.getfixturevalue(luf)
@@ -33,14 +33,14 @@ def test_not_any_busy_after_presyncing(luf: LUF, syndrome: set[Node], request):
             assert not any(node.busy for node in luf.NODES.dc.values())
             assert luf.CONTROLLER.stage is Stage.SYNCING
 
-def test_presyncing_astris(astris: LUF):
+def test_presyncing_macar(macar: LUF):
     for _ in range(2):
-        astris._advance()
+        macar._advance()
     # controller stage now PRESYNC
-    for node in astris.NODES.dc.values():
+    for node in macar.NODES.dc.values():
         node.active = True
-    astris._advance()
-    assert all(not node.active for node in astris.NODES.dc.values())
+    macar._advance()
+    assert all(not node.active for node in macar.NODES.dc.values())
 
 def test_presyncing_actis(actis: LUF):
     actis.CONTROLLER.stage = Stage.PRESYNCING
@@ -50,19 +50,19 @@ def test_presyncing_actis(actis: LUF):
     actis._advance()
     assert all(not node.active for node in actis.NODES.dc.values())
 
-def test_validate_single_isolated_error(astris3F: LUF, actis3Fu: LUF):
+def test_validate_single_isolated_error(macar3F: LUF, actis3Fu: LUF):
     syndrome = {(0, 0), (0, 1)}
     erasure = {((0, 0), (0, 1))}
 
-    n_steps = astris3F.validate(syndrome)
+    n_steps = macar3F.validate(syndrome)
     assert n_steps == 6
-    assert astris3F.erasure == erasure
+    assert macar3F.erasure == erasure
 
     n_steps = actis3Fu.validate(syndrome)
     assert n_steps == 28
     assert actis3Fu.erasure == erasure
 
-def test_validate_vdash_shape(astris3F: LUF, actis3Fu: LUF):
+def test_validate_vdash_shape(macar3F: LUF, actis3Fu: LUF):
     syndrome = {
         (0, 0),
         (1, 0),
@@ -75,9 +75,9 @@ def test_validate_vdash_shape(astris3F: LUF, actis3Fu: LUF):
         ((1, 0), (2, 0)),
     }
 
-    n_steps = astris3F.validate(syndrome)
+    n_steps = macar3F.validate(syndrome)
     assert n_steps == 6
-    assert astris3F.erasure == erasure
+    assert macar3F.erasure == erasure
 
     n_steps = actis3Fu.validate(syndrome)
     assert n_steps == 29
@@ -85,7 +85,7 @@ def test_validate_vdash_shape(astris3F: LUF, actis3Fu: LUF):
 
 def test_validate_sixpack(
         sf3F: Surface,
-        astris3F: LUF,
+        macar3F: LUF,
         actis3Fu: LUF,
 ):
     syndrome = {v for v in sf3F.NODES if not sf3F.is_boundary(v)}
@@ -93,15 +93,15 @@ def test_validate_sixpack(
         sf3F.is_boundary(v) for v in e
     )}
 
-    n_steps = astris3F.validate(syndrome)
+    n_steps = macar3F.validate(syndrome)
     assert n_steps == 8
-    assert astris3F.erasure == erasure
+    assert macar3F.erasure == erasure
 
     n_steps = actis3Fu.validate(syndrome)
     assert n_steps == 31
     assert actis3Fu.erasure == erasure
 
-def test_validate_perp_shape(astris5F: LUF, actis5Fu: LUF):
+def test_validate_perp_shape(macar5F: LUF, actis5Fu: LUF):
     syndrome = {
         (0, 1),
         (1, 0),
@@ -114,9 +114,9 @@ def test_validate_perp_shape(astris5F: LUF, actis5Fu: LUF):
         ((1, 1), (1, 2)),
     }
 
-    n_steps = astris5F.validate(syndrome)
+    n_steps = macar5F.validate(syndrome)
     assert n_steps == 8
-    assert astris5F.erasure == erasure
+    assert macar5F.erasure == erasure
 
     n_steps = actis5Fu.validate(syndrome)
     assert n_steps == 43
@@ -395,7 +395,7 @@ def test_validate_globe_shape(sf9F: Surface):
         ((8, 6), (8, 7))
     }
 
-def test_validate_single_defect(astris3T: LUF, actis3Tu: LUF):
+def test_validate_single_defect(macar3T: LUF, actis3Tu: LUF):
     syndrome: set[Node] = {
         (0, 0, 0),
     }
@@ -406,15 +406,15 @@ def test_validate_single_defect(astris3T: LUF, actis3Tu: LUF):
         ((0, 0, 0), (1, 0, 0))
     }
 
-    n_steps = astris3T.validate(syndrome)
+    n_steps = macar3T.validate(syndrome)
     assert n_steps == 10
-    assert astris3T.erasure == erasure
+    assert macar3T.erasure == erasure
 
     n_steps = actis3Tu.validate(syndrome)
     assert n_steps == 71
     assert actis3Tu.erasure == erasure
 
-def test_validate_square(astris3T: LUF, actis3Tu: LUF):
+def test_validate_square(macar3T: LUF, actis3Tu: LUF):
     syndrome = {
         (0, 0, 0),
         (1, 0, 0),
@@ -428,23 +428,23 @@ def test_validate_square(astris3T: LUF, actis3Tu: LUF):
         ((1, 0, 0), (1, 0, 1))
     }
 
-    n_steps = astris3T.validate(syndrome)
+    n_steps = macar3T.validate(syndrome)
     assert n_steps == 7
-    assert astris3T.erasure == erasure
+    assert macar3T.erasure == erasure
 
     n_steps = actis3Tu.validate(syndrome)
     assert n_steps == 35
     assert actis3Tu.erasure == erasure
 
 
-def test_pointer_digraph(astris3F: LUF, uvw):
+def test_pointer_digraph(macar3F: LUF, uvw):
     u, v, _ = uvw
-    astris3F.NODES.dc[u].pointer = 'W'
-    astris3F.NODES.dc[v].pointer = 'W'
-    astris3F.growth[u, v] = Growth.FULL
-    dig, dig_diedges, dig_edges = astris3F._pointer_digraph
+    macar3F.NODES.dc[u].pointer = 'W'
+    macar3F.NODES.dc[v].pointer = 'W'
+    macar3F.growth[u, v] = Growth.FULL
+    dig, dig_diedges, dig_edges = macar3F._pointer_digraph
     assert type(dig) is nx.DiGraph
-    assert set(dig.nodes) == set(astris3F.CODE.NODES)
+    assert set(dig.nodes) == set(macar3F.CODE.NODES)
     assert set(dig.edges) == {(v, u)}
     assert dig_diedges == [(v, u)]
     assert dig_edges == [(u, v)]

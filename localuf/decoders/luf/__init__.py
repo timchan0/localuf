@@ -2,7 +2,7 @@
 
 from localuf.decoders.luf.constants import Stage
 from localuf.decoders.luf.main import \
-    LUF, Controller, Nodes, AstrisNodes, ActisNodes, \
+    LUF, Controller, Nodes, MacarNodes, ActisNodes, \
     Waiter, OptimalWaiter, UnoptimalWaiter, \
-    _Node, AstrisNode, ActisNode, \
+    _Node, MacarNode, ActisNode, \
     Friendship, ControllerFriendship, NodeFriendship

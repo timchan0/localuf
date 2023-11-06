@@ -1,7 +1,7 @@
 import pytest
 
 from localuf.decoders.uf import direction
-from localuf.decoders.luf import LUF, AstrisNode, ActisNode, _Node, Nodes
+from localuf.decoders.luf import LUF, MacarNode, ActisNode, _Node, Nodes
 from localuf.constants import Growth
 
 # make _Node instantiable
@@ -10,9 +10,9 @@ class ConcreteNode(_Node):
         pass
 
 @pytest.fixture
-def ufn(astris: LUF):
-    v = (0, 0) if astris.NODES.LUF.CODE.DIMENSION==2 else (0, 0, 0)
-    return ConcreteNode(astris.NODES, v)
+def ufn(macar: LUF):
+    v = (0, 0) if macar.NODES.LUF.CODE.DIMENSION==2 else (0, 0, 0)
+    return ConcreteNode(macar.NODES, v)
 
 @pytest.fixture(name="ufn3", params=[
     ("sf3F", "v00"),
@@ -37,7 +37,7 @@ def _ufn3(request):
     'ph-invis',
 ])
 def _n3(request):
-    """Instances of AstrisNode and ActisNode."""
+    """Instances of MacarNode and ActisNode."""
     sf, v = (request.getfixturevalue(s) for s in request.param[:2])
     visible = request.param[2]
     luf = LUF(sf, visible=visible)
@@ -138,7 +138,7 @@ def test_reset(ufn3: _Node):
     ufn3.active = True
     ufn3.busy = True
     pointer = 'E'
-    ufn3.accessibles = {pointer: AstrisNode(ufn3.NODES, ufn3.INDEX)}
+    ufn3.accessibles = {pointer: MacarNode(ufn3.NODES, ufn3.INDEX)}
 
     ufn3.reset()
 
@@ -216,13 +216,13 @@ def test_growing_active(ufn: _Node):
             else:
                 assert luf.growth[e] is Growth.UNGROWN
 
-def test_update_accessibles_2D(astris5F: LUF):
+def test_update_accessibles_2D(macar5F: LUF):
     wce = (0, -1), (0, 0), (0, 1)
-    update_accessibles_helper(astris5F, wce)
+    update_accessibles_helper(macar5F, wce)
 
-def test_update_accessibles_3D(astris5T: LUF):
+def test_update_accessibles_3D(macar5T: LUF):
     wce = (0, -1, 0), (0, 0, 0), (0, 1, 0)
-    update_accessibles_helper(astris5T, wce)
+    update_accessibles_helper(macar5T, wce)
 
 def update_accessibles_helper(luf: LUF, wce):
     w, c, e = wce
@@ -286,8 +286,8 @@ def test_merging_flood_3D(ns3T: Nodes):
 
 def merging_flood_helper(
         node: _Node,
-        north: AstrisNode | ActisNode,
-        west: AstrisNode | ActisNode,
+        north: MacarNode | ActisNode,
+        west: MacarNode | ActisNode,
 ):
     node.accessibles = {'N': north, 'W': west}
     node.merging()

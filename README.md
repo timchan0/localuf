@@ -35,7 +35,7 @@ Install `localuf` Python package locally (using `setup.cfg` and `setup.py`):
 
 `python -m pip install --no-build-isolation --no-deps -e .`
 
-## Visualising Astris
+## Visualising Macar
 
 First, sample an error using physical error probability $p =5 \times 10^{-2}$
 and visualise it on the circuit-level decoding graph:
@@ -52,7 +52,7 @@ Drawing key:
 * bitflipped edges are thick red; else, thin black
 * boundary nodes are blue; defects red; else, green
 
-Next, compute the syndrome, feed it into Astris, and visualise the decoding:
+Next, compute the syndrome, feed it into Macar, and visualise the decoding:
 
 ```python
 luf = localuf.decoders.LUF(sf)
@@ -102,19 +102,19 @@ One should see a threshold around 0.09.
 
 ## Making Runtime Data
 
-Simulate $10^2$ syndrome validations of Astris on the surface code under circuit-level noise,
+Simulate $10^2$ syndrome validations of Macar on the surface code under circuit-level noise,
 for $(d, p) \in \{3, 5, 7, 9\} \times \{10^{-3}, 5\times 10^{-3}, 10^{-2}\}$,
 then plot the data:
 
 ```python
-tAstris = localuf.sim.make_runtime_data(
+tMacar = localuf.sim.make_runtime_data(
     ds=range(3, 11, 2),
     ps=[1e-3, 5e-3, 1e-2],
     n=int(1e2),
     error_model='circuit-level',
     validate_only=True,
 )
-localuf.plot.mean_runtime(tAstris)
+localuf.plot.mean_runtime(tMacar)
 ```
 
 To do the same for Actis, set `visible=False`.

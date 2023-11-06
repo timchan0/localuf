@@ -9,7 +9,7 @@ def _luf(sf: Surface, request):
     return LUF(sf, request.param)
 
 @pytest.fixture
-def astris(sf: Surface):
+def macar(sf: Surface):
     return LUF(sf)
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def _luf3T(sf3T: Surface, request):
     return LUF(sf3T, request.param)
 
 @pytest.fixture
-def astris3F(sf3F: Surface):
+def macar3F(sf3F: Surface):
     return LUF(sf3F)
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def actis3Fu(sf3F: Surface):
     return LUF(sf3F, False, False)
 
 @pytest.fixture
-def astris3T(sf3T: Surface):
+def macar3T(sf3T: Surface):
     return LUF(sf3T)
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def actis3Tu(sf3T: Surface):
     return LUF(sf3T, False, False)
 
 @pytest.fixture
-def astris5F(sf5F: Surface):
+def macar5F(sf5F: Surface):
     return LUF(sf5F)
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def actis5T(sf5T: Surface):
     return LUF(sf5T, False)
 
 @pytest.fixture
-def astris5T(sf5T: Surface):
+def macar5T(sf5T: Surface):
     return LUF(sf5T)
 
 @pytest.fixture(name="ns3F", params=[True, False], ids=["vis", "invis"])

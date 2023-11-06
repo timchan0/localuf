@@ -5,8 +5,8 @@ from localuf.decoders.luf import LUF
 
 # edit be independent of luf!
 @pytest.mark.parametrize("luf, syndrome", [
-    ("astris5F", "syndrome5F"),
-    ("astris5T", "syndrome5T"),
+    ("macar5F", "syndrome5F"),
+    ("macar5T", "syndrome5T"),
 ])
 def test_load(luf: LUF, syndrome: set[Node], request):
     luf = request.getfixturevalue(luf)
