@@ -219,7 +219,8 @@ class Code(abc.ABC):
         boundary_color=constants.BLUE,
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
-        **kwargs
+        error_color=constants.RED,
+        **kwargs,
     ):
         """Draw G using matplotlib.
 
@@ -261,7 +262,7 @@ class Code(abc.ABC):
                 0 for e in self.EDGES
             ]
         edge_color = [
-            'r' if e in error else
+            error_color if e in error else
             'k' for e in self.EDGES
         ]
         nx.draw(
