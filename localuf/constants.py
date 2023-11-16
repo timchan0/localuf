@@ -4,7 +4,7 @@ from enum import IntEnum
 
 from scipy.stats import norm
 
-RED, PASTEL_GREEN, GREEN, BLUE = '#ee8989', '#d3ffce', '#a0dc99', '#96d8ec'
+RED, GREEN, BLUE = '#Ff6666', '#Bef4be', '#9cdaed'
 DARK_GRAY, GRAY, LIGHT_GRAY = '#b6b6b6', '#c6cbd3', '#ecedf0'
 V_WIDE, WIDE, WIDE_MEDIUM, MEDIUM, THIN = 5.0, 3.0, 2.0, 1.0, 0.5
 DEFAULT, SMALL = 300, 50
