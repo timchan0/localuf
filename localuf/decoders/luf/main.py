@@ -196,7 +196,7 @@ class LUF(_BaseUF):
     def draw_growth(
         self,
         highlighted_edges: set[Edge] | None = None,
-        highlighted_edge_color='r',
+        highlighted_edge_color='k',
         unhighlighted_edge_color=constants.DARK_GRAY,
         x_offset=DEFAULT_X_OFFSET,
         labels: dict[Node, str] | None = None,

@@ -405,6 +405,7 @@ class UF(_BaseUF):
         x_offset=constants.DEFAULT_X_OFFSET,
         node_size=constants.SMALL,
         width=constants.WIDE_MEDIUM,
+        correction_color='k',
         **kwargs,
     ):
         """Draw forest and correction from peeling.
@@ -417,7 +418,7 @@ class UF(_BaseUF):
         pos = self.CODE._get_pos(x_offset)
         node_color = self.CODE._get_node_color(self.syndrome)
         edge_color = [
-            'r' if ((u, v) in self.correction) or ((v, u) in self.correction) else
+            correction_color if ((u, v) in self.correction) or ((v, u) in self.correction) else
             constants.GRAY for u, v in dig.edges
         ]
         return nx.draw(
