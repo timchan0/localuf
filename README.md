@@ -5,13 +5,14 @@ A Python package to simulate and visualise Union-Find decoders for CSS codes.
 ## Package Requirements
 
 From conda:
-- python
+- ipykernel
+- ipywidgets
 - matplotlib
 - networkx
-- pytest
-- ipykernel
-- scipy
 - pandas
+- pytest
+- python
+- scipy
 - snakeviz
 - statsmodels
 
@@ -21,7 +22,7 @@ From pip:
 ## Local Installation Instructions
 Create environment called `localuf`:
 
-`conda create -n localuf python matplotlib networkx pytest scipy pandas snakeviz statsmodels ipykernel ipywidgets`
+`conda create -n localuf ipykernel ipywidgets matplotlib networkx pandas pytest python scipy snakeviz statsmodels`
 
 Activate the environment:
 
