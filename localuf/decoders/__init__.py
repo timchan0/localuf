@@ -5,7 +5,9 @@ Available decoders:
 * NodeBUF
 * UF
 * BUF
-* LUF
+* Macar
+* Actis
+* Snowflake
 
 In drawings of UF-type decoders:
 * ungrown edges are invisible
@@ -13,6 +15,9 @@ In drawings of UF-type decoders:
 * fully grown edges are solid
 """
 
-from localuf.decoders.luf import LUF
-from localuf.decoders.node_uf import NodeUF, NodeBUF
-from localuf.decoders.uf import _BaseUF, UF, BUF
+from localuf.decoders.uf import UF
+from localuf.decoders.buf import BUF
+from localuf.decoders.node_uf import NodeUF
+from localuf.decoders.node_buf import NodeBUF
+from localuf.decoders.luf import Macar, Actis
+from localuf.decoders.snowflake import Snowflake

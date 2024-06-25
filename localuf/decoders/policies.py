@@ -1,16 +1,20 @@
-from typing import Any
+from typing import Literal, TYPE_CHECKING
 
 import networkx as nx
 
 from localuf.constants import Growth
 from localuf.type_aliases import Node, Edge
 
+if TYPE_CHECKING:
+    from localuf.decoders._base_uf import BaseUF
+    from localuf.decoders.luf.main import MacarNode, ActisNode, _Node
+
 class _PolicyMixin:
     """Provides `_NODES` and `_growth` attributes."""
 
     def __init__(
             self,
-            nodes: dict[Node, Any],
+            nodes: 'dict[Node, MacarNode] | dict[Node, ActisNode]',
             growth: dict[Edge, Growth],
     ):
         self._NODES = nodes
@@ -49,22 +53,28 @@ class DigraphMaker(_PolicyMixin):
 class DecodeDrawer:
     """Provides `draw_decode`."""
 
-    def __init__(self, fig_width: float):
+    def __init__(
+            self,
+            fig_width: float,
+            fig_height: None | float = None,
+    ):
         self._FIG_WIDTH = fig_width
+        self._FIG_HEIGHT = fig_width if fig_height is None else fig_height
 
     def draw(
             self,
-            history: list,
-            interactive=True,
-            fig_width=None,
+            history: list['BaseUF'],
+            style: Literal['interactive', 'horizontal', 'vertical'] = 'interactive',
+            fig_width: None | float = None,
+            fig_height: None | float = None,
             **kwargs,
     ):
         """Draw the decoder's history."""
         from matplotlib import pyplot as plt
-        if fig_width is None:
-            fig_width = self._FIG_WIDTH
+        if fig_width is None: fig_width = self._FIG_WIDTH
+        if fig_height is None: fig_height = self._FIG_HEIGHT
         n_plots = len(history)
-        if interactive:
+        if style == 'interactive':
             from ipywidgets import interact, BoundedIntText
             @interact(timestep=BoundedIntText(
                 value=1,
@@ -74,12 +84,32 @@ class DecodeDrawer:
                 description="timestep:",
                 disabled=False,
             ))
-            def f(timestep):
-                plt.figure(figsize=(fig_width, fig_width))
+            def f(timestep: int):
+                plt.figure(figsize=(fig_width, fig_height))
                 history[timestep-1].draw_growth(**kwargs)
+        elif style == 'horizontal':
+            plt.figure(figsize=(fig_width*n_plots, fig_height))
+            for k, older_self in enumerate(history, start=1):
+                plt.subplot(1, n_plots, k)
+                older_self.draw_growth(**kwargs)
+            plt.tight_layout()
         else:
-            plt.figure(figsize=(fig_width, fig_width*n_plots))
+            plt.figure(figsize=(fig_width, fig_height*n_plots))
             for k, older_self in enumerate(history, start=1):
                 plt.subplot(n_plots, 1, k)
                 older_self.draw_growth(**kwargs)
             plt.tight_layout()
+
+
+class AccessUpdater(_PolicyMixin):
+    """Updater of access.
+    
+    Currently unused!
+    """
+
+    def update(self, node: '_Node'):
+        node.access = {
+            pointer: self._NODES[e[index]]
+            for pointer, (e, index) in node.NEIGHBORS.items()
+            if self._growth[e] is Growth.FULL
+        }

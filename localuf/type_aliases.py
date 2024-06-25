@@ -1,9 +1,9 @@
 """Module containing type aliases."""
 
+from typing import Literal
+
 import numpy as np
 import numpy.typing as npt
-
-from typing import Literal
 
 
 Node = tuple[int, ...]
@@ -12,17 +12,25 @@ Edge = tuple[Node, Node]
 """Edge index."""
 Coord = tuple
 """Positional coordinate."""
-ErrorModel = Literal[
+DecodingScheme = Literal[
+    'batch',
+    'global batch',
+    'forward',
+    'frugal',
+]
+"""Decoding scheme."""
+NoiseModel = Literal[
     'code capacity',
     'phenomenological',
     'circuit-level',
 ]
+"""Noise model."""
 Parametrization = Literal[
     'standard',
     'balanced',
     'ion trap',
 ]
-"""Affects only circuit-level error model."""
+"""Affects only circuit-level noise model."""
 EdgeType = Literal[
     'S',
     'E westmost',
@@ -53,4 +61,4 @@ FourInts = tuple[
 ]
 """Tuple of 4 integers."""
 MultiplicityVector = npt.NDArray[np.int_]
-"""Array of 4 integers."""
+"""NumPy array of 4 integers."""

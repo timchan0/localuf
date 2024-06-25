@@ -1,7 +1,8 @@
 import pytest
 
 from localuf.type_aliases import Node
-from localuf.decoders.uf import UF
+from localuf.decoders import UF, BUF, NodeBUF
+from localuf.decoders.uf import _Cluster
 from localuf.constants import Growth
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def syndrome7F() -> set[Node]:
 
 @pytest.fixture
 def fixture_test_update_self_after_union():
-    def f(uf_after_union):
+    def f(uf_after_union: tuple[BUF | NodeBUF, _Cluster, _Cluster]):
         buf, larger, smaller = uf_after_union
         # check smaller cluster deleted
         assert smaller.root not in buf.clusters
@@ -76,4 +77,11 @@ def fixture_test_union():
         assert larger.odd
         assert larger.boundary == larger.root
     return f
+
+
+@pytest.fixture
+def uf7F(sf7F):
+    uf_graph = UF(sf7F)
+    uf_graph.history = []
+    return uf_graph
 

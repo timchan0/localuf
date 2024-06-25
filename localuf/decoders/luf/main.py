@@ -1,7 +1,6 @@
 """Classes for local Union--Find decoder."""
 
 import abc
-import copy
 from functools import cached_property
 from typing import Literal
 
@@ -9,15 +8,15 @@ import networkx as nx
 
 from localuf.decoders.luf.constants import Stage, BUSY_SIGNAL_SYMBOLS, ACTIVE_SIGNAL_SYMBOLS
 from localuf.type_aliases import Edge, Node
-from localuf.decoders.uf import _BaseUF, direction
 from localuf.codes import Surface
-from localuf import error_models
+from localuf import noise
 from localuf import constants
 from localuf.constants import Growth
 from localuf.decoders.policies import DigraphMaker, DecodeDrawer
+from localuf.decoders._base_uf import direction, BaseUF
 
 
-class LUF(_BaseUF):
+class LUF(BaseUF):
     """The graph used by local UF decoder.
 
     Extends `_BaseUF`.
@@ -34,10 +33,8 @@ class LUF(_BaseUF):
     i.e. strictly local iff `VISIBLE` is `False`.
     Only computed if `syndrome` not yet an attribute.
     * `_DIGRAPH_MAKER` maker of NetworkX digraph.
-    * `_DECODE_DRAWER` provides `_draw_decode`.
-    * `FIG_WIDTH` figure width used by drawer.
-    * `history` a list of past self snapshots @ each timestep
-    (all w/ same `history` attribute to prevent infinite loop).
+    * `_DECODE_DRAWER` provides `draw_decode`.
+    * `_FIG_WIDTH` figure width used by drawer.
     * `correction` only exists after calling `decode()`.
     * `_pointer_digraph` a NetworkX digraph representing the fully grown edges used by pointers,
     the set of its edges as directed edges,
@@ -55,20 +52,20 @@ class LUF(_BaseUF):
 
     DEFAULT_X_OFFSET = 0.3
 
-    def __init__(self, code: Surface, visible=True, optimal=True):
+    def __init__(self, code: Surface, visible=True, _optimal=True):
         """Input:
         * `code` the code to be decoded.
         * `visible` whether controller has direct connection w/ each node or only node w/ ID 0
         i.e. strictly local iff `visible` is `False`.
-        * `optimal` whether management of `self.NODES.countdown` is optimal.
+        * `_optimal` whether management of `self.NODES.countdown` is optimal.
         Relevant only when `visible` is `False`.
         """
         super().__init__(code)
         self._CONTROLLER = Controller(self)
-        self._NODES = MacarNodes(self) if visible else ActisNodes(self, optimal)
+        self._NODES = MacarNodes(self) if visible else ActisNodes(self, _optimal)
         self._VISIBLE = visible
         self._DIGRAPH_MAKER = DigraphMaker(self.NODES.dc, self.growth)
-        self._DECODE_DRAWER = DecodeDrawer(self.FIG_WIDTH)
+        self._DECODE_DRAWER = DecodeDrawer(self._FIG_WIDTH, fig_height=self._FIG_HEIGHT)
 
     @property
     def CONTROLLER(self): return self._CONTROLLER
@@ -86,8 +83,9 @@ class LUF(_BaseUF):
             log_history=False,
             **kwargs,
     ):
-        """Additional inputs over `BaseDecoder.decode()`:
+        """Additional inputs over those of `Decoder.decode()`:
         * `log_history` whether to populate `history` attribute.
+        * `kwargs` passed to `self.draw_decode()`.
 
         Output:
         * `tSV` # timesteps to validate syndrome.
@@ -103,7 +101,7 @@ class LUF(_BaseUF):
         )
         tBP = self.peel(log_history)
         if draw:
-            self._draw_decode(**kwargs)
+            self.draw_decode(**kwargs)
         return tSV, tBP
 
     def validate(
@@ -128,20 +126,17 @@ class LUF(_BaseUF):
         tSV = 0
         log_history |= draw
         if log_history:
-            self.history: list[LUF] = []
+            self.init_history()
             while self.CONTROLLER.stage is not Stage.BURNING:
                 self._advance()
-                self.history.append(copy.deepcopy(
-                    self,
-                    memo={id(self.history): self.history}
-                ))
+                self.append_history()
                 tSV += 1
         else:
             while self.CONTROLLER.stage is not Stage.BURNING:
                 self._advance()
                 tSV += 1
         if draw:
-            self._draw_decode(**kwargs)
+            self.draw_decode(**kwargs)
         return tSV
 
     def peel(self, log_history: bool):
@@ -158,10 +153,7 @@ class LUF(_BaseUF):
         if log_history:
             while self.CONTROLLER.stage is not Stage.DONE:
                 self._advance()
-                self.history.append(copy.deepcopy(
-                    self,
-                    memo={id(self.history): self.history}
-                ))
+                self.append_history()
                 tBP += 1
         else:
             while self.CONTROLLER.stage is not Stage.DONE:
@@ -189,7 +181,7 @@ class LUF(_BaseUF):
         self.NODES.update_unphysicals()  # nonphysical
         growth_changed = self.CONTROLLER.advance()  # physical
         if growth_changed:  # nonphsyical
-            self.NODES.update_accessibles()
+            self.NODES.update_access()
 
     # DRAWERS
 
@@ -206,11 +198,16 @@ class LUF(_BaseUF):
         anyon_color='k',
         active_shape='s',
         width=constants.WIDE_MEDIUM,
+        boundary_color=constants.BLUE,
+        defect_color=constants.RED,
+        nondefect_color=constants.GREEN,
+        show_boundary_defects=True,
+        defect_label_color='k',
         **kwargs,
     ):
         g = self.CODE.GRAPH
         dig, dig_diedges, dig_edges = self._pointer_digraph
-        pos = self.CODE._get_pos(x_offset)
+        pos = self.CODE.get_pos(x_offset)
         if highlighted_edges is None:
             try:
                 highlighted_edges = self.correction
@@ -225,7 +222,15 @@ class LUF(_BaseUF):
         # node-related kwargs
         inactive_nodelist = [v for v, node in self.NODES.dc.items() if not node.active]
         inactive_node_color, inactive_edgecolors = \
-            self._get_node_color_and_edgecolors(nodes_w_anyons, inactive_nodelist, anyon_color)
+            self._get_node_color_and_edgecolors(
+                outlined_nodes=nodes_w_anyons,
+                nodelist=inactive_nodelist,
+                outline_color=anyon_color,
+                boundary_color=boundary_color,
+                defect_color=defect_color,
+                nondefect_color=nondefect_color,
+                show_boundary_defects=show_boundary_defects,
+            )
         
         # edge-related kwargs
         edgelist = [
@@ -242,8 +247,6 @@ class LUF(_BaseUF):
         nx.draw(
             g,
             pos=pos,
-            with_labels=True,
-            labels=labels,
             nodelist=inactive_nodelist,
             node_size=node_size,
             node_color=inactive_node_color,
@@ -259,7 +262,18 @@ class LUF(_BaseUF):
         # DRAW ACTIVE NODES
         active_nodelist = [v for v, node in self.NODES.dc.items() if node.active]
         active_node_color, active_edgecolors = \
-            self._get_node_color_and_edgecolors(nodes_w_anyons, active_nodelist, anyon_color)
+            self._get_node_color_and_edgecolors(
+                outlined_nodes=nodes_w_anyons,
+                nodelist=active_nodelist,
+                outline_color=anyon_color,
+                boundary_color=boundary_color,
+                defect_color=defect_color,
+                nondefect_color=nondefect_color,
+                show_boundary_defects=show_boundary_defects,
+            )
+            # need not actually pass `show_boundary_defects`
+            # as boundary nodes are never active
+            # but include in case need test correctness
         nx.draw_networkx_nodes(
             g,
             pos,
@@ -285,31 +299,30 @@ class LUF(_BaseUF):
             edge_color=dig_edge_color, # type: ignore
         )
 
-    def _get_node_color_and_edgecolors(
-            self,
-            nodes_w_anyons: set[Node],
-            nodelist: list[Node],
-            anyon_color: str,
-    ):
-        """Return `node_color`, `edgecolors` kwargs for `networkx.draw()`."""
-        node_color = self.CODE._get_node_color(self.syndrome, nodelist=nodelist)
-        edgecolors = [anyon_color if v in nodes_w_anyons else color
-                        for v, color in zip(nodelist, node_color)]
-        return node_color, edgecolors
-    
+        # DRAW LABELS (defect labels `defect_label_color`; nondefect, black)
+        defect_labels = {v: label for v, label in labels.items() if v in self.syndrome}
+        nondefect_labels = {v: label for v, label in labels.items() if v not in self.syndrome}
+        nx.draw_networkx_labels(g, pos, labels=defect_labels, font_color=defect_label_color)
+        nx.draw_networkx_labels(g, pos, labels=nondefect_labels)
+
+
     @property
     def _pointer_digraph(self): return self._DIGRAPH_MAKER.pointer_digraph
     
-    def _draw_decode(self, **kwargs):
+    def draw_decode(self, **kwargs):
         self._DECODE_DRAWER.draw(self.history, **kwargs)
 
     @property
-    def FIG_WIDTH(self):
-        return max(1,
-            self.CODE.D
-            * (2*self.CODE.DIMENSION-1)
-            / (1+self.VISIBLE)
-            / 2)
+    def _FIG_WIDTH(self):
+        return max(1, self.CODE.D * self._FIG_FACTOR)
+
+    @property
+    def _FIG_HEIGHT(self):
+        return max(1, (self.CODE.D-1) * self._FIG_FACTOR)
+    
+    @property
+    def _FIG_FACTOR(self):
+        return 3*(self.CODE.DIMENSION-1) / (1+self.VISIBLE) / 2
 
 
 class Controller:
@@ -342,7 +355,7 @@ class Controller:
         """
         growth_changed = self.stage is Stage.PEELING
         if not self.LUF.NODES.busy:  # stage complete
-            if self.stage < Stage.N_SV_STAGES:  # in syndrome validation
+            if self.stage < Stage.SV_STAGE_COUNT:  # in syndrome validation
                 if self.stage is Stage.SYNCING and self.LUF.NODES.valid:
                     # syndrome validation done
                     self.stage = Stage.BURNING
@@ -350,7 +363,7 @@ class Controller:
                     if self.stage is Stage.GROWING:
                         growth_changed = True
                     self.stage += Stage.INCREMENT
-                    self.stage %= Stage.N_SV_STAGES
+                    self.stage %= Stage.SV_STAGE_COUNT
             else:
                 growth_changed = True
                 self.stage += Stage.INCREMENT
@@ -375,7 +388,7 @@ class Nodes(abc.ABC):
     def __init__(self, luf: LUF) -> None:
         """Input: `luf` the LUF object which has these nodes."""
         self._LUF = luf
-        self.dc: dict[Node, MacarNode | ActisNode]
+        self.dc: dict[Node, _Node]
 
     @property
     def LUF(self): return self._LUF
@@ -409,23 +422,23 @@ class Nodes(abc.ABC):
             for node in self.dc.values():
                 node.update_after_sync_step()
 
-    def update_accessibles(self):
-        """Update accessibles for all nodes.
+    def update_access(self):
+        """Update access for all nodes.
         
         Call after growth has changed.
         """
         for node in self.dc.values():
-            node.update_accessibles()
+            node.update_access()
     
     def labels(self, show_global=True):
         """Return the labels dictionary for the drawer.
         
         Input:
-        * `show_global` whether to prepend the global label to the top-left node label.
+        `show_global` whether to prepend the global label to the top-left node label.
         
         Output:
-        * `result` a dictionary where each
-        key a measure qubit index as a tuple;
+        `result` a dictionary where each
+        key a node index as a tuple;
         value, the label for the node at that index.
         """
         result = {
@@ -433,8 +446,8 @@ class Nodes(abc.ABC):
             for v, node in self.dc.items()
         }
         if show_global:
-            top_left = (0, -1, self.LUF.CODE.D-1) \
-                if self.LUF.CODE.DIMENSION==3 else (0, -1)
+            code = self.LUF.CODE
+            top_left = (0, -1, code.D-1) if code.DIMENSION == 3 else (0, -1)
             result[top_left] = self._global_label + result[top_left]
         return result
 
@@ -495,9 +508,9 @@ class ActisNodes(Nodes):
 
         d = luf.CODE.D
         # see https://switowski.com/blog/type-vs-isinstance/
-        if isinstance(luf.CODE.ERROR_MODEL, error_models.CodeCapacity):
+        if isinstance(luf.CODE.NOISE, noise.CodeCapacity):
             self._SPAN = 2*d  # 1 + (d-1) + d
-        elif isinstance(luf.CODE.ERROR_MODEL, error_models.Phenomenological):
+        elif isinstance(luf.CODE.NOISE, noise.Phenomenological):
             self._SPAN = 3*d - 1  # 1 + (d-1) + d + (d-1)
         else: # CircuitLevel
             self._SPAN = d + 1  # 1 + d
@@ -550,9 +563,9 @@ class ActisNodes(Nodes):
         super().update_unphysicals()
         for node in self.dc.values():
             node.update_unphysicals_for_actis()
-        self.update_unphysicals_for_actis()
+        self._update_unphysicals_for_actis()
 
-    def update_unphysicals_for_actis(self):
+    def _update_unphysicals_for_actis(self):
         """`next_{busy, active}_signal` -> `{busy, active}_signal`."""
 
         self.busy_signal = self.next_busy_signal
@@ -584,8 +597,9 @@ class Waiter(abc.ABC):
     @property
     def NODES(self): return self._NODES
 
-    @abc.abstractproperty
-    def received_busy_signal(self):
+    @property
+    @abc.abstractmethod
+    def received_busy_signal(self) -> bool:
         """Whether to set `countdown` to `RECEIVING_START`."""
 
     def advance(self):
@@ -601,8 +615,8 @@ class Waiter(abc.ABC):
         [and furthest node (which is a boundary) can be busy].
         * SYNCING is `span` as it takes `span-1` timesteps
         (`span-1` .. -1 .. 1)
-        for information to go from furthest bulk node to controller
-        (furthest boundary never busy nor active).
+        for information to go from furthest detector to controller
+        (furthest boundary node never busy nor active).
         """
         self.NODES.busy = True
         if self.NODES.countdown == 0:  # stage complete
@@ -625,7 +639,7 @@ class OptimalWaiter(Waiter):
 
     Extends `Waiter`.
     
-    Class constants:
+    Additional class constants:
     * `RECEIVING_WINDOW` the countdown values
     during which the waiter considers busy signals.
     """
@@ -673,6 +687,7 @@ class _Node(abc.ABC):
     * `NEIGHBORS` a dictionary where each
     key a pointer string;
     value, a tuple of the form (edge, index of edge which is neighbor).
+    * `_IS_BOUNDARY` whether node is a boundary node.
     * `defect` whether the node is a defect.
     * `active` whether the cluster the node is in is active.
     * `cid` the ID of the cluster the node belongs to.
@@ -684,7 +699,7 @@ class _Node(abc.ABC):
     * `next_anyon` the provisional `anyon` for the next timestep.
     * `pointer` the direction the node sends anyons along.
     * `busy` whether the node changes any of its attributes in the current timestep.
-    * `accessibles` refers to neighbors along fully grown edges.
+    * `access` refers to neighbors along fully grown edges.
     In the form of a dictionary of where each
     key a pointer string;
     value, the `_Node` object in the direction of that pointer.
@@ -706,7 +721,7 @@ class _Node(abc.ABC):
     }
 
     def __init__(self, nodes: Nodes, index: Node) -> None:
-        """Inputs:
+        """Input:
         * `nodes` the Nodes object the node belongs to.
         * `index` the index of the node.
         """
@@ -718,7 +733,7 @@ class _Node(abc.ABC):
         node will look at neighbors in order of this list,
         so order matters!
         """
-        if isinstance(nodes.LUF.CODE.ERROR_MODEL, error_models.CodeCapacity):
+        if isinstance(nodes.LUF.CODE.NOISE, noise.CodeCapacity):
             i, j = index
             provisional_neighbors = (
                 ('N', ((i-1, j), index), 0),
@@ -734,7 +749,7 @@ class _Node(abc.ABC):
             u = ('U', (index, (i, j, t+1)), 1)
             e = ('E', (index, (i, j+1, t)), 1)
             s = ('S', (index, (i+1, j, t)), 1)
-            if isinstance(nodes.LUF.CODE.ERROR_MODEL, error_models.Phenomenological):
+            if isinstance(nodes.LUF.CODE.NOISE, noise.Phenomenological):
                 provisional_neighbors = (n, w, d, u, e, s)
             else: # 'circuit-level'
                 provisional_neighbors = (
@@ -754,6 +769,7 @@ class _Node(abc.ABC):
             for pointer, e, e_index in provisional_neighbors
             if e in nodes.LUF.CODE.INCIDENT_EDGES[index]
         }
+        self._IS_BOUNDARY = nodes.LUF.CODE.is_boundary(index)
         self.reset()
 
     @property
@@ -778,7 +794,7 @@ class _Node(abc.ABC):
         self.next_anyon = False
         self.pointer: direction = 'C'
         self.busy = False
-        self.accessibles: dict[direction, MacarNode | ActisNode] = {}
+        self.access: dict[direction, _Node] = {}
 
     def make_defect(self):
         """Make the node a defect."""
@@ -797,33 +813,33 @@ class _Node(abc.ABC):
             for e in edges_to_grow:
                 g.growth[e] += Growth.INCREMENT
 
-    def update_accessibles(self):
-        """Update accessibles.
+    def update_access(self):
+        """Update access.
         
         Call after growth has changed.
         """
-        self.accessibles = {
+        self.access = {
             pointer: self.NODES.dc[e[index]]
             for pointer, (e, index) in self.NEIGHBORS.items()
             if self.NODES.LUF.growth[e] is Growth.FULL
         }
 
     def merging(self):
-        """Relay anyon, and update CID and pointer depending on accessibles."""
+        """Relay anyon, and update CID and pointer depending on access."""
         self.busy = False
         if all((
-            not self.NODES.LUF.CODE.is_boundary(self.INDEX),
+            not self._IS_BOUNDARY,
             self.pointer != 'C',
             self.anyon,
         )):  # relay along pointer
             self.busy = True
-            self.accessibles[self.pointer].next_anyon ^= True
+            self.access[self.pointer].next_anyon ^= True
             self.anyon = False
-        for pointer, accessible in self.accessibles.items():
-            if accessible.cid < self.next_cid:
+        for pointer, neighbor in self.access.items():
+            if neighbor.cid < self.next_cid:
                 self.busy = True
                 self.pointer = pointer
-                self.next_cid = accessible.cid
+                self.next_cid = neighbor.cid
 
     def presyncing(self):
         """Initialise for syncing stage i.e. update after merge stage.
@@ -832,7 +848,7 @@ class _Node(abc.ABC):
         else, set `active = False`.
         """
         self.active = all((
-            not self.NODES.LUF.CODE.is_boundary(self.INDEX),
+            not self._IS_BOUNDARY,
             self.pointer == 'C',
             self.anyon,
         ))
@@ -850,9 +866,9 @@ class _Node(abc.ABC):
         self.next_anyon = False
     
     def syncing(self):
-        """Update `active` depending on accessibles."""
+        """Update `active` depending on access."""
         self.busy = not self.active and any(
-            accessible.active for accessible in self.accessibles.values()
+            neighbor.active for neighbor in self.access.values()
         )
 
     def update_after_sync_step(self):
@@ -877,15 +893,15 @@ class _Node(abc.ABC):
         even if it is incident to exactly one fully grown edge.
         """
         self.busy = False
-        if self.pointer != 'C' and len(self.accessibles) == 1:
+        if self.pointer != 'C' and len(self.access) == 1:
             self.busy = True
-            pointer, accessible = next(iter(self.accessibles.items()))
-            e = self.NEIGHBORS[pointer][0]
+            pointer, neighbor = next(iter(self.access.items()))
+            e, _ = self.NEIGHBORS[pointer]
             self.NODES.LUF.growth[e] = Growth.UNGROWN
             if self.defect:
                 self.defect = False
                 self.NODES.LUF.correction.add(e)
-                accessible.defect ^= True
+                neighbor.defect ^= True
     
     def get_label(self):
         """Return node information for drawer."""
@@ -939,7 +955,7 @@ class ActisNode(_Node):
     def __init__(self, nodes: ActisNodes, index: Node) -> None:
 
         d = nodes.LUF.CODE.D
-        if isinstance(nodes.LUF.CODE.ERROR_MODEL, error_models.CircuitLevel):
+        if isinstance(nodes.LUF.CODE.NOISE, noise.CircuitLevel):
             i, j, t = index
             depth = max(i, j+1, t)  # distance to node 0
             self._SPAN = d - depth  # `d` the staging & signalling tree height
@@ -1053,7 +1069,8 @@ class Friendship(abc.ABC):
     @property
     def NODE(self): return self._NODE
 
-    def update_stage(self):
+    @abc.abstractmethod
+    def update_stage(self) -> bool:
         """Update stage depending on neighbors and return whether stage changed."""
 
     def update_stage_helper(self, relayee: Controller | ActisNode):
@@ -1072,7 +1089,7 @@ class Friendship(abc.ABC):
         return changed
 
     @abc.abstractmethod
-    def relay_signals(self):
+    def relay_signals(self) -> None:
         """Relay `{busy, active}_signal` toward controller."""
 
 
@@ -1104,7 +1121,7 @@ class NodeFriendship(Friendship):
     """
 
     def __init__(self, node: ActisNode) -> None:
-        if isinstance(node.NODES.LUF.CODE.ERROR_MODEL, error_models.CircuitLevel):
+        if isinstance(node.NODES.LUF.CODE.NOISE, noise.CircuitLevel):
             i, j, t = node.INDEX
             self._RELAYEE = (
                 i-1 if i > 0 else i,
@@ -1132,7 +1149,7 @@ class NodeFriendship(Friendship):
         super().__init__(node)
 
     @property
-    def RELAYEE(self): return self._RELAYEE
+    def RELAYEE(self) -> Node: return self._RELAYEE
 
     def update_stage(self):
         changed = self.update_stage_helper(self.NODE.NODES.dc[self.RELAYEE])

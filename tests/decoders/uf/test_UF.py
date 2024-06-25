@@ -155,9 +155,9 @@ def test_make_tree(uf7F: UF, syndrome7F):
     uf7F.validate(syndrome7F)
     assert uf7F._make_tree((0, 2)) == []
     assert uf7F._make_tree((0, 0)) == [(((0, 0), (0, 1)), (0, 1))]
-    tree = uf7F._make_tree((2, -1))
-    assert tree[0] == (((2, -1), (2, 0)), (2, 0))
-    assert set(tree[1:]) == {
+    first, *rest = uf7F._make_tree((2, -1))
+    assert first == (((2, -1), (2, 0)), (2, 0))
+    assert set(rest) == {
         (((1, 0), (2, 0)), (1, 0)),
         (((2, 0), (2, 1)), (2, 1)),
         (((2, 0), (3, 0)), (3, 0))

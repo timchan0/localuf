@@ -86,16 +86,3 @@ def get_uf_after_union():
         uf._union(larger, smaller)
         return uf, larger, smaller
     return f
-
-
-@pytest.fixture
-def uf7F(sf7F):
-    uf_graph = UF(sf7F)
-    uf_graph.history = []
-    return uf_graph
-
-
-@pytest.fixture
-def uvw():
-    u, v, w = (0, 0), (0, 1), (0, 2)
-    return u, v, w

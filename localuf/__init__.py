@@ -17,13 +17,16 @@ Available functions:
 * get_failure_data
 * get_log_runtime_data
 * get_stats
+* get_failure_data_from_SS
+* from_merging_to_all
 """
 
 
 # print(f'Invoking __init__.py for {__name__}')
 # below correct (see https://github.com/psf/requests/blob/v2.23.0/requests/__init__.py#L112)
-from localuf.codes import Surface, Repetition
+from localuf.codes import Repetition, Surface
 from localuf import decoders
 from localuf import plot
 from localuf import sim
-from localuf.data_processors import get_failure_data, get_log_runtime_data, get_stats
+from localuf.data_processors import get_failure_data, get_log_runtime_data, \
+    get_stats, get_failure_data_from_SS, from_merging_to_all

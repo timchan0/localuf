@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 
 from localuf.constants import Growth
@@ -107,7 +109,7 @@ def test_grow(uf7F: NodeUF, fixture_test_grow):
     sq, c = fixture_test_grow(uf7F)
 
     # test nonboundaries removed
-    for _ in range(2):
+    for _ in itertools.repeat(None, 2):
         uf7F._growth_round(
             dynamic=False,
             log_history=False,

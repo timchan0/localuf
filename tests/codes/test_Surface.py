@@ -1,19 +1,8 @@
-import itertools
-
 import pytest
 
-from localuf.codes import Surface
-from localuf.error_models import CodeCapacity
-
-@pytest.fixture(
-        name="sfCL",
-        params=itertools.product(range(3, 9, 2), range(2, 5)),
-        ids=lambda x: f"d{x[0]} wh{x[1]}",
-)
-def _sfCL(request):
-    d, wh = request.param
-    return Surface(d=d, error_model='circuit-level', window_height=wh)
-
+from localuf import Surface
+from localuf.noise import CodeCapacity
+from localuf._schemes import Forward
 
 def test_N_EDGES_attribute(sf: Surface):
     assert type(sf.N_EDGES) is int
@@ -22,12 +11,36 @@ def test_N_EDGES_attribute(sf: Surface):
 def test_EDGES_attribute(sf: Surface):
     assert type(sf.EDGES) is tuple
 
-def test_NODES(sf: Surface):
-    assert type(sf.NODES) is tuple
-    if isinstance(sf.ERROR_MODEL, CodeCapacity):
-        assert len(sf.NODES) == sf.D * (sf.D+1)
-    else:  # _Phenomenological | _CircuitLevel
-        assert len(sf.NODES) == sf.D**2 * (sf.D+1)
+
+class TestNODES:
+
+
+    @pytest.fixture(
+            name="sf_forward",
+            params=range(3, 11, 2),
+            ids=lambda x: f"d{x}",
+    )
+    def _sf_forward(self, request):
+        return Surface(
+            d=request.param,
+            noise='phenomenological',
+            scheme='forward',
+    )
+
+    def test_batch(self, sf: Surface):
+        assert type(sf.NODES) is tuple
+        if isinstance(sf.NOISE, CodeCapacity):
+            assert len(sf.NODES) == sf.D * (sf.D+1)
+        else:  # Phenomenological | CircuitLevel
+            assert len(sf.NODES) == sf.D**2 * (sf.D+1)
+
+
+    def test_forward(self, sf_forward: Surface):
+        assert type(sf_forward.NODES) is tuple
+        assert len(sf_forward.NODES) == sf_forward.D * (
+            (sf_forward.D+1) * sf_forward.SCHEME.WINDOW_HEIGHT
+            + sf_forward.D-1
+        )
 
 def test_LONG_AXIS_attribute(sf: Surface):
     assert sf.LONG_AXIS == 1
@@ -55,94 +68,168 @@ def test_index_label_consistency(sf: Surface, request):
         assert sf.index_to_label(sf.label_to_index(a)) == a
 
 def test_get_pos(sf3F: Surface):
-    pos = sf3F._get_pos()
+    pos = sf3F.get_pos()
     assert type(pos) is dict
 
 
-@pytest.fixture
-def index_to_id_helper():
-    def f(sf: Surface):
-        d = sf.D
-        boundary_IDs: set[int] = set()
-        bulk_IDs: set[int] = set()
-        for v in sf.NODES:
-            id_ = sf.index_to_id(v)
-            if sf.is_boundary(v):
-                boundary_IDs.add(id_)
-            else:
-                bulk_IDs.add(id_)
-        assert max(boundary_IDs) < min(bulk_IDs)
-        return d, boundary_IDs, bulk_IDs
-    return f
+class TestIndexToId:
 
 
-def test_index_to_id_2D(sf5F: Surface, index_to_id_helper):
-    d, boundary_IDs, bulk_IDs = index_to_id_helper(sf5F)
-    assert len(boundary_IDs) + len(bulk_IDs) == d * (d+1)
-    # highest ID boundary node
-    assert sf5F.index_to_id((d-1, d-1)) == 2*d - 1
-    # highest ID bulk node
-    assert sf5F.index_to_id((d-1, d-2)) == d * (d+1) - 1
+    @pytest.fixture
+    def helper(self):
+        def f(sf: Surface):
+            d = sf.D
+            boundary_IDs: set[int] = set()
+            detector_IDs: set[int] = set()
+            for v in sf.NODES:
+                id_ = sf.index_to_id(v)
+                if sf.is_boundary(v):
+                    boundary_IDs.add(id_)
+                else:
+                    detector_IDs.add(id_)
+            assert max(boundary_IDs) < min(detector_IDs)
+            return d, boundary_IDs, detector_IDs
+        return f
 
 
-def test_index_to_id_3D(sf5T: Surface, index_to_id_helper):
-    d, boundary_IDs, bulk_IDs = index_to_id_helper(sf5T)
-    assert len(boundary_IDs) + len(bulk_IDs) == d**2 * (d+1)
-    assert sf5T.index_to_id((d-1, d-1, d-1)) == 2 * d**2 - 1
-    assert sf5T.index_to_id((d-1, d-2, d-1)) == d**2 * (d+1) - 1
+    def test_2D(self, sf5F: Surface, helper):
+        d, boundary_IDs, detector_IDs = helper(sf5F)
+        assert len(boundary_IDs) + len(detector_IDs) == d * (d+1)
+        # highest ID boundary node
+        assert sf5F.index_to_id((d-1, d-1)) == 2*d - 1
+        # highest ID detector
+        assert sf5F.index_to_id((d-1, d-2)) == d * (d+1) - 1
 
 
-def test_make_circuit_level_inputs(sfCL: Surface):
-    d, wh = sfCL.D, sfCL.SCHEME.WINDOW_HEIGHT
+    def test_3D(self, sf5T: Surface, helper):
+        d, boundary_IDs, detector_IDs = helper(sf5T)
+        assert len(boundary_IDs) + len(detector_IDs) == d**2 * (d+1)
+        assert sf5T.index_to_id((d-1, d-1, d-1)) == 2 * d**2 - 1
+        assert sf5T.index_to_id((d-1, d-2, d-1)) == d**2 * (d+1) - 1
 
-    edges, edge_dict, merges = sfCL._make_circuit_level_inputs(d=d, wh=wh, merge_redundant_edges=True)
-    len_merges = 2 * (wh-1) * (2*d-1)
 
-    assert type(edges) is tuple
-    assert len(edges) == sfCL.N_EDGES
-    assert len(set(edges)) == sfCL.N_EDGES
+class TestCircuitLevelEdges:
 
-    assert type(edge_dict) is dict
-    assert len(edge_dict) == 12
-    assert sum(len(es) for es in edge_dict.values()) == sfCL.N_EDGES + len_merges
 
-    assert type(merges) is dict
-    assert len(merges) == len_merges
+    def helper(self, sfCL: Surface, temporal_boundary: bool):
+        d, h = sfCL.D, sfCL.SCHEME.WINDOW_HEIGHT
+        layer_count = h if temporal_boundary else h-1
+        len_merges = 2 * layer_count * (2*d-1)
+        horizontal_edge_count = h * sfCL.DATA_QUBIT_COUNT
+        u_per_layer = d*(d-1)
+        sd_per_layer = (d-1)**2
 
-    assert set(edges) & set(merges.keys()) == set()
+        n_edges, edges, edge_dict, merges = sfCL._circuit_level_edges(
+            h=h,
+            temporal_boundary=temporal_boundary,
+            merge_redundant_edges=True,
+        )
 
-    eu_edge_NS = tuple(((i, j, t), (i, j+1, t+1)) for i in      (0, d-1) for j in range(d-2) for t in range(wh-1))
-    eu_edge_EW = tuple(((i, j, t), (i, j+1, t+1)) for i in range(1, d-1) for j in  (-1, d-2) for t in range(wh-1))
-    assert edge_dict['EU edge'][:len(eu_edge_NS)] == eu_edge_NS
-    assert edge_dict['EU edge'][len(eu_edge_NS):] == eu_edge_EW
+        eu_per_layer = d*(d-2)
+        seu_per_layer = (d-1)*(d-2)
+        timelike_edge_count = layer_count * (u_per_layer + sd_per_layer + eu_per_layer + seu_per_layer)
+        assert n_edges == horizontal_edge_count + timelike_edge_count
+        assert sfCL.N_EDGES == n_edges
+        assert type(edges) is tuple
+        assert len(edges) == n_edges
+        assert len(set(edges)) == n_edges  # test uniqueness
 
-    assert set(edge_dict['SEU']) == {
-        ((i, j, t), (i+1, j+1, t+1))
-        for i in range(d-1)
-        for j in range(-1, d-1)
-        for t in range(wh-1)
-    }
-    assert len(edge_dict['SEU']) == (d-1) * d * (wh-1)
+        assert type(edge_dict) is dict
+        assert len(edge_dict) == 12
+        assert sum(len(es) for es in edge_dict.values()) == sfCL.N_EDGES + len_merges
 
-    edges, edge_dict_False, merges = sfCL._make_circuit_level_inputs(d=d, wh=wh, merge_redundant_edges=False)
+        assert type(merges) is dict
+        assert len(merges) == len_merges
 
-    assert len(edges) == sfCL.N_EDGES + len_merges
-    assert len(set(edges)) == sfCL.N_EDGES + len_merges
-    assert merges is None
-    assert edge_dict_False == edge_dict
+        assert set(edges) & set(merges.keys()) == set()
+
+        n_edges, edges, edge_dict_False, merges = sfCL._circuit_level_edges(
+            h=h,
+            temporal_boundary=temporal_boundary,
+            merge_redundant_edges=False,
+        )
+
+        eu_per_layer = d**2
+        seu_per_layer = d*(d-1)
+        timelike_edge_count = layer_count * (u_per_layer + sd_per_layer + eu_per_layer + seu_per_layer)
+        assert n_edges == horizontal_edge_count + timelike_edge_count
+        assert n_edges == sfCL.N_EDGES + len_merges
+        assert len(edges) == n_edges
+        assert len(set(edges)) == n_edges
+        assert merges is None
+        assert edge_dict_False == edge_dict
+
+        return d, layer_count, edge_dict
+
+
+    def test_temporal_boundary_False(self, sfCL: Surface):
+        d, layer_count, edge_dict = self.helper(sfCL, False)
+
+        eu_edge_NS = tuple(((i, j, t), (i, j+1, t+1)) for i in ( 0, d-1) for j in range(   d-2) for t in range(layer_count))
+        eu_edge_EW = tuple(((i, j, t), (i, j+1, t+1)) for j in (-1, d-2) for i in range(1, d-1) for t in range(layer_count))
+        assert edge_dict['EU edge'] == (*eu_edge_NS, *eu_edge_EW)
+
+        seu_bulk     = tuple(((i, j, t), (i+1, j+1, t+1)) for i in range(d-1) for j in range(d-2) for t in range(layer_count))
+        seu_boundary = tuple(((i, j, t), (i+1, j+1, t+1)) for j in  (-1, d-2) for i in range(d-1) for t in range(layer_count))
+        assert edge_dict['SEU'] == (*seu_boundary, *seu_bulk)
+        assert set(edge_dict['SEU']) == {
+            ((i, j, t), (i+1, j+1, t+1))
+            for i in range(d-1)
+            for j in range(-1, d-1)
+            for t in range(layer_count)
+        }
+        assert len(edge_dict['SEU']) == (d-1) * d * layer_count
+
+
+    def test_temporal_boundary_True(self, sfCL_OL: Surface):
+        d, layer_count, edge_dict = self.helper(sfCL_OL, True)
+
+        eu_edge_NS = tuple(((i, j, t), (i, j+1, t+1)) for i in ( 0, d-1) for j in range(   d-2) for t in range(layer_count))
+        eu_edge_W = tuple(((i,  -1, t), (i,   0, t+1)) for i in range(1, d-1) for t in range(-1, layer_count-1))
+        eu_edge_E = tuple(((i, d-2, t), (i, d-1, t+1)) for i in range(1, d-1) for t in range(    layer_count  ))
+        assert edge_dict['EU edge'] == (*eu_edge_NS, *eu_edge_W, *eu_edge_E)
+
+        seu_bulk = tuple(((i, j, t), (i+1, j+1, t+1)) for i in range(d-1) for j in range(d-2) for t in range(layer_count))
+        seu_W = tuple(((i, -1, t), (i+1, 0, t+1)) for i in range(d-1) for t in range(-1, layer_count-1))
+        seu_E = tuple(((i, d-2, t), (i+1, d-1, t+1)) for i in range(d-1) for t in range(layer_count))
+        assert edge_dict['SEU'] == (*seu_W, *seu_E, *seu_bulk)
+        assert len(edge_dict['SEU']) == (d-1) * d * layer_count
+
+
+    @pytest.mark.parametrize("buffer_height", range(1, 4), ids=lambda x: f"buffer_height {x}")
+    @pytest.mark.parametrize("merge_redundant_edges", [False, True], ids=lambda x: f"merge_redundant_edges {x}")
+    def test_t_start(self, sfCL_OL_scheme: Forward, buffer_height, merge_redundant_edges):
+        code = sfCL_OL_scheme._CODE
+        commit_height = sfCL_OL_scheme._COMMIT_HEIGHT
+        n_commit_edges, commit_edges, commit_edge_dict, commit_merges = code._circuit_level_edges(
+            h=commit_height,
+            temporal_boundary=True,
+            merge_redundant_edges=merge_redundant_edges,
+        )
+        n_fresh_edges, fresh_edges, fresh_edge_dict, fresh_merges = code._circuit_level_edges(
+            h=commit_height,
+            temporal_boundary=True,
+            merge_redundant_edges=merge_redundant_edges,
+            t_start=buffer_height,
+        )
+        assert n_fresh_edges == n_commit_edges
+        assert fresh_edges == tuple(code.raise_edge(e, buffer_height) for e in commit_edges)
+        assert fresh_edge_dict == {edge_type: tuple(
+            code.raise_edge(e, buffer_height) for e in edges
+        ) for edge_type, edges in commit_edge_dict.items()}
+        if merge_redundant_edges:
+            assert fresh_merges == {
+                code.raise_edge(e, buffer_height):
+                code.raise_edge(substitute, buffer_height)
+                for e, substitute in commit_merges.items() # type: ignore
+            }
+        else:
+            assert fresh_merges is None
+            assert commit_merges is None
 
 
 def test_substitute(sf3F: Surface, sf3T: Surface):
-    d = 3
-    assert sf3F._substitute(d, ((0, -1), (1, 0))) == ((1, -1), (1, 0))
-    assert sf3F._substitute(d, ((2, 1), (1, 2))) == ((2, 1), ((2, 2)))
-    assert sf3T._substitute(d, ((0, -1, 0), (1, 0, 1))) == ((1, -1, 1), (1, 0, 1))
-    assert sf3T._substitute(d, ((2, 1, 1), (2, 2, 2))) == ((2, 1, 1), (2, 2, 1))
-
-
-def test_get_matching_graph(sfCL: Surface):
-    p = 1e-1
-    matching = sfCL.get_matching_graph(p)
-    assert matching.num_edges == sfCL.N_EDGES
-    assert matching.num_detectors == sfCL.D * (sfCL.D-1) * sfCL.SCHEME.WINDOW_HEIGHT
-    assert matching.num_fault_ids == 1
+    assert sf3F._substitute(((0, -1), (1, 0))) == ((1, -1), (1, 0))
+    assert sf3F._substitute(((2, 1), (1, 2))) == ((2, 1), ((2, 2)))
+    assert sf3T._substitute(((0, -1, 0), (1, 0, 1))) == ((1, -1, 1), (1, 0, 1))
+    assert sf3T._substitute(((2, 1, 1), (2, 2, 2))) == ((2, 1, 1), (2, 2, 1))

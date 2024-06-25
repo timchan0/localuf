@@ -18,10 +18,12 @@ class Stage(IntEnum):
     """Constants for stage values."""
 
     INCREMENT = 1
-    N_SV_STAGES = 4
-    N_BP_STAGES = 3
-    GROWING, MERGING, PRESYNCING, SYNCING = range(N_SV_STAGES)
-    BURNING, PEELING, DONE = range(N_SV_STAGES, N_SV_STAGES+N_BP_STAGES)
+    SV_STAGE_COUNT = 4
+    """Syndrome validation stage count."""
+    BP_STAGE_COUNT = 3
+    """Burning & peeling stage count."""
+    GROWING, MERGING, PRESYNCING, SYNCING = range(SV_STAGE_COUNT)
+    BURNING, PEELING, DONE = range(SV_STAGE_COUNT, SV_STAGE_COUNT+BP_STAGE_COUNT)
 
     def __iadd__(self, other: 'Stage'):
         return Stage(self.value + other.value)
