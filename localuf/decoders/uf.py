@@ -250,11 +250,11 @@ class UF(BaseUF):
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
         show_boundary_defects=True,
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
         """Draw spanning forest.
 
-        `kwargs` passed to `networkx.draw()`.
+        `kwargs_for_networkx_draw` passed to `networkx.draw()`.
         
         Note: Not as informative as draw_peel().
         """
@@ -274,7 +274,7 @@ class UF(BaseUF):
             node_color=node_color,
             width=width,
             edge_color=edge_color,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
 
     def draw_peel(
@@ -287,11 +287,11 @@ class UF(BaseUF):
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
         show_boundary_defects=True,
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
         """Draw forest and correction from peeling.
 
-        `kwargs` passed to `networkx.draw()`.
+        `kwargs_for_networkx_draw` passed to `networkx.draw()`.
         
         Note: Requires calling `peel()` first.
         """
@@ -316,14 +316,14 @@ class UF(BaseUF):
             node_color=node_color,
             width=width,
             edge_color=edge_color,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
 
     def draw_decode(
             self,
             fig_width: float | None = None,
             fig_height: float | None = None,
-            **kwargs,
+            **kwargs_for_networkx_draw,
     ):
         from matplotlib import pyplot as plt
         if fig_width is None: fig_width = self._FIG_WIDTH
@@ -334,10 +334,10 @@ class UF(BaseUF):
             plt.subplot(n_plots, 1, k)
             older_self.draw_growth(
                 highlighted_edges=older_self.changed_edges,
-                **kwargs,
+                **kwargs_for_networkx_draw,
             )
         plt.subplot(n_plots, 1, n_plots)
-        self.draw_peel(**kwargs)
+        self.draw_peel(**kwargs_for_networkx_draw)
         plt.tight_layout()
 
     @property

@@ -12,6 +12,7 @@ from localuf import constants
 from localuf.type_aliases import Coord, Edge, EdgeType, Node
 from localuf._inner_init_helper import InnerInitHelper
 from localuf._base_classes import Code
+from localuf._schemes import Batch
 
 
 class Repetition(Code):
@@ -59,15 +60,19 @@ class Repetition(Code):
     def index_to_id(self, index: Node):
         """Return ID of node at index (j,) or (j, t)."""
         d = self.D
+        h = self.SCHEME.WINDOW_HEIGHT
         if len(index) == 2:
             j, t = index
             if j == -1:  # on west boundary
                 return 2*t
             elif j == d-1:  # on east boundary
                 return 2*t + 1
+            elif t == h:  # on temporal boundary
+                spatial_boundary_count = 2*h
+                return spatial_boundary_count + j
             else:  # not a boundary
-                n_boundaries = 2 * self.SCHEME.WINDOW_HEIGHT
-                return n_boundaries + (d-1)*t + j
+                boundary_count = 2*h if isinstance(self.SCHEME, Batch) else 2*h + d-1
+                return boundary_count + (d-1)*t + j
         else:  # 1
             j, = index
             return j+1
@@ -258,18 +263,21 @@ class Surface(Code):
             elif j == d-1:  # on east boundary
                 return 2*i + 1
             else:  # not a boundary
-                n_boundaries = 2 * d
-                return n_boundaries + (d-1)*i + j
+                boundary_count = 2 * d
+                return boundary_count + (d-1)*i + j
         else:  # 3
             h = self.SCHEME.WINDOW_HEIGHT
             i, j, t = index
-            if j == -1:
+            if j == -1:  # on west boundary
                 return 2*h*i + t
-            elif j == d-1:
+            elif j == d-1:  # on east boundary
                 return (2*i + 1) * h + t
-            else:
-                n_boundaries = 2 * d * h
-                return n_boundaries + h*(d-1)*i + h*j + t
+            elif t == h:  # on temporal boundary
+                spatial_boundary_count = 2*d*h
+                return spatial_boundary_count + (d-1)*i + j
+            else:  # not a boundary
+                boundary_count = 2*d*h if isinstance(self.SCHEME, Batch) else 2*d*h + d*(d-1)
+                return boundary_count + h*(d-1)*i + h*j + t
 
     def get_pos(self, x_offset: float = constants.DEFAULT_X_OFFSET) -> dict[Node, Coord]:
         if self.DIMENSION == 2:

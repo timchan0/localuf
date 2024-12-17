@@ -52,7 +52,7 @@ class Batch(Scheme):
 
         Input:
         * `decoder` the decoder.
-        * `p` physical error probability.
+        * `p` noise level.
 
         Output: `0` if success else `1`.
         """
@@ -119,13 +119,10 @@ class Global(Batch):
         for e in leftover:
             self.pairs.load(e)
         ct: int = 0
-        visited: set[Node] = set()
-        for u, v in self.pairs.dc.items():
-            if u not in visited:
-                pair_separation = abs(u[self._CODE.LONG_AXIS] - v[self._CODE.LONG_AXIS])
-                if pair_separation == self._CODE.D:
-                    ct += 1
-                visited.add(v)
+        for u, v in self.pairs.as_set:
+            pair_separation = abs(u[self._CODE.LONG_AXIS] - v[self._CODE.LONG_AXIS])
+            if pair_separation == self._CODE.D:
+                ct += 1
         return ct
 
 
@@ -142,6 +139,8 @@ class _Streaming(Scheme):
     * `pairs` a set of node pairs defining free anyon strings.
     Used to count logical error strings.
     * `_LOGICAL_COUNTER` for `get_logical_error`.
+    * `step_counts` a list in which each entry is the decoder timestep count of `d` decoding cycles.
+    Populated when `run` is called.
 
     Overriden methods:
     * `get_logical_error`
@@ -177,6 +176,7 @@ class _Streaming(Scheme):
             long_axis=code.LONG_AXIS,
             time_axis=code.TIME_AXIS,
         )
+        self.step_counts = []
 
     @property
     def WINDOW_HEIGHT(self): return self._COMMIT_HEIGHT + self._BUFFER_HEIGHT
@@ -185,6 +185,7 @@ class _Streaming(Scheme):
     def reset(self):
         """Factory reset."""
         self.pairs.reset()
+        self.step_counts.clear()
 
     def get_logical_error(self):
         """Count logical errors completed in current commit.
@@ -218,6 +219,8 @@ class Forward(_Streaming):
     * `get_logical_error`
     * `run`
     """
+
+    step_counts: list[int | tuple[int, int] | None]
 
     @staticmethod
     def __str__() -> str:
@@ -323,37 +326,47 @@ class Forward(_Streaming):
             n: int,
             draw=False,
             log_history=False,
-            **kwargs,
+            **kwargs_for_draw_run,
     ):
+        """Simulate `n` decoding cycles given `p`.
+        
+        Input:
+        * `decoder` the decoder.
+        * `p` noise level.
+        * positive integer `n` is decoding cycle count.
+
+        Output: tuple of (failure count, slenderness).
+
+        Side effect: Populate `self.step_counts` with `n-1` entries,
+        each being the step count of one decoding cycle.
+        """
         log_history |= draw
         self.reset()
+        if n == 0: return 0, 0
         m = 0
         commit_leftover: set[Edge] = set()
         buffer_leftover = self._make_error_in_buffer_region(p)
         # `cleanse_count` additional decoding cycles ensures window is free of defects
         cleanse_count = self.WINDOW_HEIGHT // self._COMMIT_HEIGHT
-        probs = itertools.chain(itertools.repeat(p, n-1), itertools.repeat(0, cleanse_count))
         if log_history:
             self.history: list[tuple[set[Edge], set[Edge], set[Node]]] = []
-            for prob in probs:
-                error = self._make_error(buffer_leftover, prob)
-                artificial_defects = self._get_artificial_defects(commit_leftover)
-                syndrome = self._CODE.get_syndrome(error) ^ artificial_defects
-                decoder.reset()
-                decoder.decode(syndrome)
-                commit_leftover, buffer_leftover = self._get_leftover(error, decoder.correction)
-                m += self.get_logical_error(commit_leftover)
+        for prob, time in itertools.chain(
+            itertools.repeat((p, True), n-1),
+            itertools.repeat((0, False), cleanse_count),
+        ):
+            error = self._make_error(buffer_leftover, prob)
+            artificial_defects = self._get_artificial_defects(commit_leftover)
+            syndrome = self._CODE.get_syndrome(error) ^ artificial_defects
+            decoder.reset()
+            step_count = decoder.decode(syndrome)
+            if time:
+                self.step_counts.append(step_count)
+            commit_leftover, buffer_leftover = self._get_leftover(error, decoder.correction)
+            if log_history:
                 self.history.append((error, commit_leftover | buffer_leftover, artificial_defects))
-            if draw:
-                self._draw_run(**kwargs)
-        else:
-            for prob in probs:
-                error = self._make_error(buffer_leftover, prob)
-                syndrome = self._get_syndrome(commit_leftover, error)
-                decoder.reset()
-                decoder.decode(syndrome)
-                commit_leftover, buffer_leftover = self._get_leftover(error, decoder.correction)
-                m += self.get_logical_error(commit_leftover)
+            m += self.get_logical_error(commit_leftover)
+        if draw:
+            self._draw_run(**kwargs_for_draw_run)
         return m, (self._BUFFER_HEIGHT + (n-1)*self._COMMIT_HEIGHT) / self._CODE.D
 
     def _draw_run(
@@ -391,8 +404,6 @@ class Frugal(_Streaming):
 
     Additional attributes:
     * `error` a set of edges.
-    * `step_counts` a list in which each entry is the decoder timestep count of `d` decoding cycles.
-    Populated when `run` is called.
     * `_temporal_boundary_syndrome` the set of defects in the temporal boundary of the viewing window.
 
     Overriden methods:
@@ -407,20 +418,19 @@ class Frugal(_Streaming):
     def __init__( self, code, commit_height, buffer_height, commit_edges):
         super().__init__(code, commit_height, buffer_height, commit_edges)
         self.error: set[Edge] = set()
-        self.step_counts: list[int] = []
         self._temporal_boundary_syndrome: set[Node] = set()
+        self.step_counts: list[int]
 
     def reset(self):
         super().reset()
         self.error.clear()
-        self.step_counts.clear()
         self._temporal_boundary_syndrome.clear()
 
     def advance(self, prob: float, decoder: Decoder, **kwargs) -> int:
         """Advance 1 decoding cycle.
 
         Input:
-        * `prob` instantaneous physical error probability.
+        * `prob` instantaneous noise level.
         * `decoder` the frugal-compatible decoder to use.
         * `log_history, time_only` arguments of `decoder.decode`.
 
@@ -473,15 +483,14 @@ class Frugal(_Streaming):
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
-            **kwargs,
+            **kwargs_for_draw_decode,
     ):
         """Simulate `n*d` decoding cycles given `p`.
 
         Input:
         * `decoder` the decoder.
-        * `p` physical error probability.
-        * positive integer `n` is slenderness :=
-        (measurement round count + 1) / (code distance).
+        * `p` noise level.
+        * positive integer `n` is slenderness := (layer count) / (code distance).
         * `draw` whether to draw.
         * `log_history` whether to populate `history` attribute.
         * `time_only` whether runtime includes a timestep
@@ -490,8 +499,8 @@ class Frugal(_Streaming):
         or each unrooting step only ('unrooting').
         Note: changing from 'merging' to 'all' simply increases each step count by 2d
         [for a total step count increase of 2d(n-1)].
-        This can be done post-run via `from_merging_to_all`.
-        * `kwargs` passed to `decoder.draw_decode`
+        This can be done post-run via `add_ignored_timesteps`.
+        * `kwargs_for_draw_decode` passed to `decoder.draw_decode`
         e.g. `margins=(0.1, 0.1)`.
 
         Output: tuple of (failure count, `n`).
@@ -501,6 +510,7 @@ class Frugal(_Streaming):
         """
         d = self._CODE.D
         self.reset()
+        if n == 0: return 0, 0
         decoder.reset()
         if draw:
             log_history = draw
@@ -524,5 +534,5 @@ class Frugal(_Streaming):
             if time:
                 self.step_counts.append(step_count)
         if draw:
-            decoder.draw_decode(**kwargs)
+            decoder.draw_decode(**kwargs_for_draw_decode)
         return m, n

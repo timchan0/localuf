@@ -67,7 +67,7 @@ class DecodeDrawer:
             style: Literal['interactive', 'horizontal', 'vertical'] = 'interactive',
             fig_width: None | float = None,
             fig_height: None | float = None,
-            **kwargs,
+            **kwargs_for_networkx_draw,
     ):
         """Draw the decoder's history."""
         from matplotlib import pyplot as plt
@@ -86,18 +86,18 @@ class DecodeDrawer:
             ))
             def f(timestep: int):
                 plt.figure(figsize=(fig_width, fig_height))
-                history[timestep-1].draw_growth(**kwargs)
+                history[timestep-1].draw_growth(**kwargs_for_networkx_draw)
         elif style == 'horizontal':
             plt.figure(figsize=(fig_width*n_plots, fig_height))
             for k, older_self in enumerate(history, start=1):
                 plt.subplot(1, n_plots, k)
-                older_self.draw_growth(**kwargs)
+                older_self.draw_growth(**kwargs_for_networkx_draw)
             plt.tight_layout()
         else:
             plt.figure(figsize=(fig_width, fig_height*n_plots))
             for k, older_self in enumerate(history, start=1):
                 plt.subplot(n_plots, 1, k)
-                older_self.draw_growth(**kwargs)
+                older_self.draw_growth(**kwargs_for_networkx_draw)
             plt.tight_layout()
 
 

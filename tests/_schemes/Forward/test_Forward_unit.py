@@ -76,13 +76,13 @@ def test_get_logical_error_repetition(forward_rp: Forward):
     ts = [0, forward_rp._COMMIT_HEIGHT-1]
     paths = [{((j, t), (j+1, t)) for j in range(-1, d-1)} for t in ts]
     assert forward_rp.get_logical_error(set()) == 0
-    assert forward_rp.pairs.dc == {}
+    assert forward_rp.pairs._dc == {}
     assert forward_rp.get_logical_error(paths[0]) == 1
-    assert forward_rp.pairs.dc == {}
+    assert forward_rp.pairs._dc == {}
     assert forward_rp.get_logical_error(paths[1]) == 1
-    assert forward_rp.pairs.dc == {}
+    assert forward_rp.pairs._dc == {}
     assert forward_rp.get_logical_error(paths[0] | paths[1]) == 2
-    assert forward_rp.pairs.dc == {}
+    assert forward_rp.pairs._dc == {}
 
 
 def test_get_logical_error_surface(sf_ol: Forward):
@@ -92,13 +92,13 @@ def test_get_logical_error_surface(sf_ol: Forward):
     ts = [0, h-1]
     paths = [{((0, j, t), (0, j+1, t)) for j in range(-1, d-1)} for t in ts]
     assert sf_ol.get_logical_error(set()) == 0
-    assert sf_ol.pairs.dc == {}
+    assert sf_ol.pairs._dc == {}
     assert sf_ol.get_logical_error(paths[0]) == 1
-    assert sf_ol.pairs.dc == {}
+    assert sf_ol.pairs._dc == {}
     assert sf_ol.get_logical_error(paths[1]) == 1
-    assert sf_ol.pairs.dc == {}
+    assert sf_ol.pairs._dc == {}
     assert sf_ol.get_logical_error(paths[0] | paths[1]) == 2
-    assert sf_ol.pairs.dc == {}
+    assert sf_ol.pairs._dc == {}
 
     commit_leftover = {
         ((0, 0, h-1), (0, 0, h)),
@@ -107,7 +107,7 @@ def test_get_logical_error_surface(sf_ol: Forward):
     }
     assert sf_ol.get_logical_error(commit_leftover) == 0
     # test pair with zero j separation not ignored
-    assert sf_ol.pairs.dc == {
+    assert sf_ol.pairs._dc == {
         (0, 0, 0): (1, 0, 0),
         (1, 0, 0): (0, 0, 0),
     }
@@ -176,6 +176,12 @@ class TestRun:
             commit_height=c,
             buffer_height=b,
         ).SCHEME
+    
+    def test_zero_cycles(self, forward: Forward):
+        decoder = UF(forward._CODE)
+        m, slenderness = forward.run(decoder, 1, 0)
+        assert m == 0
+        assert slenderness == 0
 
     @pytest.mark.parametrize("n", range(1, 4), ids=lambda x: f"n{x}")
     def test_commit_equals_buffer(self, forward: Forward, n: int):
@@ -183,19 +189,21 @@ class TestRun:
         uf.correction = set()
         p = 0.5
         cleanse_count = forward.WINDOW_HEIGHT // forward._COMMIT_HEIGHT
+        commit_leftover = set()
         with (
             mock.patch(
             "localuf._schemes.Forward._make_error_in_buffer_region",
             return_value=set()
         ) as mock_meibr,
             mock.patch("localuf._schemes.Forward._make_error") as mock_me,
-            mock.patch("localuf._schemes.Forward._get_syndrome") as mock_gs,
+            mock.patch("localuf._schemes.Forward._get_artificial_defects") as mock_gad,
+            mock.patch("localuf.codes.Repetition.get_syndrome") as mock_gs,
+            mock.patch("localuf.decoders.uf.UF.reset") as mock_reset,
             mock.patch("localuf.decoders.uf.UF.decode") as mock_decode,
             mock.patch(
             "localuf._schemes.Forward._get_leftover",
             return_value=(set(), set())
         ) as mock_gl,
-            mock.patch("localuf.decoders.uf.UF.reset") as mock_reset,
             mock.patch(
             "localuf._schemes.Forward.get_logical_error",
             return_value=1
@@ -208,11 +216,13 @@ class TestRun:
             mock_meibr.assert_called_once_with(p)
             assert mock_me.call_args_list == (n-1)*[mock.call(set(), p)] \
                 + cleanse_count*[mock.call(set(), 0)]
-            assert mock_gs.call_args_list == [mock.call(set(), mock_me.return_value)] * (n-1 + cleanse_count)
-            assert mock_decode.call_args_list == [mock.call(mock_gs.return_value)] * (n-1 + cleanse_count)
-            assert mock_gl.call_args_list == [mock.call(mock_me.return_value, uf.correction)] * (n-1 + cleanse_count)
+            assert mock_gad.call_args_list == [mock.call(commit_leftover)] * (n-1 + cleanse_count)
+            assert mock_gs.call_args_list == [mock.call(mock_me.return_value)] * (n-1 + cleanse_count)
+            syndrome = mock_gs.return_value ^ mock_gad.return_value
             assert mock_reset.call_args_list == [mock.call()] * (n-1 + cleanse_count)
-            assert mock_gle.call_args_list == [mock.call(set())] * (n-1 + cleanse_count)
+            assert mock_decode.call_args_list == [mock.call(syndrome)] * (n-1 + cleanse_count)
+            assert mock_gl.call_args_list == [mock.call(mock_me.return_value, uf.correction)] * (n-1 + cleanse_count)
+            assert mock_gle.call_args_list == [mock.call(commit_leftover)] * (n-1 + cleanse_count)
 
 
 def test_make_error(forward3F: Forward):

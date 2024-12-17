@@ -13,38 +13,38 @@ class Pairs:
     @property
     def as_set(self):
         """Return the set of pairs."""
-        result: set[Edge] = set()
+        set_: set[Edge] = set()
         visited: set[Node] = set()
-        for u, v in self.dc.items():
+        for u, v in self._dc.items():
             if u not in visited:
-                result.add((u, v))
+                set_.add((u, v))
                 visited.add(v)
-        return result
+        return set_
 
     def __init__(self) -> None:
-        self.dc: dict[Node, Node] = {}
+        self._dc: dict[Node, Node] = {}
 
     def reset(self):
         """Factory reset."""
-        self.dc.clear()
+        self._dc.clear()
 
     def __contains__(self, u: Node):
         """Return whether u is in the set."""
-        return u in self.dc
+        return u in self._dc
 
     def __getitem__(self, u: Node):
         """Return v if uv is in the set."""
-        return self.dc[u]
+        return self._dc[u]
 
     def add(self, u: Node, v: Node):
         """Add pair uv."""
-        self.dc[u] = v
-        self.dc[v] = u
+        self._dc[u] = v
+        self._dc[v] = u
 
     def remove(self, u: Node):
         """Remove pair containing u."""
-        v = self.dc.pop(u)
-        del self.dc[v]
+        v = self._dc.pop(u)
+        del self._dc[v]
 
     def load(self, e: Edge):
         """Load edge `e` onto `dc`."""
@@ -100,17 +100,14 @@ class LogicalCounter:
         lowered by commit height.
         """
         ct: int = 0
-        visited: set[Node] = set()
         new_pairs = Pairs()
-        for u, v in pairs.dc.items():
-            if u not in visited:
-                pair_separation = abs(u[self._LONG_AXIS] - v[self._LONG_AXIS])
-                if pair_separation == self._D:
-                    ct += 1
-                elif not (pair_separation == 0 and u[self._LONG_AXIS] in {-1, self._D-1}):
-                    new_pairs.load((
-                        self._lower_node(u),
-                        self._lower_node(v),
-                    ))
-                visited.add(v)
+        for u, v in pairs.as_set:
+            pair_separation = abs(u[self._LONG_AXIS] - v[self._LONG_AXIS])
+            if pair_separation == self._D:
+                ct += 1
+            elif not (pair_separation == 0 and u[self._LONG_AXIS] in {-1, self._D-1}):
+                new_pairs.load((
+                    self._lower_node(u),
+                    self._lower_node(v),
+                ))
         return ct, new_pairs

@@ -25,6 +25,11 @@ def snowflake(rp_frugal: Repetition):
 
 
 @pytest.fixture
+def snowflake_one_one(rp_frugal: Repetition):
+    return Snowflake(rp_frugal, schedule='1:1')
+
+
+@pytest.fixture
 def snowflake3():
     rp = Repetition(
         3,
@@ -32,6 +37,16 @@ def snowflake3():
         scheme='frugal',
     )
     return Snowflake(rp)
+
+
+@pytest.fixture
+def snowflake3_one_one():
+    rp = Repetition(
+        3,
+        noise='phenomenological',
+        scheme='frugal',
+    )
+    return Snowflake(rp, schedule='1:1')
 
 
 @pytest.fixture

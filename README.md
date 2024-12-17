@@ -1,6 +1,7 @@
 # localuf (Local Union-Find)
 
-A Python package to simulate and visualise Union-Find decoders for CSS codes.
+A Python package to simulate and visualise
+Union-Find-related decoders for CSS codes.
 All UML class diagrams can be found in `uml_class_diagrams.md`.
 
 ## Package Requirements
@@ -39,7 +40,7 @@ Install `localuf` Python package locally (using `setup.cfg` and `setup.py`):
 
 ## Visualising Macar
 
-First, sample an error using physical error probability $p =5 \times 10^{-2}$
+First, sample an error using noise level $p =5 \times 10^{-2}$
 and visualise it on the circuit-level decoding graph:
 
 ```python
@@ -51,8 +52,11 @@ code.draw(error, with_labels=False);
 ```
 
 Drawing key:
-* bitflipped edges are thick red; else, thin black
-* boundary nodes are blue; defects red; else, green
+* defects are red nodes;
+other detectors, green;
+boundary nodes, blue
+* bitflipped edges are thick and red;
+else, thin and black
 
 Next, compute the syndrome, feed it into Macar, and visualise the decoding:
 
@@ -84,10 +88,12 @@ for $(d, p) \in \{3, 5, 7\} \times \{0.06, 0.08, 0.1, 0.12\}$:
 ```python
 import numpy as np
 
+ds = range(3, 9, 2)
+ps = np.linspace(0.05, 0.15, 4)
+n = int(1e4)
+
 fUF = localuf.sim.accuracy.monte_carlo(
-    ds=range(3, 9, 2),
-    ps=np.linspace(0.06, 0.12, 4),
-    ns=int(1e4),
+    sample_counts={d: [(p, n) for p in ps] for d in ds},
     code_class=localuf.Surface,
     decoder_class=localuf.decoders.UF,
     noise='code capacity',
@@ -97,7 +103,7 @@ fUF = localuf.sim.accuracy.monte_carlo(
 Plot the logical success/failure data:
 
 ```python
-localuf.plot.threshold_data(fUF)
+localuf.plot.accuracy.monte_carlo(fUF);
 ```
 
 One should see a threshold around 0.09.
@@ -116,7 +122,7 @@ tMacar = localuf.sim.runtime.batch(
     noise='circuit-level',
     decoder_class=localuf.decoders.Macar,
 )
-localuf.plot.mean_runtime(tMacar);
+localuf.plot.runtime.mean(tMacar);
 ```
 
 To do the same for Actis, set `decoder_class=localuf.decoders.Actis`.
@@ -146,9 +152,14 @@ code.SCHEME.run(decoder, 0.05, 2, draw='fine')
 The second line essentially calls `_schemes.Frugal.advance` repeatedly.
 Drawing key same as in [Visualising Macar](#visualising-macar) except:
 * `CID` value `reset` is labelled 'R'
-* nodes with `unrooted = true` are outlined in black (anyons no longer exist)
+* nodes with `unrooted = true` are outlined in black (anyons do not exist in Snowflake)
+* nodes with `grown = whole = true` have a `'` after the CID label
+* nodes with `grown = true, whole = false` have a `:` after the CID label
+* nodes with `grown = false, whole = false` have a `,` after the CID label
+* stage labels (D, G, M, g, m) stand for
+(`drop, grow_whole, merging_whole, grow_half, merging_half`)
 
-To draw 1 decoding cycle (instead of timestep) per frame,
+To draw 1 _decoding cycle_ (instead of timestep) per frame,
 change `draw='coarse'`.
 
 ## Making Threshold Data for Snowflake
@@ -156,19 +167,21 @@ change `draw='coarse'`.
 Below is an example of emulating $2 \times 10^3 d$ decoding cycles of
 Snowflake applied to the repetition code under phenomenological noise,
 and plotting the accuracy.
-Generating `fUF` takes about 22 seconds on a MacBook M1.
+Generating `fUF` takes about 26 seconds on a MacBook M1.
 
 ```python
+ds = range(3, 9, 2)
+ps = np.linspace(0.04, 0.14, 4)
+n = int(2e3)
+
 fUF = localuf.sim.accuracy.monte_carlo(
-    ds=range(3, 9, 2),
-    ps=np.linspace(0.04, 0.14, 4),
-    ns=int(2e3),
+    sample_counts={d: [(p, n) for p in ps] for d in ds},
     code_class=localuf.Repetition,
     decoder_class=localuf.decoders.Snowflake,
     noise='phenomenological',
     scheme='frugal',
 )
-localuf.plot.threshold_data(fUF)
+localuf.plot.accuracy.monte_carlo(fUF)
 ```
 
 One should see a threshold around 0.09 as in [Making Threshold Data](#making-threshold-data).

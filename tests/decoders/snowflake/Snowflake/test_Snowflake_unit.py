@@ -108,19 +108,49 @@ def test_init_history(snowflake3: Snowflake):
 tds = "localuf.decoders.snowflake"
 
 
-def test_decode(snowflake3: Snowflake):
+class TestDecode:
+
     syndrome: set[Node] = {(0, 0)}
-    return_value = 'return_value'
-    with (
-        mock.patch(f"{tds}.Snowflake.drop") as mock_drop,
-        mock.patch(
-            f"{tds}.Snowflake.merge",
-            return_value=return_value,
-        ) as mock_merge,
-    ):
-        assert snowflake3.decode(syndrome) == return_value
-        mock_drop.assert_called_once_with(syndrome)
-        mock_merge.assert_called_once_with(False, time_only='merging')
+    time_only = 'merging'
+
+    def two_one(self, snowflake3: Snowflake):
+        log_history = 'fine'
+        return_value = 1
+        with (
+            mock.patch(f"{tds}.Snowflake.append_history") as mock_ah,
+            mock.patch(f"{tds}.Snowflake.drop") as mock_drop,
+            mock.patch(
+                f"{tds}.Snowflake.merge",
+                return_value=return_value,
+            ) as mock_merge,
+        ):
+            assert snowflake3.decode(self.syndrome, log_history=log_history) == 2*return_value
+            assert mock_ah.call_args_list == [mock.call()] * 3
+            mock_drop.assert_called_once_with(self.syndrome)
+            assert mock_merge.call_args_list == [
+                mock.call(True, log_history, time_only=self.time_only),
+                mock.call(False, log_history, time_only=self.time_only),
+            ]
+
+    def one_one(self, snowflake3_one_one: Snowflake):
+        return_value = 'return_value'
+        log_history = 'fine'
+        with (
+            mock.patch(f"{tds}.Snowflake.append_history") as mock_ah,
+            mock.patch(f"{tds}.Snowflake.drop") as mock_drop,
+            mock.patch(
+                f"{tds}.Snowflake.merge",
+                return_value=return_value,
+            ) as mock_merge,
+        ):
+            assert snowflake3_one_one.decode(self.syndrome, log_history=log_history) == return_value
+            assert mock_ah.call_args_list == [mock.call()] * 2
+            mock_drop.assert_called_once_with(self.syndrome)
+            mock_merge.assert_called_once_with(
+                whole=True,
+                log_history=log_history,
+                time_only=self.time_only,
+            )
 
 
 def test_drop(snowflake: Snowflake):
@@ -160,21 +190,9 @@ def test_load(snowflake3: Snowflake):
         assert node.next_defect is (v==nodes[1])
 
 
-def test_grow(snowflake: Snowflake):
-    node_calls = [mock.call()] * len(snowflake.NODES)
-    with (
-        mock.patch(f"{tds}.Snowflake.append_history") as mock_ah,
-        mock.patch(f"{tds}._Node.grow") as mock_growing,
-        mock.patch(f"{tds}._Node.update_access") as mock_ua,
-    ):
-        snowflake.grow('fine')
-        mock_ah.assert_called_once_with()
-        assert mock_growing.call_args_list == node_calls
-        assert mock_ua.call_args_list == node_calls
-
-
 def test_merge(snowflake: Snowflake):
-    node_calls = [mock.call()] * len(snowflake.NODES)
+    whole = True
+    node_count = len(snowflake.NODES)
     t = 0
 
     with (
@@ -182,10 +200,10 @@ def test_merge(snowflake: Snowflake):
         mock.patch(f"{tds}._Node.merging") as mock_merging,
         mock.patch(f"{tds}._Node.update_after_merging") as mock_uam,
     ):
-        assert snowflake.merge('fine') == t
-        mock_ah.assert_called_once_with()
-        assert mock_merging.call_args_list == node_calls
-        assert mock_uam.call_args_list == node_calls
+        assert snowflake.merge(whole, 'fine') == t
+        mock_ah.assert_not_called()
+        assert mock_merging.call_args_list == node_count * [mock.call(whole)]
+        assert mock_uam.call_args_list == node_count * [mock.call()]
 
 
 def test_append_history(snowflake3: Snowflake):

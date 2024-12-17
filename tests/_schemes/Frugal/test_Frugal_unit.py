@@ -60,42 +60,42 @@ def test_reset(frugal3: Frugal):
 def test_get_logical_error_repetition(rp_frugal: Frugal):
 
     assert not rp_frugal.get_logical_error()
-    assert rp_frugal.pairs.dc == {}
+    assert rp_frugal.pairs._dc == {}
     
     u, v = (-1, 0), (0, 0)
-    rp_frugal.pairs.dc = {u: v, v: u}
+    rp_frugal.pairs._dc = {u: v, v: u}
     assert not rp_frugal.get_logical_error()
     uu, vv = (-1, -1), (0, -1)
-    assert rp_frugal.pairs.dc == {uu: vv, vv: uu}
+    assert rp_frugal.pairs._dc == {uu: vv, vv: uu}
 
     u, v = (-1, 0), (rp_frugal._CODE.D-1, 0)
-    rp_frugal.pairs.dc = {u: v, v: u}
+    rp_frugal.pairs._dc = {u: v, v: u}
     assert rp_frugal.get_logical_error()
-    assert rp_frugal.pairs.dc == {}
+    assert rp_frugal.pairs._dc == {}
 
 
 def test_get_logical_error_surface(sf_frugal: Frugal):
     
     assert not sf_frugal.get_logical_error()
-    assert sf_frugal.pairs.dc == {}
+    assert sf_frugal.pairs._dc == {}
 
     u, v = (0, -1, 0), (0, 0, 0)
-    sf_frugal.pairs.dc = {u: v, v: u}
+    sf_frugal.pairs._dc = {u: v, v: u}
     assert not sf_frugal.get_logical_error()
     uu, vv = (0, -1, -1), (0, 0, -1)
-    assert sf_frugal.pairs.dc == {uu: vv, vv: uu}
+    assert sf_frugal.pairs._dc == {uu: vv, vv: uu}
 
     u, v = (0, -1, 0), (0, sf_frugal._CODE.D-1, 0)
-    sf_frugal.pairs.dc = {u: v, v: u}
+    sf_frugal.pairs._dc = {u: v, v: u}
     assert sf_frugal.get_logical_error()
-    assert sf_frugal.pairs.dc == {}
+    assert sf_frugal.pairs._dc == {}
 
     # unique to surface: north--south edge
     u, v = (0, 0, 0), (1, 0, 0)
-    sf_frugal.pairs.dc = {u: v, v: u}
+    sf_frugal.pairs._dc = {u: v, v: u}
     assert not sf_frugal.get_logical_error()
     uu, vv = (0, 0, -1), (1, 0, -1)
-    assert sf_frugal.pairs.dc == {uu: vv, vv: uu}
+    assert sf_frugal.pairs._dc == {uu: vv, vv: uu}
 
 
 def test_advance(frugal3: Frugal):
@@ -134,22 +134,22 @@ def test_raise_window(rp_frugal: Frugal):
     rp_frugal.error = {e, f, g}
     rp_frugal._raise_window()
     assert rp_frugal.error == {e}
-    assert rp_frugal.pairs.dc == {
+    assert rp_frugal.pairs._dc == {
         (-1, 0): (0, 1),
         (0, 1): (-1, 0),
     }
-    rp_frugal.pairs.dc = {
+    rp_frugal.pairs._dc = {
         (-1, -1): (0, 0),
         (0, 0): (-1, -1),
     }
     rp_frugal._raise_window()
     assert rp_frugal.error == set()
-    assert rp_frugal.pairs.dc == {(-1, 0): (-1, -1), (-1, -1): (-1, 0)}
+    assert rp_frugal.pairs._dc == {(-1, 0): (-1, -1), (-1, -1): (-1, 0)}
 
 def raise_window_helper(frugal: Frugal):
     frugal._raise_window()
     assert frugal.error == set()
-    assert frugal.pairs.dc == {}
+    assert frugal.pairs._dc == {}
 
 
 def test_load(rp_frugal: Frugal):
@@ -177,33 +177,41 @@ def test_load(rp_frugal: Frugal):
     assert rp_frugal._temporal_boundary_syndrome == {(0, h)}
 
 
-@pytest.mark.parametrize("n", range(1, 4))
-def test_run(frugal3: Frugal, n: int):
-    decoder = Snowflake(frugal3._CODE)
-    p = 1/2
-    raise_count = frugal3._CODE.D * n
-    height = frugal3._CODE.SCHEME.WINDOW_HEIGHT
-    with (
-        mock.patch("localuf._schemes.Frugal.reset") as mock_reset,
-        mock.patch("localuf.decoders.Snowflake.reset") as snow_reset,
-        mock.patch("localuf._schemes.Frugal.advance") as mock_advance,
-        mock.patch(
-            "localuf._schemes.Frugal.get_logical_error",
-            return_value=1,
-        ) as gle,
-        mock.patch("localuf.decoders.snowflake.Snowflake.init_history") as ih,
-        mock.patch("localuf.decoders.snowflake.Snowflake.draw_decode") as dd,
-    ):
-        assert frugal3.run(decoder, p, n) == (raise_count + 2*height, n)
-        mock_reset.assert_called_once_with()
-        snow_reset.assert_called_once_with()
-        assert mock_advance.call_args_list == \
-            raise_count * [mock.call(p, decoder, log_history=False, time_only='merging')] \
-            + 2*height * [mock.call(0, decoder, log_history=False, time_only='merging')]
-        assert gle.call_args_list == (raise_count + 2*height) * [mock.call()]
-        ih.assert_not_called()
-        dd.assert_not_called()
+class TestRun:
 
-        frugal3.run(decoder, p, n, draw='fine')
-        ih.assert_called_once_with()
-        dd.assert_called_once_with()
+    def test_zero_slenderness(self, frugal3: Frugal):
+        decoder = Snowflake(frugal3._CODE)
+        m, slenderness = frugal3.run(decoder, 1, 0)
+        assert m == 0
+        assert slenderness == 0
+
+    @pytest.mark.parametrize("n", range(1, 4))
+    def test_run(self, frugal3: Frugal, n: int):
+        decoder = Snowflake(frugal3._CODE)
+        p = 1/2
+        raise_count = frugal3._CODE.D * n
+        height = frugal3._CODE.SCHEME.WINDOW_HEIGHT
+        with (
+            mock.patch("localuf._schemes.Frugal.reset") as mock_reset,
+            mock.patch("localuf.decoders.Snowflake.reset") as snow_reset,
+            mock.patch("localuf._schemes.Frugal.advance") as mock_advance,
+            mock.patch(
+                "localuf._schemes.Frugal.get_logical_error",
+                return_value=1,
+            ) as gle,
+            mock.patch("localuf.decoders.snowflake.Snowflake.init_history") as ih,
+            mock.patch("localuf.decoders.snowflake.Snowflake.draw_decode") as dd,
+        ):
+            assert frugal3.run(decoder, p, n) == (raise_count + 2*height, n)
+            mock_reset.assert_called_once_with()
+            snow_reset.assert_called_once_with()
+            assert mock_advance.call_args_list == \
+                raise_count * [mock.call(p, decoder, log_history=False, time_only='merging')] \
+                + 2*height * [mock.call(0, decoder, log_history=False, time_only='merging')]
+            assert gle.call_args_list == (raise_count + 2*height) * [mock.call()]
+            ih.assert_not_called()
+            dd.assert_not_called()
+
+            frugal3.run(decoder, p, n, draw='fine')
+            ih.assert_called_once_with()
+            dd.assert_called_once_with()

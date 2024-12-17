@@ -9,12 +9,12 @@ def test_drop(snowflake3: Snowflake):
     edge = snowflake3.EDGES[u, v]
 
     edge.CONTACT.drop()
-    assert pairs.dc == {}
+    assert pairs._dc == {}
 
     edge.correction = True
     edge.CONTACT.drop()
     assert edge.correction is True
-    assert pairs.dc == {u: v, v: u}
+    assert pairs._dc == {u: v, v: u}
 
     edge.CONTACT.drop()
-    assert pairs.dc == {}
+    assert pairs._dc == {}

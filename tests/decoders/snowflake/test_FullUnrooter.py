@@ -24,7 +24,7 @@ def test_flooding(syncing_flooding_objects: tuple[
     # TEST FINISH UNROOTING
     center.cid = RESET
     center.next_cid = west.ID
-    center.UNROOTER.flooding()
+    center.UNROOTER.flooding_whole()
     assert center.busy
     assert center.next_cid == center.ID
     assert center.next_unrooted
@@ -34,7 +34,7 @@ def test_flooding(syncing_flooding_objects: tuple[
     west.cid = RESET
     center.access = access
     center.pointer = 'W'
-    center.UNROOTER.flooding()
+    center.UNROOTER.flooding_whole()
     assert center.busy
     assert center.next_cid == RESET
     assert center.pointer == 'C'
@@ -42,7 +42,7 @@ def test_flooding(syncing_flooding_objects: tuple[
 
     # TEST UPDATE `pointer`, `cid`
     center.access = access
-    center.UNROOTER.flooding()
+    center.UNROOTER.flooding_half()
     assert center.busy
     assert center.pointer == 'W'
     assert center.next_cid == west.ID

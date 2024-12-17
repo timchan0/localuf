@@ -81,11 +81,11 @@ class LUF(BaseUF):
             syndrome: set[Node],
             draw=False,
             log_history=False,
-            **kwargs,
+            **kwargs_for_draw_decode,
     ):
         """Additional inputs over those of `Decoder.decode()`:
         * `log_history` whether to populate `history` attribute.
-        * `kwargs` passed to `self.draw_decode()`.
+        * `kwargs_for_draw_decode` passed to `self.draw_decode()`.
 
         Output:
         * `tSV` # timesteps to validate syndrome.
@@ -101,7 +101,7 @@ class LUF(BaseUF):
         )
         tBP = self.peel(log_history)
         if draw:
-            self.draw_decode(**kwargs)
+            self.draw_decode(**kwargs_for_draw_decode)
         return tSV, tBP
 
     def validate(
@@ -109,7 +109,7 @@ class LUF(BaseUF):
             syndrome: set[Node],
             draw=False,
             log_history=False,
-            **kwargs,
+            **kwargs_for_draw_decode,
     ):
         """Validate syndrome.
         
@@ -117,9 +117,10 @@ class LUF(BaseUF):
         * `syndrome` the set of defects.
         * `draw` whether to draw.
         * `log_history` whether to populate `history` attribute.
+        * `kwargs_for_draw_decode` passed to `self.draw_decode()`.
 
         Output:
-        * `tSV` # timesteps to validate syndrome.
+        `tSV` # timesteps to validate syndrome.
         Equals `len(self.history)` if `log_history` is `True`.
         """
         self.NODES.load(syndrome)
@@ -136,17 +137,17 @@ class LUF(BaseUF):
                 self._advance()
                 tSV += 1
         if draw:
-            self.draw_decode(**kwargs)
+            self.draw_decode(**kwargs_for_draw_decode)
         return tSV
 
     def peel(self, log_history: bool):
         """Burn & peel after syndrome validation.
         
         Input:
-        * `log_history` whether to populate `history` attribute.
+        `log_history` whether to populate `history` attribute.
 
         Output:
-        * `tBP` # timesteps to burn and peel.
+        `tBP` # timesteps to burn and peel.
         """
         tBP = 0
         self.correction: set[Edge] = set()
@@ -191,6 +192,7 @@ class LUF(BaseUF):
         highlighted_edge_color='k',
         unhighlighted_edge_color=constants.DARK_GRAY,
         x_offset=DEFAULT_X_OFFSET,
+        with_labels=True,
         labels: dict[Node, str] | None = None,
         show_global=True,
         node_size=constants.DEFAULT,
@@ -198,12 +200,13 @@ class LUF(BaseUF):
         anyon_color='k',
         active_shape='s',
         width=constants.WIDE_MEDIUM,
+        arrows: bool | None = None,
         boundary_color=constants.BLUE,
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
         show_boundary_defects=True,
         defect_label_color='k',
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
         g = self.CODE.GRAPH
         dig, dig_diedges, dig_edges = self._pointer_digraph
@@ -256,7 +259,7 @@ class LUF(BaseUF):
             width=width,
             edge_color=edge_color,
             style=style,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
 
         # DRAW ACTIVE NODES
@@ -297,20 +300,22 @@ class LUF(BaseUF):
             edgelist=dig_diedges,
             width=width,
             edge_color=dig_edge_color, # type: ignore
+            arrows=arrows,
         )
 
-        # DRAW LABELS (defect labels `defect_label_color`; nondefect, black)
-        defect_labels = {v: label for v, label in labels.items() if v in self.syndrome}
-        nondefect_labels = {v: label for v, label in labels.items() if v not in self.syndrome}
-        nx.draw_networkx_labels(g, pos, labels=defect_labels, font_color=defect_label_color)
-        nx.draw_networkx_labels(g, pos, labels=nondefect_labels)
+        if with_labels:
+            # DRAW LABELS (defect labels `defect_label_color`; nondefect, black)
+            defect_labels = {v: label for v, label in labels.items() if v in self.syndrome}
+            nondefect_labels = {v: label for v, label in labels.items() if v not in self.syndrome}
+            nx.draw_networkx_labels(g, pos, labels=defect_labels, font_color=defect_label_color)
+            nx.draw_networkx_labels(g, pos, labels=nondefect_labels)
 
 
     @property
     def _pointer_digraph(self): return self._DIGRAPH_MAKER.pointer_digraph
     
-    def draw_decode(self, **kwargs):
-        self._DECODE_DRAWER.draw(self.history, **kwargs)
+    def draw_decode(self, **kwargs_for_networkx_draw):
+        self._DECODE_DRAWER.draw(self.history, **kwargs_for_networkx_draw)
 
     @property
     def _FIG_WIDTH(self):
@@ -352,6 +357,8 @@ class Controller:
         if any growths have changed
         (happens after growth and burning stages, and peeling steps);
         else, `False`.
+
+        Side effect: Update `stage`.
         """
         growth_changed = self.stage is Stage.PEELING
         if not self.LUF.NODES.busy:  # stage complete
@@ -498,7 +505,7 @@ class ActisNodes(Nodes):
     This decoder starts in the GROWING stage.
     Alternatively, could start in the SYNCING stage and in `load()`,
     call `self.update_valid()` instead of `self.valid = False`.
-    This would be beneficial if physical error probability low enough.
+    This would be beneficial if noise level low enough.
     """
     
     def __init__(self, luf: LUF, optimal=True):
@@ -507,7 +514,6 @@ class ActisNodes(Nodes):
                     for v in luf.CODE.NODES}
 
         d = luf.CODE.D
-        # see https://switowski.com/blog/type-vs-isinstance/
         if isinstance(luf.CODE.NOISE, noise.CodeCapacity):
             self._SPAN = 2*d  # 1 + (d-1) + d
         elif isinstance(luf.CODE.NOISE, noise.Phenomenological):

@@ -40,4 +40,4 @@ def test_get_logical_error(sf_frugal3: Frugal):
         m += sf_frugal3.get_logical_error()
     assert m == 0
     # below failed if pairs w/ zero pair separation (in j) are not added to `new_pairs`
-    assert sf_frugal3.pairs.dc == {}
+    assert sf_frugal3.pairs._dc == {}

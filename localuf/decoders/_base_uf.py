@@ -101,6 +101,7 @@ class BaseUF(Decoder):
         highlighted_edge_color='k',
         unhighlighted_edge_color=constants.GRAY,
         x_offset=constants.DEFAULT_X_OFFSET,
+        with_labels=True,
         labels: dict[Node, str] | None = None,
         node_size=constants.SMALL,
         width=constants.WIDE_MEDIUM,
@@ -108,7 +109,7 @@ class BaseUF(Decoder):
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
         show_boundary_defects=True,
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
         """Draw growth of edges using matplotlib.
         
@@ -117,9 +118,12 @@ class BaseUF(Decoder):
         * `syndrome` the set of defects.
         * `highlighted_edges` the set of edges to be highlighted in drawing.
         * `x_offset` the ratio of out-of-screen to along-screen distance.
+        * `with_labels` whether to show node labels.
         * `labels` a dictionary where each key a node index; value, its label as a string.
         * `width` line width of edges.
-        * `kwargs` passed to `networkx.draw()`.
+        * `arrows` whether to draw arrows on edges used by pointers.
+        For `Macar, Actis, Snowflake` decoders only.
+        * `kwargs_for_networkx_draw` passed to `networkx.draw()`.
         E.g. `linewidths` line width of node symbol border.
         """
         g = self.CODE.GRAPH
@@ -132,7 +136,8 @@ class BaseUF(Decoder):
             highlighted_edges = set()
 
         # node-related kwargs
-        with_labels = False if labels is None else True
+        if labels is None:
+            with_labels = False
         node_color = self.CODE.get_node_color(
             syndrome,
             boundary_color=boundary_color,
@@ -165,7 +170,7 @@ class BaseUF(Decoder):
             edge_color=edge_color,
             style=style,
             labels=labels,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
 
     def _get_edge_color_and_style(
@@ -194,19 +199,19 @@ class BaseUF(Decoder):
             outlined_nodes: set[Node],
             nodelist: list[Node],
             outline_color: str = 'k',
-            **kwargs,
+            **kwargs_for_get_node_color,
     ):
         """Return `node_color`, `edgecolors` kwargs for `networkx.draw()`.
 
         Input:
         * `outlined_nodes` the set of nodes to be outlined.
         * `nodelist` the list of nodes (needed to specify the node order in the outputs).
-        * `kwargs` passed to `self.CODE.get_node_color()`.
+        * `kwargs_for_get_node_color` passed to `self.CODE.get_node_color()`.
         """
         node_color = self.CODE.get_node_color(
             self.syndrome,
             nodelist=nodelist,
-            **kwargs,
+            **kwargs_for_get_node_color,
         )
         edgecolors = [outline_color if v in outlined_nodes else color
                         for v, color in zip(nodelist, node_color)]

@@ -7,6 +7,7 @@ from localuf.sim import runtime
 
 
 def test_validate_only():
+    stages = ('SV',)
     ds = [1, 2]
     ps = [0, 1]
     n = 2
@@ -31,8 +32,8 @@ def test_validate_only():
         assert mock_reset.call_args_list == call_count * [call()]
     assert type(data) is DataFrame
     assert data.shape == (n, len(ds) * len(ps))
-    assert data.columns.names == ['d', 'p']
-    assert (data.columns == MultiIndex.from_product([ds, ps])).all()
+    assert data.columns.names == ['stage', 'd', 'p']
+    assert (data.columns == MultiIndex.from_product([stages, ds, ps])).all()
 
 
 def test_full():

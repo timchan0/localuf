@@ -51,12 +51,14 @@ class Snowflake(BaseUF):
             self,
             code: Code,
             merger: Literal['fast', 'slow'] = 'fast',
+            schedule: Literal['2:1', '1:1'] = '2:1',
             unrooter: Literal['full', 'simple'] = 'full',
     ):
         """Input:
         * `code` the code to be decoded.
         * `merger` decides whether nodes flood before syncing (fast) or vice versa (slow) in a merging step.
         Setting this to `'slow'` helps break down merging for visualisation.
+        * `schedule` the cluster growth schedule.
         * `unrooter` the type of unrooting process to use.
         If `'full'`, each node in the amputated cluster resets its CID and pointer
         so that the pointer tree structure can be rebuilt from scratch,
@@ -69,6 +71,7 @@ class Snowflake(BaseUF):
         if not isinstance(code.SCHEME, Frugal):
             raise ValueError('Snowflake only compatible with frugal scheme.')
         super().__init__(code)
+        self._SCHEDULE: _Schedule = _TwoOne(self) if schedule == '2:1' else _OneOne(self)
         self._EDGES = {
             e: _Edge(self, e) for e in self.CODE.EDGES
             if all(v[self.CODE.TIME_AXIS] < self.CODE.SCHEME.WINDOW_HEIGHT for v in e)
@@ -177,12 +180,14 @@ class Snowflake(BaseUF):
         Equals the increase in `len(self.history)` if
         `log_history` is 'fine' and `time_only` is `'all'`.
         """
+        
         self._stage = Stage.DROP
         self.drop(syndrome)
-        self._stage = Stage.GROW
-        self.grow(log_history)
-        self._stage = Stage.MERGING
-        return self.merge(log_history, time_only=time_only)
+        if log_history == 'fine': self.append_history()
+        return self._SCHEDULE.finish_decode(
+            log_history=log_history,
+            time_only=time_only,
+        )
     
     def drop(self, syndrome: set[Node]):
         """Make all nodes perform a `drop` i.e. raise window by a layer."""
@@ -210,16 +215,9 @@ class Snowflake(BaseUF):
         for v in syndrome:
             self.NODES[v].next_defect ^= True
 
-    def grow(self, log_history: Literal[False, 'fine', 'coarse']):
-        """Make all nodes perform a `grow`."""
-        if log_history == 'fine': self.append_history()
-        for node in self.NODES.values():
-            node.grow()
-        for node in self.NODES.values():
-            node.update_access()  # TODO: speed up by changing just the accesses affected
-
     def merge(
         self,
+        whole: bool,
         log_history: Literal[False, 'fine', 'coarse'],
         time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
     ):
@@ -227,39 +225,48 @@ class Snowflake(BaseUF):
         
         Emergent effect: merge touching clusters, push defects to roots.
         
-        Inputs same as in `decode`.
+        Input:
+        * `whole` whether to perform `MERGING_WHOLE` or `MERGING_HALF` stage.
+        * `log_history, time_only` as in `decode` inputs.
         
         Output: `t` number of timesteps to complete growth round.
         """
         t = -1 if time_only == 'merging' else 1 if time_only == 'all' else 0
 
         while True:
-            if log_history == 'fine': self.append_history()
             for node in self.NODES.values():
-                node.merging()
+                node.merging(whole)
             for node in self.NODES.values():
                 node.update_after_merging()
             t += (time_only!='unrooting') or any(node.cid==RESET for node in self.NODES.values())
             if not any(node.busy for node in self.NODES.values()):
                 break
+            if log_history == 'fine': self.append_history()
 
         if log_history == 'coarse': self.append_history()
         return t
 
     # DRAWERS
 
-    def _labels(self, show_global=True):
+    def _labels(
+            self,
+            show_global=True,
+            show_2_1_schedule_variables=True,
+    ):
         """Return the labels dictionary for the drawer.
         
         Input:
-        `show_global` whether to prepend the global label to the top-left node label.
+        * `show_global` whether to prepend the global label to the top-left node label.
+        * `show_2_1_schedule_variables` whether to show
+        node variables specific to the 2:1 cluster growth schedule.
         
         Output:
         `result` a dictionary where each
         key a node index as a tuple;
         value, the label for the node at that index.
         """
-        result = {v: node.label for v, node in self.NODES.items()}
+        result = {v: node.label(show_2_1_schedule_variables)
+                  for v, node in self.NODES.items()}
         if show_global:
             t = self.CODE.SCHEME.WINDOW_HEIGHT - 1
             top_left = (0, -1, t) if self.CODE.DIMENSION == 3 else (-1, t)
@@ -272,18 +279,21 @@ class Snowflake(BaseUF):
         highlighted_edge_color='k',
         unhighlighted_edge_color=constants.DARK_GRAY,
         x_offset=constants.STREAM_X_OFFSET,
+        with_labels=True,
         labels: dict[Node, str] | None = None,
         show_global=True,
+        show_2_1_schedule_variables: None | bool = None,
         node_size: int | None = None,
         linewidths: float | None = None,
         active_shape='s',
         width: float | None = None,
+        arrows: bool | None = None,
         show_boundary_defects=True,
         black_and_white=False,
-        # following kwargs are only for `black_and_white = True`
+        # following 2 kwargs are only for `black_and_white = True`
         bw_unhighlighted_width=constants.MEDIUM_THIN,
         bw_unrooted_color=constants.GRAY,
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
         g = self.CODE.GRAPH
         dig, dig_diedges, dig_edges = self._pointer_digraph
@@ -291,8 +301,13 @@ class Snowflake(BaseUF):
         unrooted_nodes = {v for v, node in self.NODES.items() if node.unrooted}
         if highlighted_edges is None:
             highlighted_edges = self.correction
+        if show_2_1_schedule_variables is None:
+            show_2_1_schedule_variables = isinstance(self._SCHEDULE, _TwoOne)
         if labels is None:
-            labels = self._labels(show_global)
+            labels = self._labels(
+                show_global=show_global,
+                show_2_1_schedule_variables=show_2_1_schedule_variables,
+            )
         if node_size is None:
             node_size = self.BW_DEFAULT_NODE_SIZE if black_and_white else constants.DEFAULT
         if linewidths is None:
@@ -304,15 +319,16 @@ class Snowflake(BaseUF):
             return self._draw_growth_black_and_white(
                 g, dig, dig_diedges, dig_edges,
                 pos, unrooted_nodes,
-                highlighted_edges, labels,
+                highlighted_edges, with_labels, labels,
                 node_size=node_size,
                 unrooted_color=bw_unrooted_color,
                 linewidths=linewidths,
                 active_shape=active_shape,
                 width=width,
+                arrows=arrows,
                 unhighlighted_width=bw_unhighlighted_width,
                 show_boundary_defects=show_boundary_defects,
-                **kwargs,
+                **kwargs_for_networkx_draw,
             )
 
         # DRAW INACTIVE NODES AND EDGES UNUSED BY POINTERS
@@ -340,7 +356,7 @@ class Snowflake(BaseUF):
         nx.draw(
             g,
             pos=pos,
-            with_labels=True,
+            with_labels=with_labels,
             labels=labels,
             nodelist=inactive_nodelist,
             node_size=node_size,
@@ -351,7 +367,7 @@ class Snowflake(BaseUF):
             width=width,
             edge_color=edge_color,
             style=style,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
 
         # DRAW ACTIVE NODES
@@ -387,21 +403,23 @@ class Snowflake(BaseUF):
             edgelist=dig_diedges,
             width=width,
             edge_color=dig_edge_color, # type: ignore
+            arrows=arrows,
         )
 
     def _draw_growth_black_and_white(
         self,
         g: nx.Graph, dig: nx.DiGraph, dig_diedges: list[Edge], dig_edges: list[Edge],
         pos: dict[Node, Coord], unrooted_nodes: set[Node],
-        highlighted_edges: set[Edge], labels: dict[Node, str],
+        highlighted_edges: set[Edge], with_labels: bool, labels: dict[Node, str],
         node_size=BW_DEFAULT_NODE_SIZE,
         unrooted_color=constants.GRAY,
         linewidths=constants.THIN,
         active_shape='s',
         width=constants.WIDE,
         unhighlighted_width=constants.MEDIUM_THIN,
+        arrows: bool | None = None,
         show_boundary_defects=True,
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
 
         # DRAW INACTIVE DETECTORS AND EDGES UNUSED BY POINTERS
@@ -428,7 +446,7 @@ class Snowflake(BaseUF):
         nx.draw(
             g,
             pos=pos,
-            with_labels=True,
+            with_labels=with_labels,
             labels=labels,
             nodelist=inactive_detector_list,
             node_size=node_size,
@@ -439,7 +457,7 @@ class Snowflake(BaseUF):
             width=edge_width,
             edge_color='k',
             style=style,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
 
         # DRAW ACTIVE DETECTORS
@@ -484,6 +502,7 @@ class Snowflake(BaseUF):
             edgelist=dig_diedges,
             width=dig_edge_width, # type: ignore
             edge_color='k',
+            arrows=arrows,
         )
 
     @property
@@ -511,8 +530,8 @@ class Snowflake(BaseUF):
                 except KeyError: pass  # node in bottom sheet points down
         return dig, dig_diedges, dig_edges
     
-    def draw_decode(self, **kwargs):
-        self._DECODE_DRAWER.draw(self.history, **kwargs)
+    def draw_decode(self, **kwargs_for_networkx_draw):
+        self._DECODE_DRAWER.draw(self.history, **kwargs_for_networkx_draw)
 
     @property
     def _FIG_WIDTH(self):
@@ -556,13 +575,10 @@ class _Node(NodeEdgeMixin):
     * `_IS_BOUNDARY` whether node is a boundary node.
     * `_MERGER` the provider for the `merging` method.
     * `UNROOTER` the type of unrooting process used.
-    * `defect` whether the node has a defect.
-    * `active` whether the cluster the node is in is active.
-    * `cid` the ID of the cluster the node belongs to.
-    * `pointer` the direction the node sends defects along.
-    * `unrooted` whether node has unrooted in current growth round.
-    * `defect, active, cid, pointer, unrooted` have `next_` versions for next timestep.
-    * `busy` whether the node has any pending operations.
+    * `active, whole, cid, defect, pointer, grown, unrooted, busy`
+    explained in [arXiv:2406.01701, C.1].
+    * The variables in the above bulletpoint, save `busy`,
+    each have `next_` versions for next timestep.
     * `access` refers to neighbors along fully grown edges.
     In the form of a dictionary of where each
     key a pointer string;
@@ -612,7 +628,7 @@ class _Node(NodeEdgeMixin):
                 ('S', (index, (i+1, j, t)), 1),
                 ('SEU', (index, (i+1, j+1, t+1)), 1),
             )
-        self._NEIGHBORS: dict[direction, tuple[Edge, int]] = {
+        self._NEIGHBORS: dict[direction, tuple[Edge, int]] = { # type: ignore
             pointer: (e, e_index)
             for pointer, e, e_index in provisional_neighbors
             if e in snowflake.EDGES
@@ -640,23 +656,34 @@ class _Node(NodeEdgeMixin):
     @property
     def UNROOTER(self): return self._UNROOTER
 
-    @property
-    def label(self):
-        return str(self.cid) if self.cid != RESET else 'R'
+    def label(self, show_2_1_schedule_variables=True):
+        cid = str(self.cid) if self.cid != RESET else 'R'
+        if show_2_1_schedule_variables:
+            if self.grown:
+                grown_half = "'" if self.whole else ":"
+            else:
+                grown_half = "" if self.whole else "."
+        else:
+            grown_half = ""
+        return cid + grown_half
 
     def reset(self):
         """Factory reset."""
 
-        self.defect = False
         self.active = False
+        self.whole = True
         self.cid = self.ID
+        self.defect = False
         self.pointer: direction = 'C'
+        self.grown = False
         self.unrooted = False
 
-        self.next_defect = False
         self.next_active = False
+        self.next_whole = True
         self.next_cid = self.ID
+        self.next_defect = False
         self.next_pointer: direction = 'C'
+        self.next_grown = False
         self.next_unrooted = False
 
         self.busy = False
@@ -672,23 +699,48 @@ class _Node(NodeEdgeMixin):
         self.active = self.next_active
         self.cid = self.next_cid
         self.pointer = self.next_pointer
+        self.whole = self.next_whole
         # NEED NOT RESET...
         # `next_defect` as value correct for next use in `syncing`
         # `next_active` as always overwritten in `syncing` before next used in `update_after_merging`
         # `next_cid` as value correct for next use in `flooding`
         # `next_pointer` as always overwritten in `drop` before next used in `update_after_drop`
+        # `next_whole` as always overwritten in `drop` before next used in `update_after_drop`
 
     def grow(self):
-        """Growth-increment incident edges if active, and find broken pointers."""
+        """Call `grow` if active, then find broken pointers.
+        
+        Used only in 1:1 schedule.
+        """
         if self.active:
-            s = self.SNOWFLAKE
-            edges_to_grow = {
-                e for e, _ in self.NEIGHBORS.values()
-                if s.EDGES[e].growth in s._ACTIVE_GROWTH_VALUES
-            }
-            for e in edges_to_grow:
-                s.EDGES[e].growth += Growth.INCREMENT
+            self._grow()
         self.FRIENDSHIP.find_broken_pointers()
+
+    def grow_whole(self):
+        """Call `grow` if active and whole, then find broken pointers."""
+        if self.active and self.whole:
+            self._grow()
+            self.grown = True
+            self.next_grown = True
+        self.FRIENDSHIP.find_broken_pointers()
+
+    def grow_half(self):
+        """Call `grow` if active and half and not yet grown in current decoding cycle."""
+        self.unrooted = False
+        self.next_unrooted = False
+        if self.active and not self.whole and not self.grown:
+            self._grow()
+    
+    def _grow(self):
+        """Growth-increment incident edges."""
+        s = self.SNOWFLAKE
+        edges_to_grow = {
+            e for e, _ in self.NEIGHBORS.values()
+            if s.EDGES[e].growth in s._ACTIVE_GROWTH_VALUES
+        }
+        for e in edges_to_grow:
+            s.EDGES[e].growth += Growth.INCREMENT
+        self.whole ^= True
 
     def update_access(self):
         """Update access.
@@ -701,14 +753,14 @@ class _Node(NodeEdgeMixin):
             if self.SNOWFLAKE.EDGES[e].growth is Growth.FULL
         }
 
-    def merging(self):
+    def merging(self, whole: bool):
         """Advance 1 merging timestep.
         
         The emergent effect of each node running this method repeatedly
         is the merging of clusters.
         """
         self.busy = False
-        self._MERGER.merging()
+        self._MERGER.merging(whole)
 
     def syncing(self):
         """Update `active` depending on, and push defect to, pointee."""
@@ -728,21 +780,26 @@ class _Node(NodeEdgeMixin):
         if self.active != self.next_active:
             self.busy = True
 
-    def flooding(self):
-        """Update `pointer, cid, unrooted` depending on access."""
-        self.UNROOTER.flooding()
+    def flooding(self, whole: bool):
+        """Update `pointer, cid, unrooted, grown` depending on access."""
+        if whole:
+            self.UNROOTER.flooding_whole()
+        else:
+            self.UNROOTER.flooding_half()
 
     def update_after_merging(self):
-        """`next_{cid, defect, active, unrooted}` -> `{cid, defect, active, unrooted}`."""
+        """`next_{cid, defect, active, unrooted, grown}` -> `{cid, defect, active, unrooted, grown}`."""
         self.cid = self.next_cid
         self.defect = self.next_defect
         self.active = self.next_active
         self.unrooted = self.next_unrooted
+        self.grown = self.next_grown
         # NEED NOT RESET...
         # `next_cid` as value correct for next use in `flooding`
         # `next_defect` as value correct for next use in `syncing`
         # `next_active` as always overwritten in `syncing` before next used in `update_after_merging`
         # `next_unrooted` as value correct (unless edited) for next use in `update_after_merging`
+        # `next_grown` as value correct for next use in `flooding`
 
 
 class Friendship(abc.ABC):
@@ -761,6 +818,8 @@ class Friendship(abc.ABC):
 
     def drop(self):
         """Drop information to node immediately below."""
+        self.NODE.grown = False
+        self.NODE.next_grown = False
         self.NODE.unrooted = False
         self.NODE.next_unrooted = False
 
@@ -794,7 +853,7 @@ class NodeFriendship(Friendship):
         r.next_active = self.NODE.active
         r.next_cid = r.SNOWFLAKE.id_below(self.NODE.cid)
         r.next_pointer = self.NODE.pointer
-        
+        r.next_whole = self.NODE.whole
 
 class TopSheetFriendship(NodeFriendship):
     """Friendship for nodes in top sheet of viewing window.
@@ -838,9 +897,9 @@ class _SlowMerger(_Merger):
     Extends `_Merger`.
     """
 
-    def merging(self):
+    def merging(self, whole: bool):
         self._NODE.syncing()
-        self._NODE.flooding()
+        self._NODE.flooding(whole)
 
 
 class _FastMerger(_Merger):
@@ -849,9 +908,87 @@ class _FastMerger(_Merger):
     Extends `_Merger`.
     """
 
-    def merging(self):
-        self._NODE.flooding()
+    def merging(self, whole: bool):
+        self._NODE.flooding(whole)
         self._NODE.syncing()
+
+
+class _Schedule(abc.ABC):
+    """Abstract base class for the cluster growth schedule."""
+
+    def __init__(self, snowflake: Snowflake) -> None:
+        self._SNOWFLAKE = snowflake
+
+    @abc.abstractmethod
+    def finish_decode(
+        self,
+        log_history: Literal[False, 'fine', 'coarse'] = False,
+        time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
+    ) -> int:
+        """Perform the rest of the decoding cycle after drop.
+        
+        Output:
+        `t` number of timesteps to complete decoding cycle.
+        """
+
+    @abc.abstractmethod
+    def grow(self):
+        """Make all nodes perform a `grow`."""
+
+
+class _OneOne(_Schedule):
+    """The 1:1 cluster growth schedule.
+    
+    Extends `_Schedule`.
+    """
+
+    def finish_decode(self, log_history, time_only):
+        self._SNOWFLAKE._stage += Stage.INCREMENT
+        self.grow()
+        if log_history == 'fine': self._SNOWFLAKE.append_history()
+        self._SNOWFLAKE._stage += Stage.INCREMENT
+        return self._SNOWFLAKE.merge(
+            whole=True,
+            log_history=log_history,
+            time_only=time_only,
+        )
+    
+    def grow(self):
+        for node in self._SNOWFLAKE.NODES.values():
+            node.grow()
+        for node in self._SNOWFLAKE.NODES.values():
+            node.update_access()  # TODO: speed up by changing just the accesses affected
+
+
+class _TwoOne(_Schedule):
+    """The 2:1 cluster growth schedule.
+    
+    Extends `_Schedule`.
+    """
+
+    def finish_decode(self, log_history, time_only):
+        t = 0
+        for whole in (True, False):
+            self._SNOWFLAKE._stage += Stage.INCREMENT
+            self.grow(whole)
+            if log_history == 'fine': self._SNOWFLAKE.append_history()
+            self._SNOWFLAKE._stage += Stage.INCREMENT
+            t += self._SNOWFLAKE.merge(
+                whole,
+                log_history,
+                time_only=time_only,
+            )
+        return t
+    
+    def grow(self, whole: bool):
+        if whole:
+            for node in self._SNOWFLAKE.NODES.values():
+                node.grow_whole()
+        else:
+            for node in self._SNOWFLAKE.NODES.values():
+                node.grow_half()
+        for node in self._SNOWFLAKE.NODES.values():
+            node.update_access()  # TODO: speed up by changing just the accesses affected
 
 
 class _Unrooter(abc.ABC):
@@ -870,8 +1007,26 @@ class _Unrooter(abc.ABC):
         """Start unrooting the node."""
 
     @abc.abstractmethod
-    def flooding(self):
-        """See `_Node.flooding`."""
+    def flooding_whole(self):
+        """Update `pointer, cid, unrooted, grown` depending on access."""
+
+    def flooding_half(self):
+        """Update `pointer, cid` depending on access."""
+        for pointer, neighbor in self._NODE.access.items():
+            self._compare_cid(pointer, neighbor)
+
+    def _compare_cid(self, pointer: direction, neighbor: _Node):
+        """Update `next_cid` depending on `neighbor.cid`."""
+        if neighbor.cid < self._NODE.next_cid:
+            self._NODE.busy = True
+            self._NODE.pointer = pointer
+            self._NODE.next_cid = neighbor.cid
+
+    def _check_grown(self, neighbor: _Node):
+        """Update `next_grown` depending on `neighbor.grown`."""
+        if neighbor.grown and not self._NODE.next_grown:
+            self._NODE.busy = True
+            self._NODE.next_grown = True
 
 
 class _FullUnrooter(_Unrooter):
@@ -890,7 +1045,7 @@ class _FullUnrooter(_Unrooter):
         # `next_cid` as always overwritten in `NODE.flooding`
         # `next_pointer` as always overwritten in `drop` before next used in `NODE.update_after_drop`
 
-    def flooding(self):
+    def flooding_whole(self):
         if self._NODE.cid == RESET:  # finish unrooting `self._NODE`
             self._NODE.busy = True
             self._NODE.next_cid = self._NODE.ID
@@ -903,10 +1058,9 @@ class _FullUnrooter(_Unrooter):
                         self._NODE.next_cid = RESET
                         self._NODE.pointer = 'C'
                         break
-                elif neighbor.cid < self._NODE.next_cid:
-                    self._NODE.busy = True
-                    self._NODE.pointer = pointer
-                    self._NODE.next_cid = neighbor.cid
+                else:
+                    self._compare_cid(pointer, neighbor)
+                self._check_grown(neighbor)
 
 
 class _SimpleUnrooter(_Unrooter):
@@ -927,16 +1081,15 @@ class _SimpleUnrooter(_Unrooter):
         self._NODE.cid = RESET
         self._NODE.next_cid = RESET
 
-    def flooding(self):
+    def flooding_whole(self):
         if self._NODE.cid == RESET:
             if not self._NODE.unrooted and not self._NODE._IS_BOUNDARY:
                 self._wave()
         else:
             for pointer, neighbor in self._NODE.access.items():
-                if neighbor.cid != RESET and neighbor.cid < self._NODE.next_cid:
-                    self._NODE.busy = True
-                    self._NODE.pointer = pointer
-                    self._NODE.next_cid = neighbor.cid
+                if neighbor.cid != RESET:
+                    self._compare_cid(pointer, neighbor)
+                self._check_grown(neighbor)
 
     def _wave(self):
         """Propagate unroot wave toward nearest boundary."""

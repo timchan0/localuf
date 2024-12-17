@@ -1,5 +1,6 @@
 """Module for functions to process numerical data, mainly from `sim`."""
 
+from collections.abc import Callable
 from typing import Type
 
 import numpy as np
@@ -51,7 +52,7 @@ def get_failure_data(
     return dT
 
 
-def get_failure_data_from_SS(
+def get_failure_data_from_subset_sample(
         data: DataFrame,
         code_class: Type[Code],
         noise: NoiseModel,
@@ -125,13 +126,13 @@ def get_log_runtime_data(data: DataFrame):
     return log_data.swaplevel(0, 1, axis=0).sort_index(axis=0)
 
 
-def get_stats(log_data: DataFrame, missing='drop', **kwargs):
+def get_stats(log_data: DataFrame, missing='drop', **kwargs_for_WLS):
     """Get WLS (weighted least squares) stats from output of either
     `get_log_runtime_data` OR `get_failure_data`.
 
     Input:
     * `log_data` output from `get_log_runtime_data` or `get_failure_data`.
-    * `missing, **kwargs` passed to `statsmodels.regression.linear_model.WLS`.
+    * `missing, **kwargs_for_WLS` passed to `statsmodels.regression.linear_model.WLS`.
 
     Output: `stats` a DataFrame where each row an x-value
     (probability OR distance);
@@ -155,7 +156,7 @@ def get_stats(log_data: DataFrame, missing='drop', **kwargs):
             exog=sm.add_constant(df['x']),
             weights=1/df['yerr']**2, # type: ignore
             missing=missing,
-            **kwargs,
+            **kwargs_for_WLS,
         ).fit()
         intercept, gradient = results.params
         se_intercept, se_gradient = results.bse
@@ -179,7 +180,26 @@ def get_stats(log_data: DataFrame, missing='drop', **kwargs):
     return stats
 
 
-def from_merging_to_all(merging_data: DataFrame, _extra_steps_per_layer=2):
-    """Convert output of `sum.runtime.frugal` with `time_only='merging'` to `time_only='all'`."""
-    dc = {(d, p): merging_data[d, p] + _extra_steps_per_layer*d for (d, p) in merging_data.columns}
-    return DataFrame(dc, columns=merging_data.columns)
+def add_ignored_timesteps(
+    data: DataFrame,
+    extra_steps_per_layer=2,
+    layers_per_sample: Callable[[int], int] = lambda d: d,
+):
+    """Add ignored timesteps to `data`.
+
+    Input:
+    * `data` a DataFrame where each
+    column a (distance, probability);
+    row, a runtime sample.
+    * `extra_steps_per_layer` number of ignored timesteps per layer
+    in the decoding graph.
+    * `layers_per_sample` a function with input `d` that outputs
+    the measurement round count per sample.
+
+    E.g. if `data` is output of `sum.runtime.frugal` with `time_only='merging'`,
+    the default kwargs of this function will convert it to
+    the analogous output of `sum.runtime.frugal` with `time_only='all'`.
+    """
+    dc = {(d, p): data[d, p] + extra_steps_per_layer*layers_per_sample(int(d))
+        for d, p in data.columns}
+    return DataFrame(dc, columns=data.columns)

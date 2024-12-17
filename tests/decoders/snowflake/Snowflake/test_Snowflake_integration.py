@@ -8,6 +8,7 @@ from localuf.constants import Growth
 from localuf.decoders import Snowflake
 from localuf.decoders.snowflake import _Node
 
+whole = True
 
 @pytest.fixture
 def snowflake3tall():
@@ -29,7 +30,7 @@ def snowflake4():
         noise='phenomenological',
         scheme='frugal',
     )
-    return Snowflake(rp, merger='slow')
+    return Snowflake(rp, merger='slow', schedule='1:1')
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ def snowflake5():
         noise='phenomenological',
         scheme='frugal',
     )
-    return Snowflake(rp)
+    return Snowflake(rp, schedule='1:1')
 
 
 @pytest.fixture
@@ -52,7 +53,7 @@ def snowflake7():
         scheme='frugal',
         buffer_height=3*(d//2),
     )
-    return Snowflake(rp, merger='slow')
+    return Snowflake(rp, merger='slow', schedule='1:1')
 
 
 def test_nonroot_boundary_defect_kept(snowflake4: Snowflake):
@@ -66,10 +67,10 @@ def test_nonroot_boundary_defect_kept(snowflake4: Snowflake):
     ]:
         snowflake4.decode(syndrome)
     snowflake4.drop(set())
-    snowflake4.grow(False)
+    snowflake4._SCHEDULE.grow()
     for _ in itertools.repeat(None, 5):
         for node in snowflake4.NODES.values():
-            node.merging()
+            node.merging(whole)
         for node in snowflake4.NODES.values():
             node.update_after_merging()
         assert snowflake4.NODES[-1, 0].defect
@@ -115,10 +116,10 @@ def test_decode_fine(snowflake5: Snowflake):
     for _ in itertools.repeat(None, 2*h-1):
         # DECODE
         snowflake5.drop(set())
-        snowflake5.grow(False)
+        snowflake5._SCHEDULE.grow()
         while True:
             for node in snowflake5.NODES.values():
-                node.merging()
+                node.merging(whole)
             for node in snowflake5.NODES.values():
                 node.update_after_merging()
             assert_no_standoff(snowflake5)
@@ -228,7 +229,7 @@ def helper_infinite_due_to_unroot(snowflake5: Snowflake):
     ]:
         snowflake5.decode(syndrome)
     snowflake5.drop(set())
-    snowflake5.grow(False)
+    snowflake5._SCHEDULE.grow()
 
 def test_no_infinite_unroot_cycle(snowflake5: Snowflake):
     """Test unroot wave never cycles infinitely.
@@ -240,7 +241,7 @@ def test_no_infinite_unroot_cycle(snowflake5: Snowflake):
     helper_infinite_due_to_unroot(snowflake5)
     for _ in itertools.repeat(None, 10):  # prevent infinite loop
         for node in snowflake5.NODES.values():
-            node.merging()
+            node.merging(whole)
         for node in snowflake5.NODES.values():
             node.update_after_merging()
         if not any(node.busy for node in snowflake5.NODES.values()):
@@ -264,7 +265,7 @@ def test_no_unroot_pointer_cycle(snowflake5: Snowflake):
     helper_infinite_due_to_unroot(snowflake5)
     for _ in itertools.repeat(None, 10):  # prevent infinite loop
         for node in snowflake5.NODES.values():
-            node.merging()
+            node.merging(whole)
         for node in snowflake5.NODES.values():
             node.update_after_merging()
         assert not all((
@@ -292,10 +293,10 @@ def test_no_infinite_loop(snowflake7: Snowflake):
 
     # DECODE
     snowflake7.drop(set())
-    snowflake7.grow(False)
+    snowflake7._SCHEDULE.grow()
     for ct in range(1, 11):
         for node in snowflake7.NODES.values():
-            node.merging()
+            node.merging(whole)
         for node in snowflake7.NODES.values():
             node.update_after_merging()
         if ct == 11:

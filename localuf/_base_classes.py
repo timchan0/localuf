@@ -302,18 +302,18 @@ class Code(abc.ABC):
         return syndrome
 
     @staticmethod
-    def compose_errors(*args: set[Edge]):
+    def compose_errors(*errors: set[Edge]):
         """Sequentially compose any number of errors.
 
-        Input: `args` a tuple (error1, error2, ...) where each
+        Input: `errors` a tuple (error1, error2, ...) where each
         error a set of bitflipped edges.
 
         Output:
         A set of edges representing the sequential composition
-        of all errors in args.
+        of all errors in `errors`.
         """
         composition: set[Edge] = set()
-        for error in args:
+        for error in errors:
             composition ^= error
         return composition
 
@@ -329,10 +329,7 @@ class Code(abc.ABC):
     
     @abc.abstractmethod
     def index_to_id(self, index: Node) -> int:
-        """Return unique ID of node.
-        
-        Not implemented for non-batch schemes.
-        """
+        """Return unique ID of node."""
 
     @cached_property
     def GRAPH(self):
@@ -363,7 +360,7 @@ class Code(abc.ABC):
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
         error_color=constants.RED,
-        **kwargs,
+        **kwargs_for_networkx_draw,
     ):
         """Draw G using matplotlib.
 
@@ -377,7 +374,7 @@ class Code(abc.ABC):
         * `width` line width of edges.
         * `{boundary, defect, nondefect, error}_color` string specifying
         color of {boundary nodes, defects, nondefects, bitflipped edges}.
-        * use `kwargs` to modify/add any keyword arguments to `networkx.draw()`.
+        * `kwargs_for_networkx_draw` modifies/adds keyword arguments to `networkx.draw()`.
 
         Draws: G, where
         * bitflipped edges thick red; else, thin black
@@ -428,7 +425,7 @@ class Code(abc.ABC):
             node_color=node_color,
             width=width,
             edge_color=edge_color,
-            **kwargs,
+            **kwargs_for_networkx_draw,
         )
         return g
 
@@ -538,10 +535,10 @@ class Decoder(abc.ABC):
         """
 
     @abc.abstractmethod
-    def draw_decode(self, **kwargs):
+    def draw_decode(self, **kwargs_for_networkx_draw):
         """Draw all stages of decoding.
     
-        Input: `kwargs` passed to `NetworkX.draw`
+        Input: `kwargs_for_networkx_draw` passed to `NetworkX.draw`
         e.g. `margins=(0.1, 0.1)`.
         """
 
@@ -549,7 +546,7 @@ class Decoder(abc.ABC):
         """Simulate decoding cycles for each error subset.
 
         Input:
-        * `p` physical error probability.
+        * `p` noise level.
         * `n` number of decoding cycles per subset.
         * `tol` how much cutoff error we can tolerate,
         as a fraction of the mean.
@@ -618,7 +615,7 @@ class Scheme(abc.ABC):
         
         Input:
         * `decoder` the decoder.
-        * `p` physical error probability.
+        * `p` noise level.
         * positive integer `n` is
         decoding cycle count if scheme is 'batch' or 'forward'
         else slenderness := (layer count / code distance),

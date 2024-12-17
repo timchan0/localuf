@@ -72,6 +72,7 @@ direction LR
     class _Streaming{
         <<abstract>>
         Pairs pairs
+        list step_counts
         reset()
     }
     Forward --|> _Streaming
@@ -79,12 +80,10 @@ direction LR
     Frugal --|> _Streaming
     class Frugal{
         set error
-        list step_counts
         advance()
     }
     Global "1" o-- Pairs
     class Pairs{
-        dict dc
         set as_set
         reset()
         add()
@@ -408,7 +407,6 @@ direction LR
         index_to_id() int
         id_below() int
         drop()
-        grow()
         merge() int
     }
     Snowflake ..> Stage
@@ -416,8 +414,10 @@ direction LR
         int INCREMENT
         int STAGE_COUNT
         int DROP
-        int GROW
-        int MERGING
+        int GROW_WHOLE
+        int MERGING_WHOLE
+        int GROW_HALF
+        int MERGING_HALF
     }
     class NodeEdgeMixin{
         <<abstract>>
@@ -429,24 +429,32 @@ direction LR
         Friendship FRIENDSHIP
         dict NEIGHBORS
         _Unrooter UNROOTER
-        bool defect
         bool active
+        bool whole
         int cid
+        bool defect
         direction pointer
+        bool grown
         bool unrooted
-        bool next_defect
         bool next_active
+        bool next_whole
         int next_cid
+        bool next_defect
         direction next_pointer
+        bool next_grown
         bool next_unrooted
         bool busy
         dict access
-        str label
+        label() str
         reset()
         update_after_drop()
         grow()
+        grow_whole()
+        grow_half()
         update_access()
         merging()
+        syncing()
+        flooding()
         update_after_merging()
     }
     class _Edge{
@@ -457,6 +465,19 @@ direction LR
         reset()
         update_after_drop()
     }
+
+    class ISchedule{
+        <<interface>>
+        finish_decode()
+        grow()
+    }
+    class _Schedule{<<abstract>>}
+    Snowflake "1" *--* "1" ISchedule
+    _OneOne --|> _Schedule
+    _TwoOne --|> _Schedule
+    ISchedule <|.. _OneOne
+    ISchedule <|.. _TwoOne
+
     class IFriendship{
         <<interface>>
         _Node NODE
@@ -472,10 +493,12 @@ direction LR
     IFriendship <|.. NodeFriendship
     IFriendship <|.. TopSheetFriendship
     IFriendship <|.. NothingFriendship
+
     class IUnrooter{
         <<interface>>
         start()
-        flooding()
+        flooding_whole()
+        flooding_half()
     }
     class _Unrooter{<<abstract>>}
     _Node "1" *--* "1" IUnrooter
@@ -483,6 +506,7 @@ direction LR
     _SimpleUnrooter --|> _Unrooter
     IUnrooter <|.. _FullUnrooter
     IUnrooter <|.. _SimpleUnrooter
+
     class IMerger{
         <<interface>>
         merging()
@@ -493,11 +517,13 @@ direction LR
     _FastMerger --|> _Merger
     IMerger <|.. _SlowMerger
     IMerger <|.. _FastMerger
+
     Snowflake "*" *-- _Node
     NodeEdgeMixin <|-- _Node
     Snowflake --* "1" NodeEdgeMixin
     NodeEdgeMixin <|-- _Edge
     Snowflake "*" *-- _Edge
+
     class IContact{
         <<interface>>
         _Edge EDGE

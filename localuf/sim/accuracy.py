@@ -7,50 +7,53 @@ Available functions:
 * subset_sample
 """
 
+from collections.abc import Callable
 import itertools
-from typing import Iterable, Type
+from typing import Sequence, Type
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, MultiIndex
 
-from localuf.type_aliases import NoiseModel, DecodingScheme, Parametrization
+from localuf.sim._height_calculator import get_heights
+from localuf.type_aliases import NoiseModel, DecodingScheme, Parametrization, FloatSequence, IntSequence
 from localuf._base_classes import Code, Decoder
 
 def monte_carlo(
-        ds: Iterable[int],
-        ps: Iterable[float],
-        ns: int | Iterable[int],
+        sample_counts: dict[int, list[tuple[float, int]]],
         code_class: Type[Code],
         decoder_class: Type[Decoder],
         noise: NoiseModel,
         scheme: DecodingScheme = 'batch',
-        commit_multiplier: int | None = None,
-        buffer_multiplier: int | None = None,
+        get_commit_height: Callable[[int], int] | None = None,
+        get_buffer_height: Callable[[int], int] | None = None,
         parametrization: Parametrization = 'balanced',
         demolition: bool = False,
         monolingual: bool = False,
         merge_redundant_edges: bool = True,
-        **kwargs,
+        **kwargs_for_decoder_class,
 ):
     """Make threshold data for any decoder.
 
     Input:
-    * `ds` an iterable of surface code distances.
-    * `ps` an iterable of physical error probabilities.
-    * `ns` sample count, or iterable of sample counts for each `p` in `ps`.
+    * `sample_counts` a dictionary where each
+    key a code distance;
+    value, a list of (noise level, sample count) pairs.
+    If `scheme` is 'global batch',
+    sample count must be the same for all noise levels of a given distance.
     For a more detailed definition of 'sample', see `_base_classes.Scheme.run`.
     * `code_class` the class of the code.
     * `decoder_class` the class of the decoder.
     * inputs with same name as for `Code.__init__` serve the same purpose.
     In global batch scheme, the decoding graph is `d*n` layers tall i.e.
     as tall as the (entire) decoding graph would be in forward scheme with commit height `d`.
-    * `kwargs` are for `decoder_class`.
+    * `kwargs_for_decoder_class` are for `decoder_class`.
 
     The following 2 inputs affect only forward and frugal decoding schemes:
-    * `commit_multiplier` commit height in units of `d//2`.
+    * `get_commit_height` a function with input `d` that outputs commit height
+    e.g. `lambda d: 2*(d//2)`.
     If `None`, commit height is `d` for forward scheme and `1` for frugal scheme.
-    * `buffer_multiplier` buffer height in units of `d//2`.
+    * `get_buffer_height` a function with input `d` that outputs buffer height.
     If `None`, buffer height is `d` for forward scheme and `2*(d//2)` for frugal scheme.
 
     Output:
@@ -58,20 +61,14 @@ def monte_carlo(
     column a (distance, probability);
     rows m, n indicate number of logical errors and samples, respectively.
     """
-    if isinstance(ns, int):
-        ns = itertools.repeat(ns)
-    elif scheme == 'global batch':
-        raise ValueError('global batch scheme only supports fixed sample count')
-        
-    mi = MultiIndex.from_product([ds, ps], names=['d', 'p'])
-    df = DataFrame(columns=mi)
-    for d in ds:
-        window_height, commit_height, buffer_height = _get_heights(
+    dc = {}
+    for d, list_ in sample_counts.items():
+        window_height, commit_height, buffer_height = get_heights(
             d,
-            ns,
+            list_[0][1],
             scheme,
-            commit_multiplier,
-            buffer_multiplier,
+            get_commit_height,
+            get_buffer_height,
         )
         code = code_class(
             d,
@@ -85,68 +82,41 @@ def monte_carlo(
             monolingual=monolingual,
             merge_redundant_edges=merge_redundant_edges,
         )
-        decoder = decoder_class(code, **kwargs)
-        dc = {p: code.SCHEME.run(decoder, p, n) for p, n in zip(ps, ns)}
-        df[d] = DataFrame(dc, index=('m', 'n'))
+        decoder = decoder_class(code, **kwargs_for_decoder_class)
+        for p, n in list_:
+            dc[d, p] = code.SCHEME.run(decoder, p, n)
+    df = DataFrame(dc, index=('m', 'n'))
+    df.columns.set_names(['d', 'p'], inplace=True)
     return df
 
-def _get_heights(
-        d: int,
-        ns: Iterable[int],
-        scheme: DecodingScheme,
-        commit_multiplier: int | None,
-        buffer_multiplier: int | None,
-):
-    """Get height inputs for `Code.__init__` based on decoding scheme and multipliers."""
-    window_height = d*next(iter(ns)) if scheme == 'global batch' else None
-
-    if commit_multiplier is None:
-        if scheme == 'forward':
-            commit_height = d
-        elif scheme == 'frugal':
-            commit_height = 1
-        else:  # 'batch' in scheme
-            commit_height = None
-    else:
-        commit_height = commit_multiplier*(d//2)
-
-    if buffer_multiplier is None:
-        if scheme == 'forward':
-            buffer_height = d
-        elif scheme == 'frugal':
-            buffer_height = 2*(d//2)
-        else:  # 'batch' in scheme
-            buffer_height = None
-    else:
-        buffer_height = buffer_multiplier*(d//2)
-
-    return window_height, commit_height, buffer_height
 
 def monte_carlo_pymatching(
-        ds: Iterable[int],
-        ps: Iterable[float],
-        ns: int | Iterable[int],
+        ds: Sequence[int],
+        ps: FloatSequence,
+        ns: int | IntSequence,
         code_class: Type[Code],
         noise: NoiseModel,
-        **kwargs,
+        **kwargs_for_code_class,
 ):
     """Make threshold data for PyMatching decoder.
 
     Input:
     * `ds, ps, ns, code_class, noise` same as for `monte_carlo`.
-    * `**kwargs` for `code_class`.
+    * `**kwargs_for_code_class` for `code_class`.
 
     Output same as for `monte_carlo`.
     """
     if isinstance(ns, int):
-        ns = itertools.repeat(ns)
+        ns = [ns] * len(ps)
+    elif len(ns) != len(ps):
+        raise ValueError('Sequence `ns` must have same length as `ps`')
     mi = MultiIndex.from_product([ds, ps], names=['d', 'p'])
     df = DataFrame(columns=mi)
     for d in ds:
         code = code_class(
             d=d,
             noise=noise,
-            **kwargs,
+            **kwargs_for_code_class,
         )
         dc: dict[float, tuple[int, int]] = {}
         for p, n in zip(ps, ns):
@@ -161,16 +131,16 @@ def monte_carlo_pymatching(
     return df
 
 def monte_carlo_special(
-        ds: Iterable[int],
-        ps: Iterable[float],
-        ns: int | Iterable[int],
+        ds: Sequence[int],
+        ps: FloatSequence,
+        ns: int | IntSequence,
         code_class: Type[Code],
         decoder_class: Type[Decoder],
         parametrization: Parametrization = 'balanced',
         demolition: bool = False,
         monolingual: bool = False,
         merge_redundant_edges: bool = True,
-        **kwargs,
+        **kwargs_for_decoder_class,
 ):
     """Make threshold data where
     code noise model is circuit-level;
@@ -179,7 +149,9 @@ def monte_carlo_special(
     Input & output same as for `monte_carlo`.
     """
     if isinstance(ns, int):
-        ns = itertools.repeat(ns)
+        ns = [ns] * len(ps)
+    elif len(ns) != len(ps):
+        raise ValueError('Sequence `ns` must have same length as `ps`')
     mi = MultiIndex.from_product([ds, ps], names=['d', 'p'])
     df = DataFrame(columns=mi)
     for d in ds:
@@ -193,14 +165,14 @@ def monte_carlo_special(
         )
         decoder = decoder_class(
             code_class(d, noise='phenomenological'),
-            **kwargs,
+            **kwargs_for_decoder_class,
         )
         dc = {p: code.SCHEME.run(decoder, p, n) for p, n in zip(ps, ns)}
         df[d] = DataFrame(dc, index=('m', 'n'))
     return df
 
 def subset_sample(
-        ds: Iterable[int],
+        ds: Sequence[int],
         p: float,
         n: int,
         code_class: Type[Code],

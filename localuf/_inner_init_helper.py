@@ -27,7 +27,7 @@ class InnerInitHelper:
         if 'batch' in scheme:
             for height in (commit_height, buffer_height):
                 if height is not None:
-                    raise ValueError(f"Cannot specify `{height}` for `{scheme}` scheme.")
+                    raise ValueError(f"Cannot specify `{height=}` for `{scheme}` scheme.")
             if noise == 'code capacity':
                 h = 1
                 code._N_EDGES, code._EDGES = code._code_capacity_edges()
@@ -56,7 +56,7 @@ class InnerInitHelper:
             code._NODES = tuple(itertools.product(*node_ranges))
         else:
             if window_height is not None:
-                raise ValueError(f"Cannot specify `window_height` for `{scheme}` scheme.")
+                raise ValueError(f"Cannot specify `window_height` for the {scheme} decoding scheme.")
             code._DIMENSION += 1
             if scheme == 'forward':
                 if commit_height is None: commit_height = d
@@ -72,7 +72,7 @@ class InnerInitHelper:
             nodes += code._temporal_boundary_nodes(h)
 
             if noise == 'code capacity':
-                raise TypeError("Code capacity incompatible with these decoding schemes.")
+                raise TypeError(f"Code capacity incompatible with the {scheme} decoding scheme.")
             elif noise == 'phenomenological':
                 code._N_EDGES, code._EDGES = code._phenomenological_edges(h, True)
                 _, commit_edges = code._phenomenological_edges(commit_height, True)

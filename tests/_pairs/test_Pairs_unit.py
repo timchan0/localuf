@@ -10,14 +10,14 @@ FourNodes = tuple[Node, Node, Node, Node]
 
 def test_reset(pairs: Pairs, uvwx: FourNodes):
     u, v, _, _ = uvwx
-    pairs.dc = {u: v, v: u}
+    pairs._dc = {u: v, v: u}
     pairs.reset()
-    assert pairs.dc == {}
+    assert pairs._dc == {}
 
 
 def test_contains(pairs: Pairs, uvwx: FourNodes):
     u, v, w, _ = uvwx
-    pairs.dc = {u: v, v: u}
+    pairs._dc = {u: v, v: u}
     assert u in pairs
     assert v in pairs
     assert w not in pairs
@@ -25,7 +25,7 @@ def test_contains(pairs: Pairs, uvwx: FourNodes):
 
 def test_getitem(pairs: Pairs, uvwx: FourNodes):
     u, v, w, _ = uvwx
-    pairs.dc = {u: v, v: u}
+    pairs._dc = {u: v, v: u}
     assert pairs[u] == v
     assert pairs[v] == u
     with pytest.raises(KeyError):
@@ -35,19 +35,19 @@ def test_getitem(pairs: Pairs, uvwx: FourNodes):
 def test_add(pairs: Pairs, uvwx: FourNodes):
     u, v, _, _ = uvwx
     pairs.add(u, v)
-    assert pairs.dc == {u: v, v: u}
+    assert pairs._dc == {u: v, v: u}
 
 
 def test_remove(pairs: Pairs, uvwx: FourNodes):
     u, v, _, _ = uvwx
-    pairs.dc = {u: v, v: u}
+    pairs._dc = {u: v, v: u}
     pairs.remove(u)
-    assert pairs.dc == {}
+    assert pairs._dc == {}
 
 
 def test_load_annihilates_anyons(pairs: Pairs, uvwx: FourNodes):
     u, v, _, _ = uvwx
-    pairs.dc = {u: v, v: u}
+    pairs._dc = {u: v, v: u}
     with mock.patch(
         "localuf._pairs.Pairs.remove",
         side_effect=pairs.remove,
@@ -58,7 +58,7 @@ def test_load_annihilates_anyons(pairs: Pairs, uvwx: FourNodes):
 
 def test_load_joins_paths(pairs: Pairs, uvwx: FourNodes):
     u, v, w, x = uvwx
-    pairs.dc = {u: w, w: u, v: x, x: v}
+    pairs._dc = {u: w, w: u, v: x, x: v}
     with (
         mock.patch("localuf._pairs.Pairs.remove") as mock_remove,
         mock.patch("localuf._pairs.Pairs.add") as mock_add,
@@ -70,7 +70,7 @@ def test_load_joins_paths(pairs: Pairs, uvwx: FourNodes):
 
 def test_load_extends_path(pairs: Pairs, uvwx: FourNodes):
     u, v, w, _ = uvwx
-    pairs.dc = {u: w, w: u}
+    pairs._dc = {u: w, w: u}
     with (
         mock.patch("localuf._pairs.Pairs.remove") as mock_remove,
         mock.patch("localuf._pairs.Pairs.add") as mock_add,
@@ -97,5 +97,5 @@ def test_load_adds_path(pairs: Pairs, uvwx: FourNodes):
 
 def test_as_set(pairs: Pairs, uvwx: FourNodes):
     u, v, w, x = uvwx
-    pairs.dc = {u: v, v: u, w: x, x: w}
+    pairs._dc = {u: v, v: u, w: x, x: w}
     assert pairs.as_set == {(u, v), (w, x)}

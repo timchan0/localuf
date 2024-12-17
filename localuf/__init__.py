@@ -17,8 +17,8 @@ Available functions:
 * get_failure_data
 * get_log_runtime_data
 * get_stats
-* get_failure_data_from_SS
-* from_merging_to_all
+* get_failure_data_from_subset_sample
+* add_ignored_timesteps
 """
 
 
@@ -29,4 +29,4 @@ from localuf import decoders
 from localuf import plot
 from localuf import sim
 from localuf.data_processors import get_failure_data, get_log_runtime_data, \
-    get_stats, get_failure_data_from_SS, from_merging_to_all
+    get_stats, get_failure_data_from_subset_sample, add_ignored_timesteps

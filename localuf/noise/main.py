@@ -47,7 +47,7 @@ class Noise(abc.ABC):
         """Return DataFrame containing probabilities of each subset.
 
         Input:
-        * `p` characteristic physical error probability.
+        * `p` noise level.
         * `survival` whether to compute survival probability column.
 
         Output:
@@ -69,7 +69,7 @@ class Noise(abc.ABC):
         Used only in `Code.get_matching_graph`.
         
         Input:
-        * `p` characteristic physical error probability.
+        * `p` noise level.
 
         Output:
         * |E|-tuple of pairs (edge, bitflip probability).

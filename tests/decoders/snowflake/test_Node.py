@@ -1,3 +1,4 @@
+import itertools
 from unittest import mock
 
 import pytest
@@ -116,25 +117,75 @@ def test_update_after_drop(sfn3: _Node):
     assert sfn3.next_pointer == 'U'
 
 
-def test_growing_calls_find_broken_pointers(sfn3: _Node):
-    with mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find:
+@pytest.mark.parametrize("active", (False, True))
+def test_grow(sfn3: _Node, active):
+    """Test `grow`."""
+    sfn3.active = active
+    with (
+        mock.patch("localuf.decoders.snowflake._Node._grow") as mock_grow,
+        mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find,
+    ):
         sfn3.grow()
+        assert sfn3.busy is False
+        if active:
+            mock_grow.assert_called_once_with()
+        else:
+            mock_grow.assert_not_called()
         mock_find.assert_called_once_with()
 
 
-def test_growing_inactive(sfn3: _Node):
-    """Test `growing` when node inactive."""
-    sfn3.grow()
-    assert sfn3.busy is False
-    assert all(edge.growth is Growth.UNGROWN
-               for edge in sfn3.SNOWFLAKE.EDGES.values())
+@pytest.mark.parametrize("active", (False, True))
+@pytest.mark.parametrize("whole", (False, True))
+def test_grow_whole(sfn3: _Node, active, whole):
+    sfn3.active = active
+    sfn3.whole = whole
+    with (
+        mock.patch("localuf.decoders.snowflake._Node._grow") as mock_grow,
+        mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find,
+    ):
+        sfn3.grow_whole()
+        assert sfn3.busy is False
+        if active and whole:
+            mock_grow.assert_called_once_with()
+            assert sfn3.grown
+            assert sfn3.next_grown
+        else:
+            mock_grow.assert_not_called()
+            assert not sfn3.grown
+            assert not sfn3.next_grown
+        mock_find.assert_called_once_with()
 
 
-def test_growing_active(sfn3: _Node):
-    """Test `growing` when node active."""
-    sfn3.active = True
+@pytest.mark.parametrize("active", (False, True))
+@pytest.mark.parametrize("whole", (False, True))
+@pytest.mark.parametrize("grown", (False, True))
+def test_grow_half(sfn3: _Node, active, whole, grown):
+    sfn3.active = active
+    sfn3.whole = whole
+    sfn3.grown = grown
+    sfn3.unrooted = True
+    sfn3.next_unrooted = True
+    with (
+        mock.patch("localuf.decoders.snowflake._Node._grow") as mock_grow,
+        mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find,
+    ):
+        sfn3.grow_half()
+        assert not sfn3.unrooted
+        assert not sfn3.next_unrooted
+        assert sfn3.busy is False
+        if active and not whole and not grown:
+            mock_grow.assert_called_once_with()
+        else:
+            mock_grow.assert_not_called()
+        assert sfn3.grown is grown
+        assert sfn3.next_grown is False
+        mock_find.assert_not_called()
+
+
+def test_grow_subroutine(sfn3: _Node):
+    """Test `_grow`."""
     for growth in [Growth.HALF] + 2*[Growth.FULL]:
-        sfn3.grow()
+        sfn3._grow()
         assert sfn3.busy is False
         for e, edge in sfn3.SNOWFLAKE.EDGES.items():
             if sfn3.INDEX in e:
@@ -162,16 +213,17 @@ def test_update_access(snowflake3: Snowflake):
     assert center.access == {'E': snowflake3.NODES[e]}
 
 
-def test_merging(sfn3: _Node):
+@pytest.mark.parametrize("whole", (False, True))
+def test_merging(sfn3: _Node, whole):
     sfn3.busy = True
     with (
         mock.patch("localuf.decoders.snowflake._Node.syncing") as mock_syncing,
         mock.patch("localuf.decoders.snowflake._Node.flooding") as mock_flooding,
     ):
-        sfn3.merging()
+        sfn3.merging(whole)
         assert sfn3.busy is False
         mock_syncing.assert_called_once_with()
-        mock_flooding.assert_called_once_with()
+        mock_flooding.assert_called_once_with(whole)
 
 
 def test_syncing(syncing_flooding_objects: tuple[
@@ -233,10 +285,19 @@ def test_syncing(syncing_flooding_objects: tuple[
     assert center.busy is True
 
 
-def test_flooding(sfn3: _Node):
-    with mock.patch("localuf.decoders.snowflake.main._FullUnrooter.flooding") as mock_flooding:
-        sfn3.flooding()
-        mock_flooding.assert_called_once_with()
+@pytest.mark.parametrize("whole", (False, True))
+def test_flooding(sfn3: _Node, whole):
+    with (
+        mock.patch("localuf.decoders.snowflake.main._FullUnrooter.flooding_whole") as mock_whole,
+        mock.patch("localuf.decoders.snowflake.main._FullUnrooter.flooding_half") as mock_half,
+    ):
+        sfn3.flooding(whole)
+        if whole:
+            mock_whole.assert_called_once_with()
+            mock_half.assert_not_called()
+        else:
+            mock_whole.assert_not_called()
+            mock_half.assert_called_once_with()
 
 
 def test_update_after_merging(sfn3: _Node):

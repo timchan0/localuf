@@ -1,6 +1,6 @@
 """Module containing type aliases."""
 
-from typing import Literal
+from typing import Literal, Sequence
 
 import numpy as np
 import numpy.typing as npt
@@ -21,6 +21,10 @@ DecodingScheme = Literal[
 """Decoding scheme."""
 NoiseModel = Literal[
     'code capacity',
+    'phenomenological',
+    'circuit-level',
+]
+StreamingNoiseModel = Literal[
     'phenomenological',
     'circuit-level',
 ]
@@ -62,3 +66,5 @@ FourInts = tuple[
 """Tuple of 4 integers."""
 MultiplicityVector = npt.NDArray[np.int_]
 """NumPy array of 4 integers."""
+FloatSequence = Sequence[float] | npt.NDArray[np.float_]
+IntSequence = Sequence[int] | npt.NDArray[np.int_]

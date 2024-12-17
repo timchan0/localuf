@@ -1,132 +1,100 @@
-"""Module for plotting numeric data from `sim`."""
+"""Plot runtime data from `sim.runtime`.
 
+Available functions:
+* mean
+* distribution
+* distributions
+* violin
+"""
+
+from collections.abc import Callable
 import itertools
-from typing import Iterable, Literal
 from string import ascii_lowercase
+from typing import Iterable, Literal, Sequence
 
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.container import ErrorbarContainer
 from pandas import DataFrame, Index, Series
-from statsmodels.stats.proportion import proportion_confint
 
-from localuf.constants import STANDARD_ERROR_ALPHA
 
-def threshold_data(
-        data: DataFrame,
-        title: str = '',
-        xlabel: None | str = None,
-        ylabel: None | str = None,
-        legend: bool = True,
-        alpha: float = STANDARD_ERROR_ALPHA,
-        method: str = 'wilson',
-        **kwargs,
-):
-    """Plot threshold data in `data`.
+DEFAULT_FILL_ALPHA = 0.15
 
-    Input:
-    * `data` a DataFrame where each
-    column a (distance, probability);
-    rows m, n indicate number of logical errors and samples, respectively.
-    * `title, xlabel, ylabel, legend` for plot.
-    * `alpha` significance level of confidence intervals.
-    * `method` method to compute confidence intervals.
-    For details on confidence intervals,
-    see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
-    * `kwargs` passed to `pyplot.errorbar`.
-    """
-    for d, df in data.T.groupby(level='d'):
-        df = df.droplevel('d')
-        mean: Series[float] = df.m / df.n
-        lo, hi = proportion_confint(df.m, df.n, alpha=alpha, method=method)
-        plt.errorbar(
-            x=df.index,
-            y=mean,
-            yerr=(mean-lo, hi-mean),
-            capsize=2,
-            label=str(d),
-            **kwargs,
-        )
-    if legend:
-        plt.legend(title=r'$d =\dots$')
-    if title:
-        plt.title(title)
-    if xlabel is None:
-        xlabel = 'physical error probability'
-    plt.xlabel(xlabel)
-    if ylabel is None:
-        ylabel = 'logical error probability'
-    plt.ylabel(ylabel)
 
-def subset_sampled(
-        data: DataFrame,
-        legend: bool = True,
-        alpha: float = 0.3,
-        title: str = '',
-):
-    """Plot failure probability from output of `get_failure_data_from_SS`.
-
-    Input:
-    * `data` output of `get_failure_data_from_SS`.
-    * `legend` whether to show legend.
-    * `alpha` transparency of confidence region.
-    * `title` plot title.
-    """
-    for d, df in data.groupby(level='d'):
-        df = df.droplevel('d')
-        plt.plot(df.index, df.f, label=str(d))
-        plt.fill_between(
-            x=df.index,
-            y1=df.lo,
-            y2=df.hi,
-            alpha=alpha,
-        )
-    plt.loglog()
-    if legend:
-        plt.legend(title=r'$d =\dots$')
-    plt.xlabel('physical error probability')
-    plt.ylabel('logical error probability')
-    if title:
-        plt.title(title)
-
-def mean_runtime(
+def mean(
         data: DataFrame,
         title: str = '',
         per_measurement_round: bool = False,
+        layers_per_sample: Callable[[int], int] = lambda d: d,
         yerr_shows: Literal['sem', 'std'] = 'sem',
-        ps: Iterable[float] | None = None,
-        legend: bool = True,
-        grid: bool = True,
+        noise_levels: Sequence[float] | None = None,
+        legend: None | bool = None,
+        grid: bool = False,
         xlabel: None | str = None,
         ylabel: None | str = None,
+        base_color: None | tuple[float, float, float] | str = None,
+        fill_between: bool = True,
+        fill_alpha: float = DEFAULT_FILL_ALPHA,
+        capsize: float = 2,
+        quantile: None | float = None,
+        quantile_linestyle: str = '--',
+        **kwargs,
 ):
     """Plot mean timestep count against code distance.
-    
+
     Input:
     * `data` a DataFrame where each
     column a (distance, probability);
     row, a runtime sample.
     * `title` plot title.
     * `per_measurement_round` whether to divide runtime by measurement round count.
+    * `layers_per_sample` a function with input `d` that outputs
+    the measurement round count per row of `data`.
+    Affects output only if `per_measurement_round`.
     * `yerr_shows` what errorbars show:
     either `'sem'` for standard error,
     or `'std'` for standard deviation.
-    * `ps` iterable specifying which probabilities to plot, in case want to omit any.
+    * `noise_levels` sequence specifying which noise levels to plot, in case want to omit any.
+    * `base_color` a single color for all errorbars and their connecting lines.
+    Decreasing noise level is then shown by increasing opacity.
+    If `None`, each noise level is shown by a different, fully opaque color.
+    * `fill_between` whether to use `fill_between` instead of `errorbar`.
+    * `fill_alpha` alpha value for the filled area.
+    * `capsize` length of error bar caps in points.
+    * `quantile` optional quantile (in the interval [0, 1]) to line plot.
+    * `quantile_linestyle` linestyle for the quantile line.
+    * `**kwargs` passed to either `errorbar` or `fill_between`
+    depending on which is used.
 
     Output:
-    `data_copy` a copy of `data` with runtimes divided by distance
+    * `data_copy` a copy of `data` with runtimes divided by distance
     if `per_measurement_round`
     else an exact copy of `data`.
+    * `containers` a dictionary where each
+    key a noise level;
+    value, the `ErrorbarContainer` for that noise level.
     """
+    containers: dict[float, ErrorbarContainer | list[Line2D]] = {}
     ds: Index[int] = data.columns.get_level_values('d').unique()
     data_copy = data.copy()
     if per_measurement_round:
         for d in ds:
-            data_copy[d] = data[d] / d
+            data_copy[d] = data[d] / layers_per_sample(d)
         default_ylabel = 'mean runtime per measurement round'
     else:
         default_ylabel = 'mean runtime'
-    if ps is None:
-        ps = data.columns.get_level_values('p').unique()
-    for p in ps:
+    ps: Sequence[float] = data.columns.get_level_values('p').unique() \
+        if noise_levels is None else noise_levels # type: ignore
+    if base_color is None:
+        colors = itertools.repeat(None)
+        if legend is None:
+            legend = True
+    else:
+        if legend is None:
+            legend = False
+        p_count = len(ps)
+        colors = [(base_color, k/p_count) for k in range(p_count, 0, -1)]
+    for p, color in zip(ps, colors):
         df: DataFrame = data_copy.xs(p, level='p', axis=1) # type: ignore
 
         if yerr_shows == 'sem':
@@ -135,14 +103,43 @@ def mean_runtime(
             yerr: Series[float] = df.std()
         else:
             raise ValueError(f'invalid yerr_shows: {yerr_shows}')
-        
-        plt.errorbar(
-            x=ds,
-            y=df.mean(),
-            yerr=yerr,
-            capsize=2,
-            label=f'{p:.1e}',
-        )
+
+        if fill_between:
+            container = plt.plot(
+                ds,
+                df.mean(),
+                label=f'{p:.1e}',
+                color=color,
+            )
+            lo = df.mean() - yerr
+            hi = df.mean() + yerr
+            plt.fill_between(
+                x=ds,
+                y1=lo,
+                y2=hi,
+                color=container[0].get_color(),
+                alpha=fill_alpha,
+                linewidth=0,
+                **kwargs,
+            )
+        else:
+            container = plt.errorbar(
+                x=ds,
+                y=df.mean(),
+                yerr=yerr,
+                capsize=capsize,
+                label=f'{p:.1e}',
+                color=color,
+                **kwargs,
+            )
+        if quantile is not None:
+            plt.plot(
+                ds,
+                df.quantile(quantile),
+                color=container[0].get_color(),
+                linestyle=quantile_linestyle,
+            )
+        containers[p] = container
     plt.xticks(ds);
     if legend: plt.legend(title=r'$p =\dots$', reverse=True)
     if grid: plt.grid(which='both')
@@ -151,9 +148,10 @@ def mean_runtime(
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if title: plt.title(title)
-    return data_copy
+    return data_copy, containers
 
-def runtime_distribution(
+
+def distribution(
         data: DataFrame,
         p: float,
         bins=80,
@@ -219,33 +217,42 @@ def runtime_distribution(
             plt.axvline(x=df[d].max(), color='r')
     return f
 
-def runtime_distributions(
-        data: list[DataFrame],
+
+def distributions(
+        data: Sequence[DataFrame],
         p: float,
         bins: int | Iterable[int] = 80,
         figsize: None | tuple[float, float] = None,
         log_scale=True,
         grid=False,
         global_range=True,
-        **kwargs,
+        show_xticks=False,
+        subplots_hspace=0.05,
+        quantile: float = 1,
+        supxlabel_y: float = 0.15,
+        **kwargs_for_ylabel,
 ):
     """Histogram runtime distributions for each DataFrame in `data`.
-    
+
     Input:
-    * `data` list of DataFrames. In each DataFrame, each
+    * `data` sequence of DataFrames. In each DataFrame, each
     column a (distance, probability);
     row, a runtime sample.
-    * `p` physical error probability associated to the runtimes histogrammed.
+    * `p` noise level associated to the runtimes histogrammed.
     * `bins` bin count in each histogram.
     If an int, use same bin count for all entries in `data`.
+    If any bin count is 0, set bin width to 1.
     * `global_range` whether to use same bins for all distances within a DataFrame.
-    * `**kwargs` passed to `plt.ylabel` for the first subplot.
+    * `quantile` the quantile (in the interval [0, 1]) to draw as a horizontal red line.
+    Default is 1 i.e. the maximum of the sample.
+    * `supxlabel_y` y-coordinate for the figure x-label.
+    * `**kwargs_for_ylabel` passed to `plt.ylabel` for the leftmost subplot in each row.
     """
     if isinstance(bins, int):
         bins = itertools.repeat(bins)
     ds: Index[int] = next(iter(data)).xs(p, level='p', axis=1).columns # type: ignore
     if figsize is None:
-        figsize=(15, 4)
+        figsize=(len(ds), 3)
     w, h = figsize
     figsize = (w, h*len(data))
     f = plt.figure(figsize=figsize)
@@ -267,26 +274,40 @@ def runtime_distributions(
             plt.grid(grid)
             plt.ylim(0, max_runtime)
             if j == 1:
-                plt.ylabel(f'({letter})', **kwargs)
+                plt.ylabel(f'({letter})', **kwargs_for_ylabel)
             else:
                 ax.set_yticklabels([])
             if log_scale:
                 plt.xscale('log')
             if i == len(data)-1:
-                plt.xlabel(f'$d = {d}$')
+                plt.xlabel(str(d))
             plt.axhline(y=df[d].mean(), color='magenta')
-            plt.axhline(y=df[d].max(), color='r')
+            plt.axhline(y=df[d].quantile(quantile), color='r')
+    f.supxlabel('code distance $d$', size='medium', y=supxlabel_y)
+    f.tight_layout()
+    if not show_xticks:
+        for ax in f.axes:
+            ax.set_xticks([])
+            ax.set_xticks([], minor=True)
+        f.subplots_adjust(hspace=subplots_hspace, wspace=0)
     return f
 
-def runtime_violin(
+
+def violin(
         data: DataFrame,
         p: float,
         title='',
         widths=1,
         showextrema=False,
+        capsize: float = 3,
         errorbar_kwargs: None | dict = None,
-        **kwargs,
+        **kwargs_for_violinplot,
 ):
+    """Violin plot of runtime distributions for a given `p`.
+    
+    Input:
+    * `capsize` length of error bar caps in points.
+    """
     df: DataFrame = data.xs(p, level='p', axis=1) # type: ignore
     if errorbar_kwargs is None: errorbar_kwargs = {}
     parts = plt.violinplot(
@@ -294,7 +315,7 @@ def runtime_violin(
         positions=list(df.columns),
         widths=widths,
         showextrema=showextrema,
-        **kwargs,
+        **kwargs_for_violinplot,
     )
     for pc in parts['bodies']: # type: ignore
         pc.set_alpha(1)
@@ -303,7 +324,7 @@ def runtime_violin(
         y=df.mean(),
         yerr=df.std(),
         fmt='.',
-        capsize=3,
+        capsize=capsize,
         linestyle='none',
         **errorbar_kwargs,
     )
