@@ -56,7 +56,7 @@ def get_failure_data_from_subset_sample(
         data: DataFrame,
         code_class: Type[Code],
         noise: NoiseModel,
-        ps: npt.NDArray[np.float_],
+        ps: npt.NDArray[np.float64],
         alpha: float = STANDARD_ERROR_ALPHA,
         method='normal',
 ):

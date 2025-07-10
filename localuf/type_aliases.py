@@ -66,5 +66,5 @@ FourInts = tuple[
 """Tuple of 4 integers."""
 MultiplicityVector = npt.NDArray[np.int_]
 """NumPy array of 4 integers."""
-FloatSequence = Sequence[float] | npt.NDArray[np.float_]
+FloatSequence = Sequence[float] | npt.NDArray[np.float64]
 IntSequence = Sequence[int] | npt.NDArray[np.int_]

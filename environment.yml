@@ -1,0 +1,21 @@
+name: localuf
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - ipykernel
+  - ipywidgets
+  - matplotlib
+  - networkx
+  - pandas
+  - pytest
+  - scipy
+  - snakeviz
+  - statsmodels
+  - hatch
+  - pip
+  - pip:
+      - ldpc
+      - pymatching
+      - qecsim
+      - stim

@@ -1,0 +1,28 @@
+[project]
+name = "localuf"
+version = "3.1.0"
+description = "A Python package to simulate and visualise Union-Find-related decoders for CSS codes."
+authors = [{name="Tim Chan", email="timwlc@icloud.com"}]
+dependencies = [
+    "ipykernel",
+    "ipywidgets",
+    "matplotlib",
+    "networkx",
+    "pandas",
+    "pytest",
+    "scipy",
+    "snakeviz",
+    "statsmodels",
+    "ldpc",
+    "pymatching",
+    "qecsim",
+    "stim"
+]
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
