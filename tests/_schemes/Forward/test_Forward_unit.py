@@ -186,7 +186,6 @@ class TestRun:
     @pytest.mark.parametrize("n", range(1, 4), ids=lambda x: f"n{x}")
     def test_commit_equals_buffer(self, forward: Forward, n: int):
         uf = UF(forward._CODE)
-        uf.correction = set()
         p = 0.5
         cleanse_count = forward.WINDOW_HEIGHT // forward._COMMIT_HEIGHT
         commit_leftover = set()

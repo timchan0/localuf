@@ -5,6 +5,7 @@ Available functions:
 * frugal
 """
 
+from collections import defaultdict
 from collections.abc import Callable
 import itertools
 from typing import Iterable, Literal, Type
@@ -47,7 +48,7 @@ def batch(
     which stand for 'syndrome validation' and 'burning & peeling'.
     """
     scheme = 'batch'
-    dc: dict[tuple[str, int, float], list[int]] = {}
+    dc: defaultdict[tuple[str, int, float], list[int]] = defaultdict(list)
     for d in ds:
         code = Surface(
             d,
@@ -58,9 +59,6 @@ def batch(
         )
         decoder = decoder_class(code)
         for p in ps:
-            dc['SV', d, p] = []
-            if not validate_only:
-                dc['BP', d, p] = []
             for _ in itertools.repeat(None, times=n):
                 error = code.make_error(p)
                 syndrome = code.get_syndrome(error)

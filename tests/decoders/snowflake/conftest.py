@@ -1,6 +1,6 @@
 import pytest
 
-from localuf import Repetition
+from localuf import Repetition, Surface
 from localuf.decoders import Snowflake
 from localuf.decoders.snowflake import _Node, _Edge, Snowflake
 from localuf.type_aliases import Node
@@ -30,13 +30,17 @@ def snowflake_one_one(rp_frugal: Repetition):
 
 
 @pytest.fixture
-def snowflake3():
-    rp = Repetition(
+def frugal_rep_3():
+    return Repetition(
         3,
         noise='phenomenological',
         scheme='frugal',
     )
-    return Snowflake(rp)
+
+
+@pytest.fixture
+def snowflake3(frugal_rep_3: Repetition):
+    return Snowflake(frugal_rep_3)
 
 
 @pytest.fixture
@@ -75,3 +79,9 @@ def syncing_flooding_objects(snowflake3: Snowflake) -> tuple[
     center = snowflake3.NODES[c]
     east = snowflake3.NODES[e]
     return snowflake3, (w, c, e), (west, center, east)
+
+
+@pytest.fixture
+def surface3_CL_frugal():
+    """Distance-3 surface code, circuit-level noise, frugal scheme."""
+    return Surface(3, 'circuit-level', scheme='frugal')

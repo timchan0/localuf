@@ -3,11 +3,12 @@ from unittest import mock
 import networkx as nx
 import pytest
 
-from localuf import constants, Surface
+from localuf import constants, Surface, Repetition
+from localuf._schemes import Scheme
 from localuf.noise import CodeCapacity
 from localuf.noise.main import Phenomenological
 from localuf.type_aliases import Edge
-from localuf._base_classes import Scheme
+from localuf._base_classes import Code
 
 @pytest.fixture
 def error_2D():
@@ -31,12 +32,84 @@ def error_3D():
     "NODES",
     "TIME_AXIS",
     "LONG_AXIS",
-    "DIMENSION",
     "INCIDENT_EDGES",
 ])
 def test_property_attributes(test_property, sf3F: Surface, prop: str):
     test_property(sf3F, prop)
 
+
+class ConcreteCode(Code):
+
+    _EDGES = ()
+    _N_EDGES = 0
+    _NODES = ()
+
+    def _code_capacity_edges(self, merge_equivalent_boundary_nodes):
+        return super()._code_capacity_edges(merge_equivalent_boundary_nodes)
+
+    def _phenomenological_edges(
+            self,
+            h,
+            temporal_boundary,
+            merge_equivalent_boundary_nodes,
+    ):
+        return super()._phenomenological_edges(
+            h,
+            temporal_boundary,
+            merge_equivalent_boundary_nodes,
+        )
+
+    def _circuit_level_edges(
+            self,
+            h,
+            temporal_boundary,
+            _merge_redundant_edges,
+            merge_equivalent_boundary_nodes,
+    ): pass
+
+    def _temporal_boundary_nodes(self, h): pass
+
+    def _redundant_boundary_nodes(self, h): pass
+
+    def index_to_id(self, index): pass
+
+    def get_pos(self, x_offset, nodelist): pass
+
+
+@pytest.mark.parametrize("noise", ('code capacity', 'phenomenological'))
+@pytest.mark.parametrize("scheme", ('batch', 'global batch'))
+def test_init(noise, scheme):
+    with (
+        mock.patch(
+            "localuf._base_classes.Code._code_capacity_edges",
+            return_value=(0, (((0, 0), (0, 1)),))
+        ) as mock_code_capacity_edges,
+        mock.patch(
+            "localuf._base_classes.Code._phenomenological_edges",
+            return_value=(0, (((0, 0, 0), (0, 1, 0)),))
+        ) as mock_phenomenological_edges,
+        mock.patch(
+            "localuf._schemes.Batch.__init__",
+            return_value=None
+        ) as mock_batch_init,
+        mock.patch(
+            "localuf._schemes.Global.__init__",
+            return_value=None
+        ) as mock_global_batch_init,
+    ):
+        ConcreteCode(3, noise, scheme)
+        if noise == 'phenomenological':
+            mock_phenomenological_edges.assert_called_once()
+            mock_code_capacity_edges.assert_not_called()
+        else:
+            mock_phenomenological_edges.assert_not_called()
+            mock_code_capacity_edges.assert_called_once()
+        if scheme == 'batch':
+            mock_batch_init.assert_called_once()
+            mock_global_batch_init.assert_not_called()
+        else:
+            mock_batch_init.assert_not_called()
+            mock_global_batch_init.assert_called_once()
 
 def test_D_attribute(sf: Surface):
     assert type(sf.D) is int
@@ -157,10 +230,48 @@ def test_raise_edge(sf3T: Surface):
         assert e == ((*uij, ut+3), (*vij, vt+3))
 
 
-def test_make_error(sf3F: Surface):
-    with mock.patch("localuf.noise.main._Uniform.make_error") as m:
-        sf3F.make_error(0.5)
-        m.assert_called_once_with(0.5)
+class TestMakeError:
+
+    @pytest.mark.parametrize("noise_level", [0.0, 1e-3, 1e-1, 1.0])
+    def test_inner_called(self, sf3F: Surface, noise_level: float):
+        with mock.patch(
+            "localuf.noise.main._Uniform.make_error",
+            return_value=set(sf3F.EDGES),
+        ) as m:
+            error = sf3F.make_error(noise_level)
+            m.assert_called_once_with(noise_level)
+        assert error == set(sf3F.EDGES)
+
+    def test_exclude_temporal_boundary_edges_forward(self, rp3_forward: Repetition):
+        self._exclude_temproal_boundary_edges_helper(rp3_forward)
+
+    def test_exclude_temporal_boundary_edges_frugal(self, rp3_frugal: Repetition):
+        self._exclude_temproal_boundary_edges_helper(rp3_frugal)
+
+    def _exclude_temproal_boundary_edges_helper(self, repetition: Repetition):
+        NOISE_LEVEL = 1
+        h = repetition.SCHEME.WINDOW_HEIGHT
+        temporal_boundary_edges = {((j, h-1), (j, h)) for j in range(0, repetition.D-1)}
+        with mock.patch(
+            "localuf.noise.main._Uniform.make_error",
+            return_value=temporal_boundary_edges,
+        ) as m:
+            error = repetition.make_error(NOISE_LEVEL, exclude_temporal_boundary_edges=True)
+            m.assert_called_once_with(NOISE_LEVEL)
+        assert error == set()
+
+    def test_exclude_temporal_boundary_edges_surface(self, sfCL_OL: Surface):
+        NOISE_LEVEL = 1
+        h = sfCL_OL.SCHEME.WINDOW_HEIGHT
+        temporal_boundary_edges = {e for e in sfCL_OL.EDGES if any(
+            v[sfCL_OL.TIME_AXIS] == h for v in e)}
+        with mock.patch(
+            "localuf.noise.main.CircuitLevel.make_error",
+            return_value=temporal_boundary_edges,
+        ) as m:
+            error = sfCL_OL.make_error(NOISE_LEVEL, exclude_temporal_boundary_edges=True)
+            m.assert_called_once_with(NOISE_LEVEL)
+        assert error == set()
 
 
 def test_get_syndrome(
@@ -252,11 +363,3 @@ def test_get_node_color(sf3F: Surface):
         nodelist=[]
     )
     assert ls == []
-
-
-def test_get_matching_graph(sfCL: Surface):
-    p = 1e-1
-    matching = sfCL.get_matching_graph(p)
-    assert matching.num_edges == sfCL.N_EDGES
-    assert matching.num_detectors == sfCL.D * (sfCL.D-1) * sfCL.SCHEME.WINDOW_HEIGHT
-    assert matching.num_fault_ids == 1

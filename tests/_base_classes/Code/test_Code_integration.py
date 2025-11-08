@@ -18,7 +18,7 @@ def test_make_error(
 
 
 def test_INCIDENT_EDGES_circuit_level():
-    sf = Surface(3, 'circuit-level', merge_redundant_edges=False)
+    sf = Surface(3, 'circuit-level', _merge_redundant_edges=False)
     # boundary node
     assert sf.INCIDENT_EDGES[0, -1, 0] == {
         # cardinals

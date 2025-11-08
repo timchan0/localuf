@@ -2,8 +2,8 @@ import itertools
 
 import pytest
 
-from localuf import Repetition
-from localuf.type_aliases import Node
+from localuf import Repetition, Surface
+from localuf.type_aliases import Node, Edge
 from localuf.constants import Growth
 from localuf.decoders import Snowflake
 from localuf.decoders.snowflake import _Node
@@ -310,3 +310,56 @@ def test_no_infinite_loop(snowflake7: Snowflake):
                 assert_no_standoff_between(node_u, node_v)
         if not any(node.busy for node in snowflake7.NODES.values()):
             break
+
+
+class TestLowestEdges:
+
+    @staticmethod
+    def _check_edge_indices(decoder: Snowflake, indices: tuple[Edge, ...]):
+        for index, edge in zip(indices, decoder._LOWEST_EDGES, strict=True):
+            assert edge.INDEX == index
+
+
+    def test_repetition(self, snowflake3: Snowflake):
+        indices = (
+            ((-1, 0), (0, 0)),
+            ((0, 0), (1, 0)),
+            ((1, 0), (2, 0)),
+        )
+        self._check_edge_indices(snowflake3, indices)
+
+
+    def test_surface(self, surface3_CL_frugal: Surface):
+        """Verified `indices` by drawing each edge in a notebook."""
+        decoder = Snowflake(surface3_CL_frugal)
+        indices = (
+            ((0, 0, 0), (0, 0, 1)),
+            ((0, 1, 0), (0, 1, 1)),
+            ((1, 0, 0), (1, 0, 1)),
+            ((1, 1, 0), (1, 1, 1)),
+            ((2, 0, 0), (2, 0, 1)),
+            ((2, 1, 0), (2, 1, 1)),
+            ((0, 0, 1), (1, 0, 0)),
+            ((0, 1, 1), (1, 1, 0)),
+            ((1, 0, 1), (2, 0, 0)),
+            ((1, 1, 1), (2, 1, 0)),
+            ((0, 0, 0), (0, 1, 1)),
+            ((1, 0, 0), (1, 1, 1)),
+            ((2, 0, 0), (2, 1, 1)),
+            ((0, 0, 0), (1, 1, 1)),
+            ((1, 0, 0), (2, 1, 1)),
+            ((0, 0, 0), (1, 0, 0)),
+            ((0, 1, 0), (1, 1, 0)),
+            ((1, 0, 0), (2, 0, 0)),
+            ((1, 1, 0), (2, 1, 0)),
+            ((0, -1, 0), (0, 0, 0)),
+            ((0, 0, 0), (0, 1, 0)),
+            ((0, 1, 0), (0, 2, 0)),
+            ((1, -1, 0), (1, 0, 0)),
+            ((1, 0, 0), (1, 1, 0)),
+            ((1, 1, 0), (1, 2, 0)),
+            ((2, -1, 0), (2, 0, 0)),
+            ((2, 0, 0), (2, 1, 0)),
+            ((2, 1, 0), (2, 2, 0)),
+        )
+        self._check_edge_indices(decoder, indices)

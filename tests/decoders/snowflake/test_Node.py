@@ -1,8 +1,9 @@
-import itertools
 from unittest import mock
 
 import pytest
 
+from localuf._base_classes import Code
+from localuf.codes import Repetition, Surface
 from localuf.constants import Growth
 from localuf.decoders.snowflake.constants import RESET
 from localuf.type_aliases import Node
@@ -51,18 +52,71 @@ def test_FRIENDSHIP_property(snowflake: Snowflake):
             assert type(node.FRIENDSHIP) is NodeFriendship
 
 
-def test_NEIGHBORS_property(snowflake3: Snowflake, sfn3: _Node):
-    for v, node in snowflake3.NODES.items():
-        assert type(node.NEIGHBORS) is dict
-        is_top_detector = (
-            v[snowflake3.CODE.TIME_AXIS]==snowflake3.CODE.SCHEME.WINDOW_HEIGHT-1
-        ) and not node._IS_BOUNDARY
-        assert len(node.NEIGHBORS) + is_top_detector == len(snowflake3.CODE.INCIDENT_EDGES[v])
-    assert sfn3.NEIGHBORS == {
-        'W': (((-1, 0), (0, 0)), 0),
-        'E': (((0, 0), (1, 0)), 1),
-        'U': (((0, 0), (0, 1)), 1),
-    }
+class TestNEIGHBORSProperty:
+
+    def _general_checks(self, code: Code, decoder: Snowflake):
+        for v, node in decoder.NODES.items():
+            assert type(node.NEIGHBORS) is dict
+            is_top_detector = (
+                v[code.TIME_AXIS]==code.SCHEME.WINDOW_HEIGHT-1
+            ) and not node._IS_BOUNDARY
+            if isinstance(code, Repetition):
+                assert len(node.NEIGHBORS) + is_top_detector == len(code.INCIDENT_EDGES[v])
+            else:
+                if is_top_detector:
+                    assert len(node.NEIGHBORS) < len(code.INCIDENT_EDGES[v])
+                else:
+                    assert len(node.NEIGHBORS) == len(code.INCIDENT_EDGES[v])
+
+
+    def test_default_order(self, snowflake3: Snowflake, sfn3: _Node):
+        self._general_checks(snowflake3.CODE, snowflake3)
+        assert sfn3.NEIGHBORS == {
+            'W': (((-1, 0), (0, 0)), 0),
+            'E': (((0, 0), (1, 0)), 1),
+            'U': (((0, 0), (0, 1)), 1),
+        }
+
+
+    def test_repetition_custom_order(self, frugal_rep_3: Repetition):
+        decoder = Snowflake(
+            code=frugal_rep_3,
+            _neighbor_order=('U', 'W', 'E', 'D')
+        )
+        self._general_checks(frugal_rep_3, decoder)
+        assert tuple(decoder.NODES[0, 0].NEIGHBORS.items()) == (
+            ('U', (((0, 0), (0, 1)), 1)),
+            ('W', (((-1, 0), (0, 0)), 0)),
+            ('E', (((0, 0), (1, 0)), 1)),
+        )
+
+    def test_surface_custom_order(self, surface3_CL_frugal: Surface):
+        decoder = Snowflake(
+            surface3_CL_frugal,
+            _neighbor_order=(
+                'U',
+                'NU',
+                'EU',
+                'SEU',
+                'N',
+                'W',
+                'E',
+                'S',
+                'NWD',
+                'WD',
+                'SD',
+                'D',
+            )
+        )
+        self._general_checks(surface3_CL_frugal, decoder)
+        assert tuple(decoder.NODES[0, 0, 0].NEIGHBORS.items()) == (
+            ('U', (((0, 0, 0), (0, 0, 1)), 1)),
+            ('EU', (((0, 0, 0), (0, 1, 1)), 1)),
+            ('SEU', (((0, 0, 0), (1, 1, 1)), 1)),
+            ('W', (((0, -1, 0), (0, 0, 0)), 0)),
+            ('E', (((0, 0, 0), (0, 1, 0)), 1)),
+            ('S', (((0, 0, 0), (1, 0, 0)), 1)),
+        )
 
 
 def test_busy_attribute(sfn3: _Node):

@@ -1,13 +1,14 @@
 """Module for decoders.
 
 Available decoders:
-* NodeUF
-* NodeBUF
-* UF
+* Actis
 * BUF
 * Macar
-* Actis
+* MWPM
+* NodeBUF
+* NodeUF
 * Snowflake
+* UF
 
 In drawings of UF-type decoders:
 * ungrown edges are invisible
@@ -20,4 +21,5 @@ from localuf.decoders.buf import BUF
 from localuf.decoders.node_uf import NodeUF
 from localuf.decoders.node_buf import NodeBUF
 from localuf.decoders.luf import Macar, Actis
+from localuf.decoders.mwpm import MWPM
 from localuf.decoders.snowflake import Snowflake

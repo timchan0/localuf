@@ -37,7 +37,7 @@ def test_validate(node_buf, syndrome7F):
     bucket = {_Cluster(node_buf, (0, 0))}
     node_buf.buckets = {1: bucket}
 
-    def fake_growth_round(dynamic, log_history, clusters_to_grow: set[_Cluster]):
+    def fake_growth_round(log_history, clusters_to_grow: set[_Cluster]):
         clusters_to_grow.clear()
 
     with (
@@ -50,7 +50,6 @@ def test_validate(node_buf, syndrome7F):
         node_buf.validate(syndrome7F)
         mock_load.assert_called_once_with(syndrome7F)
         mock_growth_round.assert_called_once_with(
-            False,
             False,
             clusters_to_grow=bucket,
         )

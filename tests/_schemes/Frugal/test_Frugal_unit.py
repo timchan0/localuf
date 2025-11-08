@@ -117,7 +117,7 @@ def test_advance(frugal3: Frugal):
     ):
         assert frugal3.advance(p, Snowflake(frugal3._CODE)) == 2
         rw.assert_called_once_with()
-        me.assert_called_once_with(p)
+        me.assert_called_once_with(p, exclude_temporal_boundary_edges=False)
         mock_load.assert_called_once_with(set())
         mock_decode.assert_called_once_with(set())
 

@@ -1,6 +1,7 @@
 """Classes for noise models."""
 
 import abc
+from collections import defaultdict
 from functools import cache
 import random
 from typing import Literal, Iterable
@@ -16,6 +17,9 @@ from localuf.noise._multiset_handler import MultisetHandler
 
 class Noise(abc.ABC):
     """Abstract base class for noise models."""
+
+    @abc.abstractmethod
+    def __str__(self) -> str: raise NotImplementedError
 
     @property
     @abc.abstractmethod
@@ -63,21 +67,30 @@ class Noise(abc.ABC):
         return df
 
     @abc.abstractmethod
-    def get_edge_probabilities(self, p: float) -> tuple[tuple[Edge, float], ...]:
-        """Return edges and their bitflip probabilities.
-        
-        Used only in `Code.get_matching_graph`.
-        
+    def get_edge_weights(
+        self,
+        noise_level: None | float,
+    ) -> dict[Edge, tuple[float, float]]:
+        """Return map from edge to its flip probability and weight.
+
         Input:
-        * `p` noise level.
+        * `noise_level` a probability that represents the noise strength.
+        This is needed to define nonuniform edge weights of the decoding graph
+        in the circuit-level noise model.
+        If `None`, all edges have flip probability 0 and weight 1.
 
         Output:
-        * |E|-tuple of pairs (edge, bitflip probability).
+        * map from edge to the pair (flip probability, weight).
         """
+
+    @staticmethod
+    def log_odds_of_no_flip(p: float) -> float:
+        """Convert flip probability to log odds of no flip."""
+        return np.log10((1-p)/p)
 
 
 class _Uniform(Noise):
-    """Base class for noise model where each edge has bitflip probability `p`.
+    """Base class for noise model where each edge has flip probability `p`.
 
     Extends `Noise`.
 
@@ -125,8 +138,15 @@ class _Uniform(Noise):
         )
         return probs
     
-    def get_edge_probabilities(self, p: float):
-        return tuple((e, p) for e in self.EDGES)
+    @cache
+    def get_edge_weights(self, noise_level: None | float) -> dict[Edge, tuple[float, float]]:
+        if noise_level is None:
+            flip_probability = 0
+            weight = 1
+        else:
+            flip_probability = noise_level
+            weight = self.log_odds_of_no_flip(noise_level)
+        return {e: (flip_probability, weight) for e in self.EDGES}
 
 
 class CodeCapacity(_Uniform):
@@ -228,23 +248,17 @@ class CircuitLevel(Noise):
     ):
         """Return `_EDGES` instance attribute."""
         multiplicities = cls._make_multiplicities(demolition, monolingual)
-        edges: dict[FourInts, list[Edge]] = {}
+        edges: defaultdict[FourInts, list[Edge]] = defaultdict(list)
         if merges is None:
             for edge_type, es in edge_dict.items():
                 m: FourInts = tuple(multiplicities[edge_type]) # type: ignore
-                if m in edges:
-                    edges[m] += list(es)
-                else:
-                    edges[m] = list(es)
+                edges[m] += list(es)
         else:
             dc = cls._get_dc(edge_dict, multiplicities, merges)
             for e, mv in dc.items():
                 m: FourInts = tuple(mv) # type: ignore
-                if m in edges:
-                    edges[m].append(e)
-                else:
-                    edges[m] = [e]
-        return edges
+                edges[m].append(e)
+        return dict(edges)
 
     @classmethod
     def _make_multiplicities(cls, demolition: bool, monolingual: bool):
@@ -281,20 +295,20 @@ class CircuitLevel(Noise):
         merges: dict[Edge, Edge],
     ):
         """Return map from edge to multiplicity 4-vector."""
-        dc: dict[Edge, MultiplicityVector] = {}
-        for edge_type, es in edge_dict.items():
+        # IMPORTANT: instantiate NEW array for each edge!
+        dc: defaultdict[Edge, MultiplicityVector] = defaultdict(lambda: np.zeros(4, dtype=int))
+        for edge_type, edges in edge_dict.items():
             m = multiplicities[edge_type]
-            for e in es:
+            for e in edges:
                 if e in merges:
                     substitute = merges[e]
                     dc[substitute] += m
                 else:
-                    # EXTREMELY IMPORTANT: instantiate NEW array for each edge!
-                    dc[e] = np.array(m)
+                    dc[e] += m
         return dc
     
     def make_error(self, p):
-        bitflip_probs = self._get_bitflip_probabilities(p)
+        bitflip_probs = self._get_flip_probabilities(p)
         error: set[Edge] = set()
         for m, pr in bitflip_probs.items():
             error |= {e for e in self._EDGES[m] if random.random() < pr}
@@ -315,21 +329,35 @@ class CircuitLevel(Noise):
         pi = self._pi(p)
         return self._FORCER.subset_probability(weights, pi)
     
-    def get_edge_probabilities(self, p):
-        bitflip_probs = self._get_bitflip_probabilities(p)
-        ls: list[tuple[Edge, float]] = []
-        for m, edges in self._EDGES.items():
-            bp = bitflip_probs[m]
-            for e in edges:
-                ls.append((e, bp))
-        return tuple(ls)
-    
-    def _pi(self, p: float) -> FourFloats:
-        """Return 4-vector probability pi = c*p."""
-        return tuple(c*p for c in self._COEFFICIENTS) # type: ignore
+    @cache
+    def get_edge_weights(self, noise_level: None | float):
+        result: dict[Edge, tuple[float, float]] = {}
+        if noise_level is None:
+            for m, edges in self._EDGES.items():
+                for e in edges:
+                    result[e] = (0, 1)
+        else:
+            flip_probabilities = self._get_flip_probabilities(noise_level)
+            for m, edges in self._EDGES.items():
+                p = flip_probabilities[m]
+                weight = self.log_odds_of_no_flip(p)
+                for e in edges:
+                    result[e] = (p, weight)
+        return result
+
+    def _pi(self, noise_level: float) -> FourFloats:
+        """Return 4-vector probability `pi = c*noise_level`."""
+        return tuple(c*noise_level for c in self._COEFFICIENTS) # type: ignore
     
     @cache
-    def _get_bitflip_probabilities(self, p: float) -> dict[FourInts, float]:
-        """Return map from multiplicity to bitflip probability."""
-        pi = self._pi(p)
+    def _get_flip_probabilities(self, noise_level: float) -> dict[FourInts, float]:
+        """Return map from multiplicity to flip probability.
+        
+        Input:
+        * `noise_level` a probability that represents the noise strength.
+
+        Output:
+        * map from multiplicity to a flip probability.
+        """
+        pi = self._pi(noise_level)
         return {m: MultisetHandler.pr(m, pi) for m in self._EDGES.keys()}

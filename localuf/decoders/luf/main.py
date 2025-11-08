@@ -60,6 +60,7 @@ class LUF(BaseUF):
         * `_optimal` whether management of `self.NODES.countdown` is optimal.
         Relevant only when `visible` is `False`.
         """
+        self.correction = set()
         super().__init__(code)
         self._CONTROLLER = Controller(self)
         self._NODES = MacarNodes(self) if visible else ActisNodes(self, _optimal)
@@ -150,7 +151,6 @@ class LUF(BaseUF):
         `tBP` # timesteps to burn and peel.
         """
         tBP = 0
-        self.correction: set[Edge] = set()
         if log_history:
             while self.CONTROLLER.stage is not Stage.DONE:
                 self._advance()
@@ -212,10 +212,7 @@ class LUF(BaseUF):
         dig, dig_diedges, dig_edges = self._pointer_digraph
         pos = self.CODE.get_pos(x_offset)
         if highlighted_edges is None:
-            try:
-                highlighted_edges = self.correction
-            except AttributeError:
-                highlighted_edges = set()
+            highlighted_edges = self.correction
         if labels is None:
             labels = self.NODES.labels(show_global)
         nodes_w_anyons = {v for v, node in self.NODES.dc.items() if node.anyon}

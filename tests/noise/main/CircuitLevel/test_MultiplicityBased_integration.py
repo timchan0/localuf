@@ -9,7 +9,7 @@ from localuf.type_aliases import Edge, FourInts
 @pytest.mark.parametrize('d', range(3, 7, 2), ids=lambda d: f'd{d}')
 def test_init(d: int):
 
-    sf1 = Surface(d, 'circuit-level', merge_redundant_edges=False)
+    sf1 = Surface(d, 'circuit-level', _merge_redundant_edges=False)
     sf2 = Surface(d, 'circuit-level')
     sf2_edges = set(sf2.EDGES)
 

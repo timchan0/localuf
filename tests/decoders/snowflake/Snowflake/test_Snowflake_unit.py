@@ -40,9 +40,17 @@ def test_property_attributes(test_property, snowflake: Snowflake, prop):
     test_property(snowflake, prop)
 
 
-def test_syndrome(snowflake: Snowflake):
+def test_syndrome(snowflake: Snowflake,):
     snowflake.NODES[0, 0].defect = True
     assert snowflake.syndrome == {(0, 0)}
+    snowflake.NODES[-1, 0].defect = True
+    assert snowflake.syndrome == {(0, 0)}
+
+
+@pytest.mark.parametrize("v", [(0, 0), (-1, 0)])
+def test_verbose_syndrome(snowflake: Snowflake, v: Node):
+    snowflake.NODES[v].defect = True
+    assert snowflake.verbose_syndrome == {v}
 
 
 def test_growth(snowflake: Snowflake, uvw: tuple[Node, Node, Node]):

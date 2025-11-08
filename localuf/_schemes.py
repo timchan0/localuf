@@ -1,13 +1,85 @@
+import abc
 from abc import abstractmethod
 import itertools
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 
 from localuf import constants
 from localuf.noise import CodeCapacity
 from localuf.type_aliases import Edge, Node
-from localuf._base_classes import Scheme, Code, Decoder
 from localuf._pairs import LogicalCounter, Pairs
-from localuf._determinants import SpaceDeterminant, SpaceTimeDeterminant
+from localuf._determinants import Determinant, SpaceDeterminant, SpaceTimeDeterminant
+
+
+if TYPE_CHECKING:
+    from localuf._base_classes import Code, Decoder
+    from localuf.decoders.snowflake.main import Snowflake
+
+
+class Scheme(abc.ABC):
+    """Abstract base class for decoding scheme of a CSS code.
+
+    Attributes:
+    * `_CODE` the CSS code.
+    * `_DETERMINANT` object to determine whether a node is a boundary.
+    * `WINDOW_HEIGHT` total height of decoding graph G or sliding window W.
+    """
+
+    def __init__(self, code: 'Code'):
+        """Input: `code` the CSS code."""
+        self._CODE = code
+        self._DETERMINANT: Determinant
+
+    @property
+    @abc.abstractmethod
+    def WINDOW_HEIGHT(self) -> int:
+        """Total height of decoding graph G or sliding window W."""
+
+    @abc.abstractmethod
+    def get_logical_error(self, leftover: set[Edge]) -> int:
+        """See `Code.get_logical_error`."""
+
+    def is_boundary(self, v: Node):
+        """See `Code.is_boundary`."""
+        return self._DETERMINANT.is_boundary(v)
+
+    @abc.abstractmethod
+    def run(
+        self,
+        decoder: 'Decoder',
+        p: float,
+        n: int,
+        **kwargs,
+    ) -> tuple[int, int | float]:
+        """Simulate `n` (equivalent) decoding cycles given `p`.
+
+        Input:
+        * `decoder` the decoder.
+        * `p` noise level.
+        * positive integer `n` is
+        decoding cycle count if scheme is 'batch' or 'forward'
+        else slenderness := (layer count / code distance),
+        where layer count := measurement round count + 1.
+
+        Output: tuple of (failure count, decoding cycle count
+        if noise is code capacity else slenderness).
+        """
+
+    @abc.abstractmethod
+    def sim_cycles_given_weight(
+            self,
+            decoder: 'Decoder',
+            weight: int | tuple[int, ...],
+            n: int,
+    ) -> tuple[int, int]:
+        """Simulate `n` decoding cycles given `weight`.
+
+        Input:
+        * `decoder` the decoder.
+        * `weight` the weight of the error.
+        * `n` decoding cycle count.
+
+        Output: tuple of (failure count, `n`).
+        """
 
 
 class Batch(Scheme):
@@ -25,7 +97,7 @@ class Batch(Scheme):
     def __str__() -> str:
         return 'batch'
 
-    def __init__(self, code: Code, window_height: int):
+    def __init__(self, code: 'Code', window_height: int):
         """Additional inputs: `window_height` the height of the batch."""
         super().__init__(code)
         self._WINDOW_HEIGHT = window_height
@@ -34,7 +106,7 @@ class Batch(Scheme):
     @property
     def WINDOW_HEIGHT(self): return self._WINDOW_HEIGHT
 
-    def run(self, decoder: Decoder, p: float, n: int):
+    def run(self, decoder: 'Decoder', p: float, n: int):
         # this assumes logical error count per batch << 1
         m = sum(self._sim_cycle_given_p(decoder, p) for _ in itertools.repeat(None, n))
         return (m, n if isinstance(self._CODE.NOISE, CodeCapacity)
@@ -47,7 +119,7 @@ class Batch(Scheme):
             ct += (u[self._CODE.LONG_AXIS] == -1)
         return ct % 2
 
-    def _sim_cycle_given_p(self, decoder: Decoder, p: float) -> int:
+    def _sim_cycle_given_p(self, decoder: 'Decoder', p: float) -> int:
         """Simulate a decoding cycle given `p`.
 
         Input:
@@ -59,7 +131,7 @@ class Batch(Scheme):
         error = self._CODE.make_error(p)
         return self._sim_cycle_given_error(decoder, error)
 
-    def _sim_cycle_given_error(self, decoder: Decoder, error: set[Edge]):
+    def _sim_cycle_given_error(self, decoder: 'Decoder', error: set[Edge]):
         """Simulate a decoding cycle given `error`.
 
         Input:
@@ -99,7 +171,7 @@ class Global(Batch):
     def __str__() -> str:
         return 'global batch'
 
-    def __init__(self, code: Code, window_height: int):
+    def __init__(self, code: 'Code', window_height: int):
         self.pairs = Pairs()
         super().__init__(code, window_height)
 
@@ -107,7 +179,7 @@ class Global(Batch):
         """Factory reset."""
         self.pairs.reset()
 
-    def run(self, decoder: Decoder, p: float, n: int):
+    def run(self, decoder: 'Decoder', p: float, n: int):
         # `slenderness = n` assumes the following:
         assert self.WINDOW_HEIGHT == self._CODE.D * n
         self.reset()
@@ -148,7 +220,7 @@ class _Streaming(Scheme):
 
     def __init__(
             self,
-            code: Code,
+            code: 'Code',
             commit_height: int,
             buffer_height: int,
             commit_edges: tuple[Edge, ...],
@@ -321,7 +393,7 @@ class Forward(_Streaming):
     
     def run(
             self,
-            decoder: Decoder,
+            decoder: 'Decoder',
             p: float,
             n: int,
             draw=False,
@@ -348,6 +420,8 @@ class Forward(_Streaming):
         buffer_leftover = self._make_error_in_buffer_region(p)
         # `cleanse_count` additional decoding cycles ensures window is free of defects
         cleanse_count = self.WINDOW_HEIGHT // self._COMMIT_HEIGHT
+        # Be F the last freshly discovered region of edges that can flip,
+        # then `cleanse_count` is the number of decoding cycles needed for F to be committed.
         if log_history:
             self.history: list[tuple[set[Edge], set[Edge], set[Node]]] = []
         for prob, time in itertools.chain(
@@ -426,18 +500,28 @@ class Frugal(_Streaming):
         self.error.clear()
         self._temporal_boundary_syndrome.clear()
 
-    def advance(self, prob: float, decoder: Decoder, **kwargs) -> int:
+    def advance(
+            self,
+            prob: float,
+            decoder: 'Decoder',
+            exclude_temporal_boundary_edges: bool = False,
+            **kwargs,
+    ) -> int:
         """Advance 1 decoding cycle.
 
         Input:
         * `prob` instantaneous noise level.
         * `decoder` the frugal-compatible decoder to use.
-        * `log_history, time_only` arguments of `decoder.decode`.
+        * `exclude_temporal_boundary_edges` passed to `self._CODE.make_error`.
+        * `log_history, time_only, defects_possible` arguments of `decoder.decode`.
 
         Output: number of decoder timesteps to complete decoding cycle.
         """
         self._raise_window()
-        error = self._CODE.make_error(prob)
+        error = self._CODE.make_error(
+            prob,
+            exclude_temporal_boundary_edges=exclude_temporal_boundary_edges,
+        )
         syndrome = self._load(error)
         return decoder.decode(syndrome, **kwargs) # type: ignore
 
@@ -460,7 +544,9 @@ class Frugal(_Streaming):
         """Load incremental `error`.
 
         Input: `error` the incremental error, which should never intersect `self.error`.
+        
         Output: `syndrome` the incremental syndrome due to `error`.
+        
         Side effect: Update `self.error` and `self.temporal_boundary_syndrome`.
         """
         self.error |= error
@@ -477,7 +563,7 @@ class Frugal(_Streaming):
 
     def run(
             self,
-            decoder: Decoder,
+            decoder: 'Decoder',
             p: float,
             n: int,
             draw: Literal[False, 'fine', 'coarse'] = False,
@@ -498,7 +584,9 @@ class Frugal(_Streaming):
         each merging step only ('merging');
         or each unrooting step only ('unrooting').
         Note: changing from 'merging' to 'all' simply increases each step count by 2d
-        [for a total step count increase of 2d(n-1)].
+        [for a total step count increase of 2d(n-1)]
+        in the case of Snowflake with the 1:1 schedule.
+        In the case of the 2:1 schedule, the increase of each step count is 3d.
         This can be done post-run via `add_ignored_timesteps`.
         * `kwargs_for_draw_decode` passed to `decoder.draw_decode`
         e.g. `margins=(0.1, 0.1)`.
@@ -536,3 +624,53 @@ class Frugal(_Streaming):
         if draw:
             decoder.draw_decode(**kwargs_for_draw_decode)
         return m, n
+    
+    def sample_latency(
+            self,
+            decoder: 'Snowflake',
+            p: float,
+            draw: Literal[False, 'fine', 'coarse'] = False,
+            log_history: Literal[False, 'fine', 'coarse'] = False,
+            time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
+            **kwargs_for_draw_decode,
+    ):
+        """Sample the latency of the decoder.
+
+        This runs a memory experiment of `self.WINDOW_HEIGHT+1` measurement rounds
+        i.e. `self.WINDOW_HEIGHT+2` sheets of syndrome data are produced.
+        Assumes commit height is 1.
+
+        Inputs same as in `run`.
+
+        Output:
+        * `latency` the number of timesteps from receiving the last measurement round
+        to outputting the final correction.
+        """
+        self.reset()
+        decoder.reset()
+        if draw:
+            log_history = draw
+        if log_history:
+            decoder.init_history()
+        latency = 0
+        defects_possible = True
+        for prob, include_in_latency in itertools.chain(
+            itertools.repeat((p, False), self.WINDOW_HEIGHT+1),
+            ((p, True),),
+            itertools.repeat((0, True), self.WINDOW_HEIGHT-1),
+        ):
+            if defects_possible and prob==0:
+                defects_possible = bool(decoder.syndrome)
+            step_count = self.advance(
+                prob,
+                decoder,
+                exclude_temporal_boundary_edges=include_in_latency,
+                log_history=log_history,
+                time_only=time_only,
+                defects_possible=defects_possible,
+            )
+            if include_in_latency:
+                latency += step_count
+        if draw:
+            decoder.draw_decode(**kwargs_for_draw_decode)
+        return latency

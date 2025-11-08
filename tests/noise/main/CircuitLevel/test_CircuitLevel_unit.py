@@ -117,7 +117,7 @@ def test_make_error(toy_cl: CircuitLevel, e_westmost: tuple[Edge, Edge]):
     m0, m1 = toy_cl._EDGES.keys()
     for p in (0, 1):
         with mock.patch(
-            'localuf.noise.CircuitLevel._get_bitflip_probabilities',
+            'localuf.noise.CircuitLevel._get_flip_probabilities',
             return_value={m0: 1-p, m1: p},
         ) as mock_gep:
             error = toy_cl.make_error(p)
@@ -125,10 +125,10 @@ def test_make_error(toy_cl: CircuitLevel, e_westmost: tuple[Edge, Edge]):
             assert error == {e_westmost[p]}
 
 
-def test_get_bitflip_probabilities(cl: CircuitLevel):
+def test_get__flip_probabilities(cl: CircuitLevel):
     with mock.patch('localuf.noise._multiset_handler.MultisetHandler.pr') as mock_pr:
-        cl._get_bitflip_probabilities(0)
-        cl._get_bitflip_probabilities(1)
+        cl._get_flip_probabilities(0)
+        cl._get_flip_probabilities(1)
         assert mock_pr.call_args_list == [
             mock.call(m, (0, 0, 0, 0))
             for m in cl._EDGES.keys()
@@ -138,8 +138,8 @@ def test_get_bitflip_probabilities(cl: CircuitLevel):
         ]
 
 
-def test_get_edge_probabilities(cl: CircuitLevel):
+def test_get_edge_weights(cl: CircuitLevel):
     p = 1e-1
-    with mock.patch("localuf.noise.CircuitLevel.get_edge_probabilities") as mock_gep:
-        cl.get_edge_probabilities(p)
-        mock_gep.assert_called_once_with(p)
+    with mock.patch("localuf.noise.CircuitLevel._get_flip_probabilities") as mock_gfp:
+        cl.get_edge_weights(p)
+        mock_gfp.assert_called_once_with(p)

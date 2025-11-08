@@ -6,11 +6,15 @@ from localuf.noise import CircuitLevel
 
 
 @pytest.fixture
-def cl_dc(e_westmost: tuple[Edge, Edge]):
+def ottf():
+    return (1, 2, 3, 4)
+
+
+@pytest.fixture
+def cl_dc(e_westmost: tuple[Edge, Edge], ottf):
     e0, e1 = e_westmost
     f = ((1, -1, 0), (1, 0, 1))
     g = ((0, -1, 0), (1, 0, 1))
-    ottf = (1, 2, 3, 4)
 
     return CircuitLevel._get_dc(
         edge_dict={
@@ -30,9 +34,9 @@ def cl_dc(e_westmost: tuple[Edge, Edge]):
 def test_get_dc(
         cl_dc: dict[Edge, MultiplicityVector],
         e_westmost: tuple[Edge, Edge],
+        ottf,
 ):
     e0, e1 = e_westmost
-    ottf = (1, 2, 3, 4)
 
     assert len(cl_dc) == 2
     assert (cl_dc[e0] == np.array(ottf)).all()

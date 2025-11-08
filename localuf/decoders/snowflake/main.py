@@ -1,4 +1,5 @@
 import abc
+from collections.abc import Iterable, Sequence
 from functools import cache
 from typing import Literal
 
@@ -33,6 +34,15 @@ class Snowflake(BaseUF):
     the set of its edges as undirected edges.
     * `_stage` the current stage of the decoder.
     Only used for `draw_growth` when `show_global = True`.
+    * `_LOWEST_EDGES` a tuple of the edges in the bottom layer of the viewing window.
+    For repetition code, only the spacelike edges are included,
+    ordered from west to east.
+    For surface code, all the edges in the bottom layer are included,
+    ordered first by type (up, south_down, east_up, south_east_up, south, east),
+    then by x-coordinate (north to south), then by y-coordinate (west to east).
+    * `floor_history` a list of bitstrings representing
+    the correction output from the bottom layer at each drop.
+    The order of the bits is given by `self._LOWEST_EDGES`.
 
     Overriden methods:
     * `reset`.
@@ -53,6 +63,7 @@ class Snowflake(BaseUF):
             merger: Literal['fast', 'slow'] = 'fast',
             schedule: Literal['2:1', '1:1'] = '2:1',
             unrooter: Literal['full', 'simple'] = 'full',
+            _neighbor_order: Iterable[direction] | None = None,
     ):
         """Input:
         * `code` the code to be decoded.
@@ -65,17 +76,35 @@ class Snowflake(BaseUF):
         via further merging timesteps.
         If `'simple'`, the node at breaking point only
         establishes the shortest path to a boundary.
+        * `_neighbor_order` optionally customizes the order in which each node checks its neighbors.
+        For the repetition code, this should be an iterable of the four directions
+        ('W', 'E', 'D', 'U') in some order.
+        For the surface code, this should be an iterable of the twelve directions
+        ('NWD', 'N', 'NU', 'WD', 'W', 'D', 'U', 'E', 'EU', 'SD', 'S', 'SEU') in some order.
+        Technically you can exclude the ones which are not part of the decoding the graph
+        e.g. the diagonal directions (comprising >=2 characters) for phenomenological noise,
+        but if you accidentally exclude a relevant direction
+        then no node will ever check that direction for growing, flooding, nor syncing.
+        So it is safest to include all twelve directions even if some are not used.
+        If `_neighbor_order` is not specified, the orders listed above are used.
         """
         if isinstance(code.NOISE, CodeCapacity):
             raise ValueError('Snowflake incompatible with code capacity noise model.')
         if not isinstance(code.SCHEME, Frugal):
-            raise ValueError('Snowflake only compatible with frugal scheme.')
+            raise ValueError('Snowflake only compatible with frugal scheme i.e. `code.SCHEME` must be `Frugal`.')
         super().__init__(code)
-        self._SCHEDULE: _Schedule = _TwoOne(self) if schedule == '2:1' else _OneOne(self)
+        self._SCHEDULE: _Schedule = (_TwoOne if schedule == '2:1' else _OneOne)(self)
+        window_height = self.CODE.SCHEME.WINDOW_HEIGHT
         self._EDGES = {
             e: _Edge(self, e) for e in self.CODE.EDGES
-            if all(v[self.CODE.TIME_AXIS] < self.CODE.SCHEME.WINDOW_HEIGHT for v in e)
+            if all(v[self.CODE.TIME_AXIS] < window_height for v in e)
         }
+        if _neighbor_order is None:
+            if isinstance(code, Repetition):
+                _neighbor_order = ('W', 'E', 'D', 'U')
+            else:  # Surface
+                _neighbor_order = ('NWD', 'N', 'NU', 'WD', 'W', 'D', 'U', 'E', 'EU', 'SD', 'S', 'SEU')
+        self._NEIGHBOR_ORDER: Iterable[direction] = _neighbor_order
         self._NODES = {
             v: _Node(
                 self,
@@ -83,13 +112,15 @@ class Snowflake(BaseUF):
                 merger=merger,
                 unrooter=unrooter,
             ) for v in self.CODE.NODES
-            if v[self.CODE.TIME_AXIS] < self.CODE.SCHEME.WINDOW_HEIGHT
+            if v[self.CODE.TIME_AXIS] < window_height
         }
         self._DECODE_DRAWER = DecodeDrawer(self._FIG_WIDTH, fig_height=self._FIG_HEIGHT)
         self._stage = Stage.DROP
+        self._BITSTRING_CONVERTER = (_Repetition if type(code) is Repetition else _Surface)(code.D, window_height)
+        self._LOWEST_EDGES = tuple(self.EDGES[e] for e in self._BITSTRING_CONVERTER.lowest_edges(str(code.NOISE)))
     
     def __repr__(self) -> str:
-        return f'decoders.snowflake.Snowflake(code={self.CODE})'
+        return f'decoders.Snowflake({self.CODE})'
 
     @property
     def NODES(self): return self._NODES
@@ -99,6 +130,10 @@ class Snowflake(BaseUF):
 
     @property
     def syndrome(self):
+        return self.verbose_syndrome.difference(self.CODE.BOUNDARY_NODES)
+
+    @property
+    def verbose_syndrome(self):
         return {v for v, node in self.NODES.items() if node.defect}
     
     @property
@@ -130,6 +165,11 @@ class Snowflake(BaseUF):
                 return 2*d * (h-1 - t) + d + i
             else:
                 return 2*d*h + d*(d-1)*(h-1 - t) + d*j + i
+            
+    def init_history(self):
+        """Initialize `history` and `floor_history` attributes."""
+        super().init_history()
+        self.floor_history: list[str] = []
         
     @cache
     def id_below(self, id_: int):
@@ -155,18 +195,21 @@ class Snowflake(BaseUF):
         self._stage = Stage.DROP
         try: del self.history
         except AttributeError: pass
+        try: del self.floor_history
+        except AttributeError: pass
     
     def decode(
             self,
             syndrome: set[Node],
             log_history: Literal[False, 'fine', 'coarse'] = False,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
+            defects_possible: bool = True,
         ):
         """Perform a decoding cycle i.e. a growth round.
         
         Input:
         * `syndrome` the syndrome in the new region discovered by the window raise
-        i.e. all defects in `syndrome` have time coordinate as `WINDOW_HEIGHT-1`.
+        i.e. all defects in `syndrome` have the time coordinate `self.CODE.SCHEME.WINDOW_HEIGHT-1`.
         * `log_history` whether to populate `history` attribute --
         'fine' logs each timestep;
         'coarse', only the final timestep of the growth round.
@@ -174,20 +217,30 @@ class Snowflake(BaseUF):
         for each drop, each grow, and each merging step ('all');
         each merging step only ('merging');
         or each unrooting step only ('unrooting').
+        * `defects_possible` whether to expect there may be defects in the viewing window
+        in the current or any future timestep.
+        If `False`, the decoder will perform only 'drop',
+        and will skip 'grow' and 'merge' stages.
+        This is useful at the end of the memory experiment after the final syndrome data has come in.
 
         Output:
         * `t` number of timesteps to complete decoding cycle.
         Equals the increase in `len(self.history)` if
         `log_history` is 'fine' and `time_only` is `'all'`.
         """
-        
         self._stage = Stage.DROP
+        if log_history:
+            self.floor_history.append(
+                ''.join(str(int(e.correction)) for e in self._LOWEST_EDGES))
         self.drop(syndrome)
         if log_history == 'fine': self.append_history()
-        return self._SCHEDULE.finish_decode(
-            log_history=log_history,
-            time_only=time_only,
-        )
+        if defects_possible:
+            return self._SCHEDULE.finish_decode(
+                log_history=log_history,
+                time_only=time_only,
+            )
+        else:
+            return 1 if time_only == 'all' else 0
     
     def drop(self, syndrome: set[Node]):
         """Make all nodes perform a `drop` i.e. raise window by a layer."""
@@ -426,7 +479,7 @@ class Snowflake(BaseUF):
         
         # node-related kwargs
         inactive_detector_list = [v for v, node in self.NODES.items() if not (node.active or node._IS_BOUNDARY)]
-        inactive_detector_linewidths = [width if v in self.syndrome else linewidths for v in inactive_detector_list]
+        inactive_detector_linewidths = [width if v in self.verbose_syndrome else linewidths for v in inactive_detector_list]
         inactive_detector_color = [unrooted_color if v in unrooted_nodes else 'w' for v in inactive_detector_list]
         
         # edge-related kwargs
@@ -462,7 +515,7 @@ class Snowflake(BaseUF):
 
         # DRAW ACTIVE DETECTORS
         active_detector_list = [v for v, node in self.NODES.items() if node.active]
-        active_detector_linewidths = [width if v in self.syndrome else linewidths for v in active_detector_list]
+        active_detector_linewidths = [width if v in self.verbose_syndrome else linewidths for v in active_detector_list]
         active_detector_color = [unrooted_color if v in unrooted_nodes else 'w' for v in active_detector_list]
         nx.draw_networkx_nodes(
             g,
@@ -477,7 +530,7 @@ class Snowflake(BaseUF):
 
         # DRAW BOUNDARY NODES
         boundary_nodelist = [v for v, node in self.NODES.items() if node._IS_BOUNDARY]
-        boundary_linewidths = [width if v in self.syndrome else linewidths for v in boundary_nodelist] \
+        boundary_linewidths = [width if v in self.verbose_syndrome else linewidths for v in boundary_nodelist] \
             if show_boundary_defects else linewidths
         nx.draw_networkx_nodes(
             g,
@@ -545,6 +598,225 @@ class Snowflake(BaseUF):
     def _FIG_FACTOR(self):
         n = self.CODE.DIMENSION
         return 3*n*(n-1) / 10
+    
+
+    def generate_output(
+            self,
+            syndromes: list[str] | list[set[Node]],
+            output_to_csv_file: str | None = None,
+            draw: bool = False,
+            margins=(0.2, 0.2),
+            style: Literal['interactive', 'horizontal', 'vertical'] = 'interactive',
+            **kwargs_for_draw_decode,
+    ):
+        """Generate output in the form of bitstrings.
+        
+        Input:
+        * `syndromes` the input of Snowflake.
+        This can either be...
+            * a list of sets of coordinates,
+            each set representing a syndrome,
+            each coordinate specifying a defect.
+            The vertical (i.e. time) coordinate of each defect must be `self.CODE.SCHEME.WINDOW_HEIGHT-1`.
+            * a list of syndrome vectors,
+            each a string of '0's and '1's.
+            The ordering of the nodes for the...
+                * repetition code goes from west to east.
+                * surface code goes from west to east along each row, then from south to north.
+        * `output_to_csv_file` the CSV file path to save the data in e.g. 'snowflake_data.csv'.
+        Defaults to `None`, meaning no CSV file is saved.
+        * `draw` whether to draw the decoding process.
+        * `margins` margins for the drawing.
+        * `style` how different drawing frames are laid out.
+        Can be 'interactive', 'horizontal', or 'vertical'.
+        * `kwargs_for_draw_decode` additional keyword arguments for `decoder.draw_decode()`.
+
+        Output:
+        * The output of Snowflake.
+        This is a list of strings, each representing
+        the horizontal edges in the bottom layer that are flipped just before each drop.
+        The ordering of the edges is given by `self._LOWEST_EDGES`
+        e.g. for the repetition code, the edges are ordered from west to east.
+
+        Side effects:
+        * If `output_to_csv_file` is not None, the input and output of Snowflake
+        are saved in a CSV file at path `output_to_csv_file`.
+        * If `draw` is True, the decoding process is drawn.
+        """
+        first_syndrome, *_ = syndromes
+        if type(first_syndrome) is str:
+            # pad `syndrome_vectors` with zero vectors
+            syndrome_vectors: list[str] = syndromes + self.CODE.SCHEME.WINDOW_HEIGHT * ['0'*self._BITSTRING_CONVERTER.LENGTH] # type: ignore
+            syndrome_sets = self._BITSTRING_CONVERTER.syndrome_vectors_to_sets(syndrome_vectors)
+        else:
+            # pad `syndrome_sets` with empty sets
+            syndrome_sets: list[set[Node]] = syndromes + self.CODE.SCHEME.WINDOW_HEIGHT * [set()] # type: ignore
+            syndrome_vectors = self._BITSTRING_CONVERTER.sets_to_syndrome_vectors(syndrome_sets)
+        
+        self.init_history()
+        for syndrome in syndrome_sets:
+            self.decode(syndrome, log_history='fine')
+        if draw:
+            self.draw_decode(
+                margins=margins,
+                style=style,
+                **kwargs_for_draw_decode,
+            )
+        if output_to_csv_file is not None:
+            import csv
+            # Save syndrome vectors and corresponding floor history to CSV
+            with open(output_to_csv_file, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                # Write header
+                writer.writerow(['syndrome_vector', 'floor_history'])
+                # Write data rows
+                for syndrome_vector, floor_vector in zip(syndrome_vectors, self.floor_history, strict=True):
+                    writer.writerow([syndrome_vector, floor_vector])
+        return self.floor_history
+
+
+class _BitstringConverter(abc.ABC):
+    """Converts syndromes from bitstring format to sets of coordinates format."""
+
+    @property
+    @abc.abstractmethod
+    def LENGTH(self):
+        """The expected length of the syndrome vector."""
+
+    def __init__(self, d: int, window_height: int):
+        """Input:
+        * `d` the code distance.
+        * `window_height` the height of the viewing window.
+        """
+        self._D = d
+        self._WINDOW_HEIGHT = window_height
+
+    def syndrome_vectors_to_sets(
+            self,
+            vectors: Sequence[str],
+        ) -> list[set[Node]]:
+        """Convert a sequence of syndrome vectors to a list of sets of defects.
+        
+        Input:
+        * `vectors` a sequence of syndrome vectors, each a string of '0's and '1's.
+
+        Output:
+        * A list of sets of defects, each set corresponding to a syndrome vector.
+        """
+        return [self._syndrome_vector_to_set(vector) for vector in vectors]
+
+    @abc.abstractmethod
+    def _syndrome_vector_to_set(
+            self,
+            vector: str,
+        ) -> set[Node]:
+        """Convert a syndrome vector to a set of defects.
+        
+        The ordering of the nodes is stated in `Snowflake.generate_output` docstring.
+        """
+
+    def sets_to_syndrome_vectors(
+            self,
+            syndromes: Sequence[set[Node]],
+        ) -> list[str]:
+        """Convert a sequence of sets of defects to a list of syndrome vectors.
+        
+        Input:
+        * `syndromes` a sequence of sets of defects.
+
+        Output:
+        * A list of syndrome vectors, each a string of '0's and '1's,
+        each corresponding to a set of defects.
+        """
+        return [self._set_to_syndrome_vector(syndrome) for syndrome in syndromes]
+
+    @abc.abstractmethod
+    def _set_to_syndrome_vector(
+            self,
+            syndrome: set[Node],
+    ) -> str:
+        """Convert a set of defects to a syndrome vector.
+        
+        The ordering of the nodes is stated in `Snowflake.generate_output` docstring.
+        """
+
+    @abc.abstractmethod
+    def lowest_edges(self, noise_model: str) -> tuple[Edge]:
+        """Return the edges in the bottom layer of the viewing window in the order given by `Snowflake._LOWEST_EDGES`."""
+
+
+class _Repetition(_BitstringConverter):
+
+    @property
+    def LENGTH(self):
+        return self._D - 1
+    
+    def _syndrome_vector_to_set(self, vector):
+        if len(vector) != self.LENGTH:
+            raise ValueError(f'Repetition code of distance {self._D} expects syndrome vector of length {self.LENGTH} but received length {len(vector)}.')
+        return {(j, self._WINDOW_HEIGHT-1) for j, bit in enumerate(vector) if bit == '1'}
+    
+    def _set_to_syndrome_vector(self, syndrome):
+        ones = {j for j, _ in syndrome}
+        return ''.join('1' if j in ones else '0' for j in range(self.LENGTH))
+    
+    def lowest_edges(self, noise_model):
+        if noise_model == 'phenomenological':
+            return tuple(((j, 0), (j+1, 0)) for j in range(-1, self._D-1))
+        else:
+            raise NotImplementedError(f"Noise model {noise_model} not implemented for repetition code.")
+
+
+class _Surface(_BitstringConverter):
+
+    @property
+    def LENGTH(self):
+        return self._D * (self._D - 1)
+
+    def _syndrome_vector_to_set(self, vector):
+        if len(vector) != self.LENGTH:
+            raise ValueError(f'Surface code of distance {self._D} expects syndrome vector of length {self.LENGTH} but received length {len(vector)}.')
+        return {self._bit_position_to_defect(position) for position, bit in enumerate(vector) if bit == '1'}
+    
+    def _bit_position_to_defect(self, position: int) -> Node:
+        """Convert bit position `position` to defect coordinate (i, j, t)."""
+        return (
+            self._D-1 - (position // (self._D-1)),
+            position % (self._D-1),
+            self._WINDOW_HEIGHT-1,
+        )
+    
+    def _set_to_syndrome_vector(self, syndrome):
+        ones = {self._defect_to_bit_position(defect) for defect in syndrome}
+        return ''.join('1' if position in ones else '0' for position in range(self.LENGTH))
+    
+    def _defect_to_bit_position(self, defect: Node) -> int:
+        """Convert defect coordinate (i, j, t) to a bit position."""
+        i, j, t = defect
+        if not (0 <= i < self._D and 0 <= j < self._D-1 and t == self._WINDOW_HEIGHT-1):
+            raise ValueError(f'Defect {defect} out of range for surface code of distance {self._D} with window height {self._WINDOW_HEIGHT}.')
+        return (self._D-1 - i) * (self._D-1) + j
+    
+    def lowest_edges(self, noise_model):
+        d = self._D
+        up = tuple(
+            ((i, j, 0), (i, j, 1)) for i in range(d) for j in range(d-1))
+        south_down = tuple(
+            ((i, j, 1), (i+1, j, 0)) for i in range(d-1) for j in range(d-1))
+        east_up = tuple(
+            ((i, j, 0), (i, j+1, 1)) for i in range(d) for j in range(d-2))
+        south_east_up = tuple(
+            ((i, j, 0), (i+1, j+1, 1)) for i in range(d-1) for j in range(d-2))
+        south = tuple(
+            ((i, j, 0), (i+1, j, 0)) for i in range(d-1) for j in range(d-1))
+        east = tuple(
+            ((i, j, 0), (i, j+1, 0)) for i in range(d) for j in range(-1, d-1))
+        if noise_model == 'phenomenological':
+            return up + south + east
+        elif noise_model == 'circuit-level':
+            return up + south_down + east_up + south_east_up + south + east
+        else:
+            raise NotImplementedError(f"Noise model {noise_model} not implemented for surface code.")
 
 
 class NodeEdgeMixin(abc.ABC):
@@ -606,32 +878,32 @@ class _Node(NodeEdgeMixin):
             else NodeFriendship(self)
         if isinstance(snowflake.CODE, Repetition):
             j, t = index
-            provisional_neighbors = (
-                ('W', ((j-1, t), index), 0),
-                ('E', (index, (j+1, t)), 1),
-                ('D', ((j, t-1), index), 0),
-                ('U', (index, (j, t+1)), 1),
-            )
+            provisional_neighbors: dict[direction, tuple[Edge, int]] = {
+                'W': (((j-1, t), index), 0),
+                'E': ((index, (j+1, t)), 1),
+                'D': (((j, t-1), index), 0),
+                'U': ((index, (j, t+1)), 1),
+            }
         else:  # Surface
             i, j, t = index
-            provisional_neighbors = (
-                ('NWD', ((i-1, j-1, t-1), index), 0),
-                ('N', ((i-1, j, t), index), 0),
-                ('NU', ((i-1, j, t+1), index), 0),
-                ('WD', ((i, j-1, t-1), index), 0),
-                ('W', ((i, j-1, t), index), 0),
-                ('D', ((i, j, t-1), index), 0),
-                ('U', (index, (i, j, t+1)), 1),
-                ('E', (index, (i, j+1, t)), 1),
-                ('EU', (index, (i, j+1, t+1)), 1),
-                ('SD', (index, (i+1, j, t-1)), 1),
-                ('S', (index, (i+1, j, t)), 1),
-                ('SEU', (index, (i+1, j+1, t+1)), 1),
-            )
-        self._NEIGHBORS: dict[direction, tuple[Edge, int]] = { # type: ignore
-            pointer: (e, e_index)
-            for pointer, e, e_index in provisional_neighbors
-            if e in snowflake.EDGES
+            provisional_neighbors: dict[direction, tuple[Edge, int]] = {
+                'NWD': (((i-1, j-1, t-1), index), 0),
+                'N': (((i-1, j, t), index), 0),
+                'NU': (((i-1, j, t+1), index), 0),
+                'WD': (((i, j-1, t-1), index), 0),
+                'W': (((i, j-1, t), index), 0),
+                'D': (((i, j, t-1), index), 0),
+                'U': ((index, (i, j, t+1)), 1),
+                'E': ((index, (i, j+1, t)), 1),
+                'EU': ((index, (i, j+1, t+1)), 1),
+                'SD': ((index, (i+1, j, t-1)), 1),
+                'S': ((index, (i+1, j, t)), 1),
+                'SEU': ((index, (i+1, j+1, t+1)), 1),
+            }
+        self._NEIGHBORS: dict[direction, tuple[Edge, int]] = {
+            pointer: provisional_neighbors[pointer]
+            for pointer in snowflake._NEIGHBOR_ORDER
+            if provisional_neighbors[pointer][0] in snowflake.EDGES
         }
         self._IS_BOUNDARY = snowflake.CODE.is_boundary(index)
         self._MERGER = _FastMerger(self) if merger == 'fast' else _SlowMerger(self)
@@ -639,7 +911,10 @@ class _Node(NodeEdgeMixin):
         self.reset()
 
     def __repr__(self) -> str:
-        return f'decoders.snowflake._Node(snowflake={self._SNOWFLAKE}, index={self.INDEX})'
+        return f'decoders.snowflake._Node({self._SNOWFLAKE}, {self.INDEX})'
+    
+    def __str__(self) -> str:
+        return str(self.INDEX)
 
     @property
     def INDEX(self): return self._INDEX
@@ -926,6 +1201,9 @@ class _Schedule(abc.ABC):
         time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
     ) -> int:
         """Perform the rest of the decoding cycle after drop.
+
+        Input:
+        * `log_history, time_only` as in `decode` inputs.
         
         Output:
         `t` number of timesteps to complete decoding cycle.
@@ -1125,6 +1403,12 @@ class _Edge(NodeEdgeMixin):
         lowness = sum(v[snowflake.CODE.TIME_AXIS] == 0 for v in index)
         self._CONTACT = EdgeContact(self) if lowness == 0 else FloorContact(self)
         self.reset()
+
+    def __repr__(self) -> str:
+        return f'decoders.snowflake._Edge({self.SNOWFLAKE}, {self.INDEX})'
+    
+    def __str__(self) -> str:
+        return str(self.INDEX)
 
     @property
     def INDEX(self): return self._INDEX

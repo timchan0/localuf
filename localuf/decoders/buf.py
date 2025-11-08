@@ -17,9 +17,10 @@ class BUF(UF):
     * `_demote_cluster`.
 
     Overriden attributes:
-    * `buckets` replaces `active_clusters`
-    and is a dictionary where each key an integer;
-    value, a set of all active clusters whose vision length is that integer.
+    * `buckets` replaces `active_clusters` and maps each integer
+    to a set of all active clusters whose vision length is that integer.
+    It is important that its keys is in ascending order
+    as it is used by `_update_mvl()`.
 
     Overriden methods:
     * `reset`.
@@ -60,7 +61,6 @@ class BUF(UF):
     def validate(
             self,
             syndrome: set[Node],
-            dynamic=False,
             log_history=False
     ):
         """Grow clusters (always shortest vision first) until they are all valid."""
@@ -68,29 +68,27 @@ class BUF(UF):
         if log_history: self.init_history()
         while self.mvl is not None:
             self._growth_round(
-                dynamic,
                 log_history,
                 clusters_to_grow=self.buckets[self.mvl]
             )
             self._update_mvl()
 
-    def _merge(self, cu, cv, uv, dynamic):
-        u, v = uv
-        if dynamic:
-            if cu == cv:
-                self.growth[u, v] = Growth.BURNT
-                self._demote_cluster(cu)
-            elif (cu.boundary and cv.boundary):
-                self.growth[u, v] = Growth.BURNT
-                self._demote_cluster(cu)
-                self._demote_cluster(cv)
-            else:
-                self._union(cu, cv)
+    def static_merge(self, cu, cv):
+        if cu == cv:
+            self._demote_cluster(cu)
         else:
-            if cu == cv:
-                self._demote_cluster(cu)
-            else:
-                self._union(cu, cv)
+            self._union(cu, cv)
+
+    def dynamic_merge(self, cu, cv, e):
+        if cu == cv:
+            self.growth[e] = Growth.BURNT
+            self._demote_cluster(cu)
+        elif (cu.boundary and cv.boundary):
+            self.growth[e] = Growth.BURNT
+            self._demote_cluster(cu)
+            self._demote_cluster(cv)
+        else:
+            self._union(cu, cv)
 
     def _demote_cluster(self, cluster: _Cluster):
         """If cluster active, move down a bucket as an edge has been removed from its vision. Else do nothing."""

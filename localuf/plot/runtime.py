@@ -69,7 +69,7 @@ def mean(
     Output:
     * `data_copy` a copy of `data` with runtimes divided by distance
     if `per_measurement_round`
-    else an exact copy of `data`.
+    else an exact deep copy of `data`.
     * `containers` a dictionary where each
     key a noise level;
     value, the `ErrorbarContainer` for that noise level.

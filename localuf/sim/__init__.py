@@ -5,4 +5,4 @@ Available submodules:
 * runtime
 """
 
-from localuf.sim import accuracy, runtime
+from localuf.sim import accuracy, runtime, latency

@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 
 from localuf import Surface
@@ -108,56 +110,114 @@ class TestIndexToId:
         assert sf5T.index_to_id((d-1, d-2, d-1)) == d**2 * (d+1) - 1
 
 
+class TestCodeCapacityEdges:
+    
+    def test_correct_count(self, sf3F: Surface):
+        count, edges = sf3F._code_capacity_edges(False)
+        assert count == len(edges)
+        nodes = set().union(*edges)
+        assert nodes == set(itertools.product(range(3), range(-1, 3)))
+
+    def test_merge_equivalent_boundary_nodes(self, sf3F: Surface):
+        count, edges = sf3F._code_capacity_edges(True)
+        assert count == len(edges)
+        nodes = set().union(*edges)
+        assert nodes == set(itertools.product(range(3), range(2))) | {
+            (0, -1), (0, 2),
+        }
+
+
+class TestPhenomenologicalEdges:
+    
+    def test_correct_count(self, sf3T: Surface):
+        count, edges = sf3T._phenomenological_edges(
+            3,
+            False,
+            merge_equivalent_boundary_nodes=False,
+        )
+        assert count == len(edges)
+        nodes = set().union(*edges)
+        assert nodes == set(itertools.product(range(3), range(-1, 3), range(3)))
+
+    def test_merge_equivalent_boundary_nodes(self, sf3T: Surface):
+        count, edges = sf3T._phenomenological_edges(
+            3,
+            False,
+            merge_equivalent_boundary_nodes=True,
+        )
+        assert count == len(edges)
+        nodes = set().union(*edges)
+        assert nodes == set(itertools.product(range(3), range(2), range(3))) | {
+            (0, -1, 0), (0, 2, 0),
+        }
+
+
 class TestCircuitLevelEdges:
 
 
-    def helper(self, sfCL: Surface, temporal_boundary: bool):
-        d, h = sfCL.D, sfCL.SCHEME.WINDOW_HEIGHT
+    def helper(
+            self,
+            surface: Surface,
+            temporal_boundary: bool,
+            merge_equivalent_boundary_nodes=False,
+    ):
+        """Output:
+        * `d` code distance
+        * `layer_count` number of layers in decoding graph
+        * `edge_dict` maps from edge type
+        (i.e. orientation and location)
+        to tuple of all edges of that type.
+        Always includes redundant edges.
+        Inter-key order matters as used by `noise.forcers.ForceByEdge.force_error`.
+        """
+        d, h = surface.D, surface.SCHEME.WINDOW_HEIGHT
         layer_count = h if temporal_boundary else h-1
         len_merges = 2 * layer_count * (2*d-1)
-        horizontal_edge_count = h * sfCL.DATA_QUBIT_COUNT
+        horizontal_edge_count = h * surface.DATA_QUBIT_COUNT
         u_per_layer = d*(d-1)
         sd_per_layer = (d-1)**2
 
-        n_edges, edges, edge_dict, merges = sfCL._circuit_level_edges(
+        n_edges, edges, edge_dict, merges = surface._circuit_level_edges(
             h=h,
             temporal_boundary=temporal_boundary,
-            merge_redundant_edges=True,
+            _merge_redundant_edges=True,
+            merge_equivalent_boundary_nodes=merge_equivalent_boundary_nodes,
         )
 
         eu_per_layer = d*(d-2)
         seu_per_layer = (d-1)*(d-2)
         timelike_edge_count = layer_count * (u_per_layer + sd_per_layer + eu_per_layer + seu_per_layer)
         assert n_edges == horizontal_edge_count + timelike_edge_count
-        assert sfCL.N_EDGES == n_edges
+        assert surface.N_EDGES == n_edges
         assert type(edges) is tuple
         assert len(edges) == n_edges
         assert len(set(edges)) == n_edges  # test uniqueness
 
         assert type(edge_dict) is dict
         assert len(edge_dict) == 12
-        assert sum(len(es) for es in edge_dict.values()) == sfCL.N_EDGES + len_merges
+        assert sum(len(es) for es in edge_dict.values()) == surface.N_EDGES + len_merges
 
         assert type(merges) is dict
         assert len(merges) == len_merges
 
-        assert set(edges) & set(merges.keys()) == set()
+        if not merge_equivalent_boundary_nodes:
+            assert set(edges) & set(merges.keys()) == set()
 
-        n_edges, edges, edge_dict_False, merges = sfCL._circuit_level_edges(
-            h=h,
-            temporal_boundary=temporal_boundary,
-            merge_redundant_edges=False,
-        )
+            n_edges, edges, edge_dict_False, merges = surface._circuit_level_edges(
+                h=h,
+                temporal_boundary=temporal_boundary,
+                _merge_redundant_edges=False,
+            )
 
-        eu_per_layer = d**2
-        seu_per_layer = d*(d-1)
-        timelike_edge_count = layer_count * (u_per_layer + sd_per_layer + eu_per_layer + seu_per_layer)
-        assert n_edges == horizontal_edge_count + timelike_edge_count
-        assert n_edges == sfCL.N_EDGES + len_merges
-        assert len(edges) == n_edges
-        assert len(set(edges)) == n_edges
-        assert merges is None
-        assert edge_dict_False == edge_dict
+            eu_per_layer = d**2
+            seu_per_layer = d*(d-1)
+            timelike_edge_count = layer_count * (u_per_layer + sd_per_layer + eu_per_layer + seu_per_layer)
+            assert n_edges == horizontal_edge_count + timelike_edge_count
+            assert n_edges == surface.N_EDGES + len_merges
+            assert len(edges) == n_edges
+            assert len(set(edges)) == n_edges
+            assert merges is None
+            assert edge_dict_False == edge_dict
 
         return d, layer_count, edge_dict
 
@@ -197,19 +257,19 @@ class TestCircuitLevelEdges:
 
 
     @pytest.mark.parametrize("buffer_height", range(1, 4), ids=lambda x: f"buffer_height {x}")
-    @pytest.mark.parametrize("merge_redundant_edges", [False, True], ids=lambda x: f"merge_redundant_edges {x}")
-    def test_t_start(self, sfCL_OL_scheme: Forward, buffer_height, merge_redundant_edges):
+    @pytest.mark.parametrize("_merge_redundant_edges", [False, True], ids=lambda x: f"_merge_redundant_edges {x}")
+    def test_t_start(self, sfCL_OL_scheme: Forward, buffer_height, _merge_redundant_edges):
         code = sfCL_OL_scheme._CODE
         commit_height = sfCL_OL_scheme._COMMIT_HEIGHT
         n_commit_edges, commit_edges, commit_edge_dict, commit_merges = code._circuit_level_edges(
             h=commit_height,
             temporal_boundary=True,
-            merge_redundant_edges=merge_redundant_edges,
+            _merge_redundant_edges=_merge_redundant_edges,
         )
         n_fresh_edges, fresh_edges, fresh_edge_dict, fresh_merges = code._circuit_level_edges(
             h=commit_height,
             temporal_boundary=True,
-            merge_redundant_edges=merge_redundant_edges,
+            _merge_redundant_edges=_merge_redundant_edges,
             t_start=buffer_height,
         )
         assert n_fresh_edges == n_commit_edges
@@ -217,7 +277,7 @@ class TestCircuitLevelEdges:
         assert fresh_edge_dict == {edge_type: tuple(
             code.raise_edge(e, buffer_height) for e in edges
         ) for edge_type, edges in commit_edge_dict.items()}
-        if merge_redundant_edges:
+        if _merge_redundant_edges:
             assert fresh_merges == {
                 code.raise_edge(e, buffer_height):
                 code.raise_edge(substitute, buffer_height)
@@ -226,6 +286,10 @@ class TestCircuitLevelEdges:
         else:
             assert fresh_merges is None
             assert commit_merges is None
+
+    
+    def test_merge_equivalent_boundary_nodes(self, sfCL: Surface):
+        self.helper(sfCL, False, True)
 
 
 def test_substitute(sf3F: Surface, sf3T: Surface):

@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import copy
-from functools import cached_property
+from functools import cache, cached_property
 from typing import Literal
 
 import networkx as nx
@@ -9,6 +9,7 @@ from localuf import constants
 from localuf._base_classes import Code, Decoder
 from localuf.constants import Growth
 from localuf.type_aliases import Edge, Node
+from itertools import chain, repeat
 
 
 direction = Literal[
@@ -30,7 +31,8 @@ direction = Literal[
 
 
 class BaseUF(Decoder):
-    """The abstract graph used by the UF decoder (Union--Find).
+    """The abstract class representing the UF decoder (Union--Find).
+    
     Extends `BaseDecoder`.
 
     Class attributes:
@@ -38,12 +40,16 @@ class BaseUF(Decoder):
     * `_INACTIVE_GROWTH_VALUES` the set of growth values for which an edge is inactive.
 
     Additional instance attributes:
-    * `growth` a dictionary where each key an edge; value, an integer representing its growth stage.
+    * `growth` maps each edge in the decoding graph to an integer representing its growth value.
     * `syndrome` the set of defects.
     * `erasure` the set of fully grown edges.
     Only computed if `erasure` not yet an attribute.
     * `history` a list of past self snapshots @ each growth round
     (all w/ same `history` attribute to prevent infinite loop).
+    * `_cached_swim_graph` a NetworkX graph representing
+    the search graph for the swim distance DCS.
+    The only time it is retrieved is in the property `_swim_graph`,
+    which always updates the edge weights before returning the graph.
     """
 
     _ACTIVE_GROWTH_VALUES = {Growth.UNGROWN, Growth.HALF}
@@ -71,12 +77,15 @@ class BaseUF(Decoder):
     @cached_property
     def erasure(self):
         """Compute erasure from growth."""
-        return {e for e in self.CODE.EDGES if self.growth[e] is Growth.FULL}
+        return {e for e, growth in self.growth.items() if growth is Growth.FULL}
 
     def reset(self):
         """Factory reset."""
-        for e in self.growth.keys():
-            self.growth[e] = Growth.UNGROWN
+        # use `_growth` instead of `growth` as the child class `Snowflake`
+        # defines latter as a property that must be computed every time it is accessed
+        # meaning the property would have to be redundantly computed |E| times!
+        for e in self._growth.keys():
+            self._growth[e] = Growth.UNGROWN
         super().reset()
         try: del self.erasure
         except AttributeError: pass
@@ -93,6 +102,29 @@ class BaseUF(Decoder):
             self, memo={id(self.history): self.history}
         ))
 
+    @cache
+    def _total_edge_weight(self, noise_level: None | float = None) -> float:
+        """Compute the sum of all edge weights in the decoding graph."""
+        edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
+        return sum(weight for _, weight in edge_weights.values())
+    
+    def unclustered_edge_fraction(self, noise_level: None | float = None):
+        """Compute the Unclustered Edge Fraction DCS from `self.growth`.
+        
+        Input:
+        * `noise_level` a probability representing the noise strength.
+        This is needed to define nonuniform edge weights of the decoding graph
+        in the circuit-level noise model.
+        If `None`, all edges are assumed to have weight 1.
+
+        Output:
+        * `fraction` the fraction of edges in the decoding graph that are not in a cluster,
+        weighted by their weights.
+        """
+        edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
+        return 1 - sum(weight*self.growth[e].as_float for e, (_, weight) in edge_weights.items()) \
+            / self._total_edge_weight(noise_level=noise_level)
+    
     def draw_growth(
         self,
         growth: dict[Edge, Growth] | None = None,
@@ -216,3 +248,123 @@ class BaseUF(Decoder):
         edgecolors = [outline_color if v in outlined_nodes else color
                         for v, color in zip(nodelist, node_color)]
         return node_color, edgecolors
+    
+    def swim_distance(
+            self,
+            noise_level: None | float = None,
+            draw=False,
+            **kwargs_for_draw_swim_graph,
+    ) -> float:
+        """Compute the swim distance DCS from `self.growth`.
+        
+        Assumes `self.validate()` or `self.decode()` has already been called.
+        swim distance is the shortest distance from one boundary to the other
+        where travelling within clusters is free.
+        Introduced in [doi.org/10.1038/s42005-024-01883-4] and [arXiv:2405.07433].
+
+        This method works regardless of whether `self.CODE` was instantiated with
+        `merge_equivalent_boundary_nodes=False` or `True`
+        but works slightly faster in the latter case.
+
+        Input:
+        * `noise_level` a probability representing the noise strength.
+        This is needed to define nonuniform edge weights of the decoding graph
+        in the circuit-level noise model.
+        If `None`, all edges are assumed to have weight 1.
+        * `draw` whether to draw the search graph and the shortest path.
+        * `kwargs_for_draw_swim_graph` passed to `self._draw_swim_graph()`.
+
+        Output:
+        * `length` the swim distance.
+        """
+        graph, west, east = self._swim_graph(noise_level=noise_level)
+        length, path = nx.bidirectional_dijkstra(graph, west, east)
+        if draw:
+            self._draw_swim_graph(path, **kwargs_for_draw_swim_graph)
+        return length
+    
+    def _swim_graph(self, noise_level: None | float = None) -> tuple[nx.Graph, Node, Node]:
+        """Return the search graph and endpoints for the swim distance.
+
+        Input:
+        * `noise_level` as described in `swim_distance()`.
+        
+        Output:
+        * `graph` the search graph.
+        * `west` the node representing the west boundary.
+        * `east` the node representing the east boundary.
+
+        The edges not in `self.growth` have weight 0 ALWAYS.
+        The weight of the other edges is set according to `self.growth`.
+        """
+        # TODO: use `networkx.quotient_graph`
+        graph, _, _ = self._cached_swim_graph
+        for e, (_, weight) in self.CODE.NOISE.get_edge_weights(noise_level).items():
+            if self.growth[e] is Growth.UNGROWN:
+                graph.edges[e]['weight'] = weight
+            elif self.growth[e] is Growth.HALF:
+                graph.edges[e]['weight'] = weight / 2
+            else:  # growth is Growth.FULL or Growth.BURNT
+                graph.edges[e]['weight'] = 0
+        return self._cached_swim_graph
+    
+    @cached_property
+    def _cached_swim_graph(self):
+        """Return the search graph and endpoints for the swim distance.
+        
+        Output:
+        * `graph` the search graph.
+        * `west` the node representing the west boundary.
+        * `east` the node representing the east boundary.
+
+        The edges not in `self.growth` have weight 0 ALWAYS.
+        There is no guarantee about the weight of the other edges.
+        """
+        graph = self.CODE.GRAPH.copy()
+        d = self.CODE.D
+        a = self.CODE.LONG_AXIS
+        n = self.CODE.DIMENSION
+        west = tuple(chain(repeat(d//2, a), (-2,), repeat(d//2, n-a-1)))
+        east = tuple(chain(repeat(d//2, a), (d,), repeat(d//2, n-a-1)))
+        graph.add_edges_from(((west, v) for v in self.CODE.NODES if v[a]==-1), weight=0)
+        graph.add_edges_from(((v, east) for v in self.CODE.NODES if v[a]==d-1), weight=0)
+        return graph, west, east
+
+    def _draw_swim_graph(
+            self,
+            path: list[Node],
+            weightless_edge_width=constants.THIN,
+            max_edge_width=constants.V_WIDE,
+            node_size=100,
+            node_alpha=1,
+            edge_alpha=0.5,
+            **kwargs_for_networkx_draw,
+    ):
+        """Draw the search graph for the swim distance.
+        
+        Input:
+        * `path` the shortest west--east path.
+        * `weightless_edge_width` the width of zero-weight edges.
+        * `max_edge_width` the maximum width of edges.
+        * `kwargs_for_networkx_draw` passed to `networkx.draw()`.
+        """
+        graph, _, _ = self._cached_swim_graph
+        max_weight: float = max(weight for _, _, weight in graph.edges.data('weight')) # type: ignore
+        width_multiplier = (max_edge_width - weightless_edge_width) / max_weight
+        nx.draw_networkx_nodes(
+            graph,
+            pos=self.CODE.get_pos(nodelist=graph.nodes),
+            node_size=node_size,
+            node_color=self.CODE.get_node_color(path, nodelist=graph.nodes), # type: ignore
+            alpha=node_alpha,
+        )
+        nx.draw_networkx_edges(
+            graph,
+            pos=self.CODE.get_pos(nodelist=graph.nodes),
+            node_size=node_size,
+            width=[width_multiplier * weight + weightless_edge_width
+                   for _, _, weight in graph.edges.data('weight')], # type: ignore
+            edge_color=[constants.RED if set(edge)<=set(path) else 'k' for edge in graph.edges], # type: ignore
+            alpha=edge_alpha,
+            **kwargs_for_networkx_draw,
+        )

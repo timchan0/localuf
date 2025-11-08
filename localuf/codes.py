@@ -5,12 +5,12 @@ Available codes:
 * Surface
 """
 
+from collections.abc import Iterable
 from functools import cache
-import itertools
+from itertools import repeat, chain
 
 from localuf import constants
 from localuf.type_aliases import Coord, Edge, EdgeType, Node
-from localuf._inner_init_helper import InnerInitHelper
 from localuf._base_classes import Code
 from localuf._schemes import Batch
 
@@ -22,25 +22,31 @@ class Repetition(Code):
     """
 
     _LONG_AXIS = 0
+    _CODE_DIMENSION = 1
 
-    def _inner_init(self, **kwargs):
-        self._DIMENSION = 1
-        node_ranges = [range(-1, self.D)]
-        InnerInitHelper.help_(
-                code=self,
-                node_ranges=node_ranges,
-                **kwargs,
-            )
-
-    def _code_capacity_edges(self) -> tuple[int, tuple[Edge, ...]]:
+    def _code_capacity_edges(
+            self,
+            merge_equivalent_boundary_nodes: bool,
+    ) -> tuple[int, tuple[Edge, ...]]:
         d = self.D
         return d, tuple(((j,), (j+1,)) for j in range(-1, d-1))
 
-    def _phenomenological_edges(self, h, temporal_boundary, t_start=0) -> tuple[int, tuple[Edge, ...]]:
+    def _phenomenological_edges(
+            self,
+            h,
+            temporal_boundary,
+            t_start=0,
+            merge_equivalent_boundary_nodes=False,
+    ) -> tuple[int, tuple[Edge, ...]]:
         d = self.D
         layer_count = h if temporal_boundary else h-1
         n_edges = h*d + layer_count*(d-1)
-        j_edges = (((j, t), (j+1, t)) for j in range(-1, d-1) for t in range(t_start, t_start+h))
+        if merge_equivalent_boundary_nodes:
+            j_edges = [((-1, 0), (0, t)) for t in range(t_start, t_start+h)] \
+            + [((j, t), (j+1, t)) for j in range(d-2) for t in range(t_start, t_start+h)] \
+            + [((d-2, t), (d-1, 0)) for t in range(t_start, t_start+h)]
+        else:
+            j_edges = (((j, t), (j+1, t)) for j in range(-1, d-1) for t in range(t_start, t_start+h))
         t_edges = (((j, t), (j, t+1)) for j in range(d-1) for t in range(t_start, t_start+layer_count))
         return n_edges, (*j_edges, *t_edges)
 
@@ -52,9 +58,6 @@ class Repetition(Code):
     
     def _circuit_level_edges(self, **_):
         raise NotImplementedError("Yet to implement circuit-level noise for repetition code.")
-
-    def __repr__(self) -> str:
-        return f'Repetition(d={self.D}, noise={str(self.NOISE)})'
 
     @cache
     def index_to_id(self, index: Node):
@@ -80,11 +83,14 @@ class Repetition(Code):
     def get_pos(
             self,
             x_offset: float = constants.DEFAULT_X_OFFSET,
+            nodelist: None | Iterable[Node] = None,
     ) -> dict[Node, Coord]:
+        if nodelist is None:
+            nodelist = self.NODES
         if self.DIMENSION == 1:
-            pos = {(j,): (j, 0) for j, in self.NODES}
+            pos = {(j,): (j, 0) for j, in nodelist}
         else:
-            pos = dict(zip(self.NODES, self.NODES))
+            pos = dict(zip(nodelist, nodelist))
         return pos
 
 
@@ -98,34 +104,44 @@ class Surface(Code):
     """
 
     _LONG_AXIS = 1
+    _CODE_DIMENSION = 2
 
     @property
     def DATA_QUBIT_COUNT(self) -> int:
         d = self.D
         return d**2 + (d-1)**2
 
-    def _inner_init(self, **kwargs):
-        d = self.D
-        self._DIMENSION = 2
-        node_ranges = [range(d), range(-1, d)]
-        InnerInitHelper.help_(
-            code=self,
-            node_ranges=node_ranges,
-            **kwargs,
-        )
-
-    def _code_capacity_edges(self) -> tuple[int, tuple[Edge, ...]]:
+    def _code_capacity_edges(
+            self,
+            merge_equivalent_boundary_nodes: bool,
+    ) -> tuple[int, tuple[Edge, ...]]:
         d = self.D
         i_edges = (((i, j), (i+1, j)) for i in range(d-1) for j in range(    d-1))
-        j_edges = (((i, j), (i, j+1)) for i in range(d  ) for j in range(-1, d-1))
+        if merge_equivalent_boundary_nodes:
+            j_edges = [((0, -1), (i, 0)) for i in range(d)] \
+                + [((i, j), (i, j+1)) for i in range(d  ) for j in range(d-2)] \
+                + [((i, d-2), (0, d-1)) for i in range(d)]
+        else:
+            j_edges = (((i, j), (i, j+1)) for i in range(d  ) for j in range(-1, d-1))
         return self.DATA_QUBIT_COUNT, (*i_edges, *j_edges)
 
-    def _phenomenological_edges(self, h, temporal_boundary, t_start=0) -> tuple[int, tuple[Edge, ...]]:
+    def _phenomenological_edges(
+            self,
+            h,
+            temporal_boundary,
+            t_start=0,
+            merge_equivalent_boundary_nodes=False,
+    ) -> tuple[int, tuple[Edge, ...]]:
         d = self.D
         layer_count = h if temporal_boundary else h-1
         n_edges = h * self.DATA_QUBIT_COUNT + layer_count * d*(d-1)
         i_edges = (((i, j, t), (i+1, j, t)) for i in range(d-1) for j in range(    d-1) for t in range(t_start, t_start+h))
-        j_edges = (((i, j, t), (i, j+1, t)) for i in range(d  ) for j in range(-1, d-1) for t in range(t_start, t_start+h))
+        if merge_equivalent_boundary_nodes:
+            j_edges = [((0, -1, 0), (i, 0, t)) for i in range(d) for t in range(t_start, t_start+h)] \
+                + [((i, j, t), (i, j+1, t)) for i in range(d  ) for j in range(d-2) for t in range(t_start, t_start+h)] \
+                + [((i, d-2, t), (0, d-1, 0)) for i in range(d) for t in range(t_start, t_start+h)]
+        else:
+            j_edges = (((i, j, t), (i, j+1, t)) for i in range(d  ) for j in range(-1, d-1) for t in range(t_start, t_start+h))
         t_edges = (((i, j, t), (i, j, t+1)) for i in range(d  ) for j in range(    d-1) for t in range(t_start, t_start+layer_count))
         return n_edges, (*i_edges, *j_edges, *t_edges)
 
@@ -141,8 +157,9 @@ class Surface(Code):
             self,
             h: int,
             temporal_boundary: bool,
-            merge_redundant_edges: bool,
+            _merge_redundant_edges: bool,
             t_start=0,
+            merge_equivalent_boundary_nodes=False,
     ) -> tuple[
         int,
         tuple[Edge, ...],
@@ -155,33 +172,47 @@ class Surface(Code):
             layer_count = h
             t_ranges = (
                 range(t_start-1, t_start-1+layer_count),
-                *itertools.repeat(range(t_start, t_start+layer_count), 2)
+                *repeat(range(t_start, t_start+layer_count), 2)
             )
         else:
             layer_count = h-1
-            t_ranges = tuple(itertools.repeat(range(t_start, t_start+layer_count), 3))
+            t_ranges = tuple(repeat(range(t_start, t_start+layer_count), 3))
+        # south
         s = tuple(((i, j, t), (i+1, j, t)) for i in range(d-1) for j in range(d-1) for t in range(t_start, t_start+h))
+        # east [westmost, bulk, eastmost]
         e_wm, e_bulk, e_em = (tuple(
             ((i, j, t), (i, j+1, t)) for i in range(d) for j in js for t in range(t_start, t_start+h)
         ) for js in j_ranges)
+        if merge_equivalent_boundary_nodes:
+            e_wm = tuple(((0, -1, 0), (i, 0, t)) for i in range(d) for t in range(t_start, t_start+h))
+            e_em = tuple(((i, d-2, t), (0, d-1, 0)) for i in range(d) for t in range(t_start, t_start+h))
+        # north- or southmost up, up
         u3, u4 = (tuple(
             ((i, j, t), (i, j, t+1)) for i in is_ for j in range(d-1) for t in range(t_start, t_start+layer_count)
         ) for is_ in ((0, d-1), range(1, d-1)))
+        # south down
         sd = tuple(((i, j, t), (i+1, j, t-1)) for i in range(d-1) for j in range(d-1) for t in range(t_start+1, t_start+1+layer_count))
+        # east up [west corners, on north or south wall, east corners]
         eu_wc, eu_edge_NS, eu_ec = (tuple(
             ((i, j, t), (i, j+1, t+1)) for i in (0, d-1) for j in js for t in ts
         ) for js, ts in zip(j_ranges, t_ranges))
+        # east up [on west wall, in centre, on east wall]
         eu_edge_W, eu_centre, eu_edge_E = (tuple(
                 ((i, j, t), (i, j+1, t+1)) for i in range(1, d-1) for j in js for t in ts
         ) for js, ts in zip(j_ranges, t_ranges))
+        # east up on east or west wall
         eu_edge_EW = (*eu_edge_W, *eu_edge_E)
+        # east up on a wall
         eu_edge = (*eu_edge_NS, *eu_edge_EW)
+        # south east up [westmost, bulk, eastmost]
         seu_W, seu_bulk, seu_E = (tuple(
                 ((i, j, t), (i+1, j+1, t+1)) for i in range(d-1) for j in js for t in ts
         ) for js, ts in zip(j_ranges, t_ranges))
+        # south east up west- or eastmost
         seu_boundary = (*seu_W, *seu_E)
+        # south east up
         seu = (*seu_boundary, *seu_bulk)
-        if merge_redundant_edges:
+        if _merge_redundant_edges or merge_equivalent_boundary_nodes:
             n_edges = h * self.DATA_QUBIT_COUNT + layer_count * (2*d-1)*(2*d-3)
             edges = (
                 *s,
@@ -191,7 +222,7 @@ class Surface(Code):
                 *eu_edge_NS, *eu_centre,
                 *seu_bulk,
             )
-            merges = {e: self._substitute(e)
+            merges = {e: self._substitute(e, merge_equivalent_boundary_nodes)
                 for e in (*eu_wc, *eu_ec, *eu_edge_EW, *seu_boundary)}
         else:
             n_edges = (h+layer_count) * self.DATA_QUBIT_COUNT + 2 * d * (d-1) * layer_count
@@ -220,21 +251,22 @@ class Surface(Code):
         }
         return n_edges, edges, edge_dict, merges
 
-    def _substitute(self, e: Edge) -> Edge:
+    def _substitute(self, e: Edge, merge_equivalent_boundary_nodes: bool = False) -> Edge:
         """Return substitute edge for redundant edge `e`."""
         d = self.D
+        a = self.LONG_AXIS
         u, v = e
-        if u[self.LONG_AXIS] == -1:
-            w = (*v[:self.LONG_AXIS], -1, *v[self.LONG_AXIS+1:])
+        remaining_dimensions = len(u) - a - 1
+        if u[a] == -1:
+            w = tuple(chain(repeat(0, a), (-1,), repeat(0, remaining_dimensions))
+            ) if merge_equivalent_boundary_nodes else ((*v[:a], -1, *v[a+1:]))
             return (w, v)
-        elif v[self.LONG_AXIS] == d-1:
-            w = (*u[:self.LONG_AXIS], d-1, *u[self.LONG_AXIS+1:])
+        elif v[a] == d-1:
+            w = tuple(chain(repeat(0, a), (d-1,), repeat(0, remaining_dimensions))
+            ) if merge_equivalent_boundary_nodes else (*u[:a], d-1, *u[a+1:])
             return (u, w)
         else:
             raise ValueError(f'Edge {e} must have a boundary node.')
-
-    def __repr__(self) -> str:
-        return f'Surface(d={self.D}, noise={str(self.NOISE)})'
 
     def index_to_label(self, index: Node):
         """Return node label of measure-Z qubit at index (i, j)."""
@@ -279,10 +311,16 @@ class Surface(Code):
                 boundary_count = 2*d*h if isinstance(self.SCHEME, Batch) else 2*d*h + d*(d-1)
                 return boundary_count + h*(d-1)*i + h*j + t
 
-    def get_pos(self, x_offset: float = constants.DEFAULT_X_OFFSET) -> dict[Node, Coord]:
+    def get_pos(
+            self,
+            x_offset: float = constants.DEFAULT_X_OFFSET,
+            nodelist: None | Iterable[Node] = None,
+    ) -> dict[Node, Coord]:
+        if nodelist is None:
+            nodelist = self.NODES
         if self.DIMENSION == 2:
-            pos = {(i, j): (j, -i) for i, j in self.NODES}
+            pos = {(i, j): (j, -i) for i, j in nodelist}
         else:
             pos = {(i, j, t): (j+x_offset*i, t-x_offset*i)
-                for i, j, t in self.NODES}
+                for i, j, t in nodelist}
         return pos

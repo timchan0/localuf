@@ -148,7 +148,8 @@ def get_stats(log_data: DataFrame, missing='drop', **kwargs_for_WLS):
         float, float,
         float, float,
     ]] = []
-    index_name, _ = log_data.index.names
+    index_name: str
+    index_name, _ = log_data.index.names # type: ignore
     for idx, df in log_data.groupby(level=0):
         df=df.droplevel(index_name, axis=0)
         results = sm.WLS(
@@ -196,9 +197,13 @@ def add_ignored_timesteps(
     * `layers_per_sample` a function with input `d` that outputs
     the measurement round count per sample.
 
-    E.g. if `data` is output of `sum.runtime.frugal` with `time_only='merging'`,
+    E.g. if `data` is output of `sim.runtime.frugal` with `time_only='merging'`
+    using Snowflake with the 1:1 schedule,
     the default kwargs of this function will convert it to
-    the analogous output of `sum.runtime.frugal` with `time_only='all'`.
+    the analogous output of `sim.runtime.frugal` with `time_only='all'`.
+    This is because the extra timesteps per layer are a drop and a grow.
+    If using Snowflake with the 2:1 schedule,
+    set `extra_steps_per_layer=3` as there is one additional grow timestep.
     """
     dc = {(d, p): data[d, p] + extra_steps_per_layer*layers_per_sample(int(d))
         for d, p in data.columns}

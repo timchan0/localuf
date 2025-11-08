@@ -4,6 +4,7 @@ from localuf.type_aliases import Node
 from localuf.decoders import UF, BUF, NodeBUF
 from localuf.decoders.uf import _Cluster
 from localuf.constants import Growth
+from localuf.type_aliases import Node
 
 @pytest.fixture
 def v00():
@@ -63,25 +64,17 @@ def fixture_test_grow():
 
 
 @pytest.fixture
-def uvw():
+def uvw() -> tuple[Node, Node, Node]:
     u, v, w = (0, 0), (0, 1), (0, 2)
     return u, v, w
 
 
 @pytest.fixture
 def fixture_test_union():
-    def f(uf_after_union):
+    def f(uf_after_union: tuple[BUF | NodeBUF, _Cluster, _Cluster]):
         uf, larger, smaller = uf_after_union
         assert uf.parents[smaller.root] == larger.root
         assert larger.size == 2
         assert larger.odd
         assert larger.boundary == larger.root
     return f
-
-
-@pytest.fixture
-def uf7F(sf7F):
-    uf_graph = UF(sf7F)
-    uf_graph.history = []
-    return uf_graph
-

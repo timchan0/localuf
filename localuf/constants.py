@@ -22,3 +22,10 @@ class Growth(IntEnum):
 
     def __iadd__(self, other: 'Growth'):
         return Growth(self.value + other.value)
+    
+    @property
+    def as_float(self) -> float:
+        """Convert growth value to float. Burnt takes the value of 1."""
+        if self is Growth.BURNT:
+            return 1
+        return self.value/2

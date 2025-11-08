@@ -36,7 +36,6 @@ class NodeBUF(NodeUF):
     def validate(
         self,
         syndrome,
-        dynamic=False,
         log_history=False,
     ):
         """Grow clusters (always smallest first) until they are all valid."""
@@ -44,7 +43,7 @@ class NodeBUF(NodeUF):
         if log_history: self.init_history()
         for bucket in self.buckets.values():
             while bucket:
-                self._growth_round(dynamic, log_history, clusters_to_grow=bucket)
+                self._growth_round(log_history, clusters_to_grow=bucket)
 
     def _update_self_after_union(self, larger: _NodeCluster, smaller: _NodeCluster, old_larger_size: int):
         """Update attributes clusters and buckets after union of larger w/ smaller."""

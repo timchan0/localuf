@@ -22,24 +22,48 @@ def _rp(request):
 def _rpCC(request):
     return Repetition(request.param, 'code capacity')
 
-@pytest.mark.parametrize("buffer_height", range(1, 4), ids=lambda x: f"buffer_height {x}")
-def test_phenomenological_edges(forward_rp: Forward, buffer_height):
-    code = forward_rp._CODE
-    commit_height = forward_rp._COMMIT_HEIGHT
-    n_commit_edges, commit_edges = code._phenomenological_edges(
-        commit_height,
-        True,
-    )
-    n_fresh_edges, fresh_edges = code._phenomenological_edges(
-        commit_height,
-        True,
-        t_start=buffer_height,
-    )
-    assert n_fresh_edges == n_commit_edges
-    assert fresh_edges == tuple((
-        (*u[:-1], buffer_height+u[-1]),
-        (*v[:-1], buffer_height+v[-1]),
-    ) for u, v in commit_edges)
+
+class TestPhenomenologicalEdges:
+
+    @pytest.mark.parametrize("buffer_height", range(1, 4), ids=lambda x: f"buffer_height {x}")
+    def test_t_start_consistency(self, forward_rp: Forward, buffer_height):
+        code = forward_rp._CODE
+        commit_height = forward_rp._COMMIT_HEIGHT
+        n_commit_edges, commit_edges = code._phenomenological_edges(
+            commit_height,
+            True,
+        )
+        n_fresh_edges, fresh_edges = code._phenomenological_edges(
+            commit_height,
+            True,
+            t_start=buffer_height,
+        )
+        assert n_commit_edges == len(commit_edges)
+        assert n_fresh_edges == n_commit_edges
+        assert fresh_edges == tuple((
+            (*u[:-1], buffer_height+u[-1]),
+            (*v[:-1], buffer_height+v[-1]),
+        ) for u, v in commit_edges)
+        nodes = set().union(*commit_edges)
+        assert nodes == set(itertools.product(range(-1, code.D), range(commit_height))) | {
+            (j, commit_height) for j in range(code.D-1)
+        }
+
+    def test_merge_equivalent_boundary_edges(self, forward_rp: Forward):
+        code = forward_rp._CODE
+        h = forward_rp.WINDOW_HEIGHT
+        edge_count, edges = code._phenomenological_edges(
+            h,
+            False,
+            merge_equivalent_boundary_nodes=True,
+        )
+        assert edge_count == len(edges)
+        assert edge_count == code.D * h + (code.D-1) * (h-1)
+        nodes = set().union(*edges)
+        assert nodes == set(itertools.product(range(code.D-1), range(h))) | {
+            (-1, 0), (code.D-1, 0),
+        }
+
 
 def test_N_EDGES_attribute(rp: Repetition):
     assert type(rp.N_EDGES) is int

@@ -18,6 +18,8 @@ from pandas import DataFrame, MultiIndex
 from localuf.sim._height_calculator import get_heights
 from localuf.type_aliases import NoiseModel, DecodingScheme, Parametrization, FloatSequence, IntSequence
 from localuf._base_classes import Code, Decoder
+from localuf.decoders import MWPM
+
 
 def monte_carlo(
         sample_counts: dict[int, list[tuple[float, int]]],
@@ -30,7 +32,7 @@ def monte_carlo(
         parametrization: Parametrization = 'balanced',
         demolition: bool = False,
         monolingual: bool = False,
-        merge_redundant_edges: bool = True,
+        _merge_redundant_edges: bool = True,
         **kwargs_for_decoder_class,
 ):
     """Make threshold data for any decoder.
@@ -59,9 +61,9 @@ def monte_carlo(
     Output:
     `df` a DataFrame where each
     column a (distance, probability);
-    rows m, n indicate number of logical errors and samples, respectively.
+    rows 'm', 'n' indicate number of logical errors and samples, respectively.
     """
-    dc = {}
+    dc: dict[tuple[int, float], tuple[int, int | float]] = {}
     for d, list_ in sample_counts.items():
         window_height, commit_height, buffer_height = get_heights(
             d,
@@ -80,7 +82,7 @@ def monte_carlo(
             parametrization=parametrization,
             demolition=demolition,
             monolingual=monolingual,
-            merge_redundant_edges=merge_redundant_edges,
+            _merge_redundant_edges=_merge_redundant_edges,
         )
         decoder = decoder_class(code, **kwargs_for_decoder_class)
         for p, n in list_:
@@ -88,6 +90,19 @@ def monte_carlo(
     df = DataFrame(dc, index=('m', 'n'))
     df.columns.set_names(['d', 'p'], inplace=True)
     return df
+
+
+def monte_carlo_results_to_sample_counts(results: DataFrame):
+    """Convert `monte_carlo` output to its first input.
+    
+    Assumes row 'n' of `results` is the input of `_base_classes.Scheme.run`.
+    """
+    sample_counts: dict[int, list[tuple[float, int]]] = {}
+    for (d, p), (_, n) in results.items(): # type: ignore
+        if d not in sample_counts:
+            sample_counts[d] = []
+        sample_counts[d].append((p, int(n)))
+    return sample_counts
 
 
 def monte_carlo_pymatching(
@@ -118,11 +133,12 @@ def monte_carlo_pymatching(
             noise=noise,
             **kwargs_for_code_class,
         )
+        decoder = MWPM(code)
         dc: dict[float, tuple[int, int]] = {}
         for p, n in zip(ps, ns):
-            matching = code.get_matching_graph(p)
+            matching = decoder.get_matching(p)
             m = 0
-            for _ in itertools.repeat(None, n):
+            for _ in itertools.repeat(None, n):  # TODO: use `decode_batch`
                 error, syndrome = matching.add_noise() # type: ignore
                 correction = matching.decode(syndrome)
                 m += not np.array_equal(error, correction) # type: ignore
@@ -139,7 +155,7 @@ def monte_carlo_special(
         parametrization: Parametrization = 'balanced',
         demolition: bool = False,
         monolingual: bool = False,
-        merge_redundant_edges: bool = True,
+        _merge_redundant_edges: bool = True,
         **kwargs_for_decoder_class,
 ):
     """Make threshold data where
@@ -161,7 +177,7 @@ def monte_carlo_special(
             parametrization=parametrization,
             demolition=demolition,
             monolingual=monolingual,
-            merge_redundant_edges=merge_redundant_edges,
+            _merge_redundant_edges=_merge_redundant_edges,
         )
         decoder = decoder_class(
             code_class(d, noise='phenomenological'),

@@ -22,9 +22,8 @@ class _BaseForcer(abc.ABC):
     """Abstract base class for all forcers.
     
     Instance attributes:
-    * `_EDGES` a dictionary where each
-    key a multiplicity 4-vector;
-    value, the corresponding subset as a list of edges.
+    * `_EDGES` maps each multiplicity 4-vector
+    to the corresponding subset as a list of edges.
     """
 
     def __init__(self, edges: dict[FourInts, list[Edge]]) -> None:

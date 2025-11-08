@@ -6,6 +6,7 @@ direction LR
     class ICode{
         <<interface>>
         int D
+        bool MERGED_EQUIVALENT_BOUNDARY_NODES
         Scheme SCHEME
         int N_EDGES
         tuple EDGES
@@ -15,6 +16,9 @@ direction LR
         int LONG_AXIS
         int DIMENSION
         dict INCIDENT_EDGES
+        tuple DETECTORS
+        int DETECTOR_COUNT
+        tuple BOUNDARY_NODES
         Graph GRAPH
         is_boundary() bool
         neighbors() set
@@ -29,15 +33,11 @@ direction LR
         draw() Graph
         get_pos() dict
         get_node_color() list
-        get_matching_graph() Matching
     }
     class Code{<<abstract>>}
 
     Repetition --|> Code
-    Repetition ..> InnerInitHelper
     Surface --|> Code
-    Surface ..> InnerInitHelper
-    InnerInitHelper: help_()$
     ICode <|.. Repetition
     ICode <|.. Surface
 
@@ -107,7 +107,8 @@ direction LR
         force_error() set
         subset_probability() Iterable
         subset_probabilities() DataFrame
-        get_edge_probabilities() tuple
+        get_edge_weights() tuple
+        log_odds_of_no_flip() float
     }
     class Noise{<<abstract>>}
     ICode "1" *-- INoise
@@ -177,6 +178,8 @@ direction LR
         init_history()
         append_history()
         draw_growth()
+        unclustered_edge_fraction() float
+        swim_distance() float
     }
     BaseUF --|> Decoder
 
@@ -188,11 +191,14 @@ direction LR
         DiGraph digraph
         load()
         validate()
+        static_merge()
+        dynamic_merge()
         peel()
+        unclustered_node_fraction() float
+        complementary_gap() float
         draw_forest()
         draw_peel()
     }
-    UF --|> BaseUF
     class BUF{
         int mvl
         dict buckets
@@ -208,19 +214,46 @@ direction LR
     IDecoder <|.. NodeUF
     IDecoder <|.. NodeBUF
 
-    class _Cluster{
+    class BaseCluster{
         Node root
         int size
         bool odd
-        set vision
         Node boundary
     }
-    _Cluster --* "*" UF
+    class _Cluster{
+        set vision
+    }
+
+    UF "1" *-- IInclination
+    class IInclination{
+        <<interface>>
+        update_boundary()
+    }
+    IInclination <|.. DefaultInclination
+    IInclination <|.. WestInclination
+    class _Inclination{<<abstract>>}
+    DefaultInclination --|> _Inclination
+    WestInclination --|> _Inclination
+
+    UF "1" *-- IForester
+    class IForester{
+        <<interface>>
+        merge()
+    }
+    IForester <|.. _StaticForester
+    IForester <|.. _DynamicForester
+    class Forester{<<abstract>>}
+    _StaticForester --|> Forester
+    _DynamicForester --|> Forester
+
+    UF "*" *-- _Cluster
+    UF --|> BaseUF
     class _NodeCluster{
-        set boundaries
+        set frontier
     }
     NodeUF "*" *-- _NodeCluster
-    _NodeCluster --|> _Cluster
+    _Cluster --|> BaseCluster
+    _NodeCluster --|> BaseCluster
 
     DecodeDrawer: draw()
     
@@ -251,6 +284,16 @@ direction LR
     Snowflake "1" *-- DecodeDrawer
     Snowflake --|> BaseUF
     IDecoder <|.. Snowflake
+
+    class MWPM{
+        array correction_vector
+        float correction_weight
+        get_matching() Matching
+        get_binary_vector() array
+        complementary_gap() tuple
+    }
+    MWPM --|> Decoder
+    IDecoder <|.. MWPM
 ```
 # Macar/Actis
 ```mermaid

@@ -1,6 +1,7 @@
 """Module containing type aliases."""
 
-from typing import Literal, Sequence
+from typing import Literal
+from collections.abc import Sequence
 
 import numpy as np
 import numpy.typing as npt

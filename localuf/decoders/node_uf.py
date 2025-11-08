@@ -23,7 +23,6 @@ class NodeUF(uf.UF):
 
     def _growth_round(
             self,
-            dynamic,
             log_history,
             clusters_to_grow: 'set[_NodeCluster] | None' = None,
     ):
@@ -36,7 +35,7 @@ class NodeUF(uf.UF):
         for u, v in merge_ls:
             cu = self.clusters[self._find(u)]
             cv = self.clusters[self._find(v)]
-            self._merge(cu, cv, (u, v), dynamic)
+            self._FORESTER.merge(cu, cv, (u, v)) # type: ignore
         if log_history:
             self.changed_edges = changed_edges
             self.append_history()
@@ -47,23 +46,23 @@ class NodeUF(uf.UF):
             merge_ls,
             changed_edges,
     ):
-        nonboundaries = set()
-        for v in cluster.boundaries:
+        ex_frontier: set[Node] = set()
+        for v in cluster.frontier:
 
             edges_to_grow = {e for e in self.CODE.INCIDENT_EDGES[v]
                 if self.growth[e] in self._ACTIVE_GROWTH_VALUES}
             changed_edges.update(edges_to_grow)
-            # if node no longer on cluster boundary, mark to remove
+            # if node no longer on cluster frontier, mark to remove
             if not edges_to_grow:
-                nonboundaries.add(v)
+                ex_frontier.add(v)
 
             for e in edges_to_grow:
                 self.growth[e] += Growth.INCREMENT
                 if self.growth[e] is Growth.FULL:
                     merge_ls.append(e)
 
-        # remove nonbounary nodes from boundary set
-        cluster.boundaries.difference_update(nonboundaries)
+        # remove nodes that are no longer on the cluster frontier
+        cluster.frontier.difference_update(ex_frontier)
 
     def _union(self, cu: '_NodeCluster', cv: '_NodeCluster'):
         if cu.size >= cv.size:
@@ -74,22 +73,20 @@ class NodeUF(uf.UF):
         old_larger_size = larger.size
         larger.size += smaller.size
         larger.odd ^= smaller.odd  # logical XOR
-        larger.boundaries.update(smaller.boundaries)
-        if (not larger.boundary) and smaller.boundary:
-            larger.boundary = smaller.boundary
-        self._update_self_after_union(larger, smaller, old_larger_size)
+        larger.frontier.update(smaller.frontier)
+        self._INCLINATION.update_boundary(larger, smaller)
+        self._update_self_after_union(larger, smaller, old_larger_size) # type: ignore
 
 
-class _NodeCluster(uf._Cluster):
-    """A tree data structure to represent a cluster of nodes of original UF.
+class _NodeCluster(uf.BaseCluster):
+    """A UF cluster that tracks the nodes on its frontier.
+
+    Extends `BaseCluster`.
     
-    Overriden attributes:
-    * `vision` replaced by `boundaries`.
-    * `boundaries` the boundary nodes of the cluster
-    i.e. not a surface boundary and incident to >=1 active edge.
+    Additional attributes:
+    * `frontier` the detectors in the cluster that are incident to >=1 active edge.
     """
 
-    def __init__(self, uf, root: Node):
+    def __init__(self, uf: NodeUF, root: Node):
         super().__init__(uf, root)
-        del self.vision
-        self.boundaries: set[Node] = set() if uf.CODE.is_boundary(root) else {root}
+        self.frontier: set[Node] = set() if uf.CODE.is_boundary(root) else {root}

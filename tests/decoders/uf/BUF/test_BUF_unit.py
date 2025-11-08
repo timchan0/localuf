@@ -59,7 +59,6 @@ def test_validate(buf: BUF, syndrome7F):
         mock_load.assert_called_once_with(syndrome7F)
         mock_growth_round.assert_called_once_with(
             False,
-            False,
             clusters_to_grow=buf.buckets[not_none],
         )
         mock_update_mvl.assert_called_once_with()
