@@ -61,21 +61,21 @@ def test_init(in_: ActisNode):
 
 def test_countdown_start(actis_nodes: ActisNodes):
     d = actis_nodes.LUF.CODE.D
-    ct = Counter(node.SPAN for node in actis_nodes.dc.values())
+    counter = Counter(node.SPAN for node in actis_nodes.dc.values())
     if str(actis_nodes.LUF.CODE.NOISE) == 'code capacity':
         for cs in range(2*d):
             if cs < d:
-                assert ct[cs] == cs + 1
+                assert counter[cs] == cs + 1
             else:
-                assert ct[cs] == 2*d - cs
+                assert counter[cs] == 2*d - cs
     elif str(actis_nodes.LUF.CODE.NOISE) == 'phenomenological':
         # cs goes up somewhat as triangular numbers
         pass
     elif str(actis_nodes.LUF.CODE.NOISE) == 'circuit-level':
         for cs in range(1, d+1):
             small = d - cs
-            assert ct[cs] == (small+1)**3 - small**3
-        assert ct[0] == d**2
+            assert counter[cs] == (small+1)**3 - small**3
+        assert counter[0] == d**2
 
 
 def test_advance(in_: ActisNode):

@@ -38,51 +38,51 @@ class TestCount:
 
     def test_no_pairs(self, repetition_counter: LogicalCounter):
         pairs = Pairs()
-        ct, new_pairs = repetition_counter.count(pairs)
-        assert ct == 0
+        error_count, new_pairs = repetition_counter.count(pairs)
+        assert error_count == 0
         assert new_pairs._dc == {}
 
     def test_single_logical_error(self, repetition_counter: LogicalCounter):
         pairs = Pairs()
         pairs.add((-1, 0), (2, 0))
-        ct, new_pairs = repetition_counter.count(pairs)
-        assert ct == 1
+        error_count, new_pairs = repetition_counter.count(pairs)
+        assert error_count == 1
         assert new_pairs._dc == {}
 
     def test_multiple_logical_errors(self, repetition_counter: LogicalCounter):
         pairs = Pairs()
         pairs.add((-1, 0), (2, 0))
         pairs.add((-1, 1), (2, 1))
-        ct, new_pairs = repetition_counter.count(pairs)
-        assert ct == 2
+        error_count, new_pairs = repetition_counter.count(pairs)
+        assert error_count == 2
         assert new_pairs._dc == {}
 
     def test_no_logical_errors(self, repetition_counter: LogicalCounter):
         pairs = Pairs()
         pairs.add((0, 2), (1, 2))
-        ct, new_pairs = repetition_counter.count(pairs)
-        assert ct == 0
+        error_count, new_pairs = repetition_counter.count(pairs)
+        assert error_count == 0
         assert new_pairs.as_set == {((0, 0), (1, 0))}
 
     def test_mixed_pairs(self, repetition_counter: LogicalCounter):
         pairs = Pairs()
         pairs.add((-1, 0), (2, 0))
         pairs.add((-1, 1), (1, 2))
-        ct, new_pairs = repetition_counter.count(pairs)
-        assert ct == 1
+        error_count, new_pairs = repetition_counter.count(pairs)
+        assert error_count == 1
         assert new_pairs.as_set == {((-1, -1), (1, 0))}
 
     @pytest.mark.parametrize("j", (-1, 2))
     def test_ignore_pair_on_same_boundary(self, repetition_counter: LogicalCounter, j: int):
         pairs = Pairs()
         pairs.add((j, 0), (j, 1))
-        ct, new_pairs = repetition_counter.count(pairs)
-        assert ct == 0
+        error_count, new_pairs = repetition_counter.count(pairs)
+        assert error_count == 0
         assert new_pairs._dc == {}
 
     def test_keep_zero_separation_pair(self, surface_counter: LogicalCounter):
         pairs = Pairs()
         pairs.add((0, 0, 2), (1, 0, 2))
-        ct, new_pairs = surface_counter.count(pairs)
-        assert ct == 0
+        error_count, new_pairs = surface_counter.count(pairs)
+        assert error_count == 0
         assert new_pairs.as_set == {((0, 0, 0), (1, 0, 0))}

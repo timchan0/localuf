@@ -294,12 +294,12 @@ def test_no_infinite_loop(snowflake7: Snowflake):
     # DECODE
     snowflake7.drop(set())
     snowflake7._SCHEDULE.grow()
-    for ct in range(1, 11):
+    for cycle_index in range(1, 11):
         for node in snowflake7.NODES.values():
             node.merging(whole)
         for node in snowflake7.NODES.values():
             node.update_after_merging()
-        if ct == 11:
+        if cycle_index == 11:
             for v, node in snowflake7.NODES.items():
                 # check there's 1 defect left
                 if not snowflake7.CODE.is_boundary(v):
@@ -322,6 +322,8 @@ class TestLowestEdges:
 
     def test_repetition(self, snowflake3: Snowflake):
         indices = (
+            ((0, 0), (0, 1)),
+            ((1, 0), (1, 1)),
             ((-1, 0), (0, 0)),
             ((0, 0), (1, 0)),
             ((1, 0), (2, 0)),

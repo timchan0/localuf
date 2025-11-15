@@ -35,11 +35,14 @@ class Snowflake(BaseUF):
     * `_stage` the current stage of the decoder.
     Only used for `draw_growth` when `show_global = True`.
     * `_LOWEST_EDGES` a tuple of the edges in the bottom layer of the viewing window.
-    For repetition code, only the spacelike edges are included,
-    ordered from west to east.
-    For surface code, all the edges in the bottom layer are included,
-    ordered first by type (up, south_down, east_up, south_east_up, south, east),
+    For repetition code, the edges are ordered
+    first by type (up, east)
+    then by y-coordinate (west to east).
+    For surface code, the edges are ordered
+    first by type (up, south_down, east_up, south_east_up, south, east),
     then by x-coordinate (north to south), then by y-coordinate (west to east).
+    If `__init__` was called with `_include_timelike_lowest_edges = False`,
+    the purely timelike (i.e. 'up') edges are excluded.
     * `floor_history` a list of bitstrings representing
     the correction output from the bottom layer at each drop.
     The order of the bits is given by `self._LOWEST_EDGES`.
@@ -64,6 +67,7 @@ class Snowflake(BaseUF):
             schedule: Literal['2:1', '1:1'] = '2:1',
             unrooter: Literal['full', 'simple'] = 'full',
             _neighbor_order: Iterable[direction] | None = None,
+            _include_timelike_lowest_edges: bool = True,
     ):
         """Input:
         * `code` the code to be decoded.
@@ -87,6 +91,8 @@ class Snowflake(BaseUF):
         then no node will ever check that direction for growing, flooding, nor syncing.
         So it is safest to include all twelve directions even if some are not used.
         If `_neighbor_order` is not specified, the orders listed above are used.
+        * `_include_timelike_lowest_edges` whether to include
+        the purely timelike (i.e. 'up') edges in `self._LOWEST_EDGES`.
         """
         if isinstance(code.NOISE, CodeCapacity):
             raise ValueError('Snowflake incompatible with code capacity noise model.')
@@ -117,7 +123,10 @@ class Snowflake(BaseUF):
         self._DECODE_DRAWER = DecodeDrawer(self._FIG_WIDTH, fig_height=self._FIG_HEIGHT)
         self._stage = Stage.DROP
         self._BITSTRING_CONVERTER = (_Repetition if type(code) is Repetition else _Surface)(code.D, window_height)
-        self._LOWEST_EDGES = tuple(self.EDGES[e] for e in self._BITSTRING_CONVERTER.lowest_edges(str(code.NOISE)))
+        self._LOWEST_EDGES = tuple(self.EDGES[e] for e in self._BITSTRING_CONVERTER.lowest_edges(
+            str(code.NOISE),
+            _include_timelike_lowest_edges=_include_timelike_lowest_edges,
+        ))
     
     def __repr__(self) -> str:
         return f'decoders.Snowflake({self.CODE})'
@@ -634,9 +643,11 @@ class Snowflake(BaseUF):
         Output:
         * The output of Snowflake.
         This is a list of strings, each representing
-        the horizontal edges in the bottom layer that are flipped just before each drop.
-        The ordering of the edges is given by `self._LOWEST_EDGES`
-        e.g. for the repetition code, the edges are ordered from west to east.
+        the edges in the bottom layer that are flipped just before each drop.
+        The ordering of the edges is given by `self._LOWEST_EDGES`.
+        INCONSISTENCY: for the repetition code,
+        the purely timelike edges in the last layer are excluded from `self._LOWEST_EDGES`;
+        the spacelike edges are ordered from west to east.
 
         Side effects:
         * If `output_to_csv_file` is not None, the input and output of Snowflake
@@ -741,8 +752,18 @@ class _BitstringConverter(abc.ABC):
         """
 
     @abc.abstractmethod
-    def lowest_edges(self, noise_model: str) -> tuple[Edge]:
-        """Return the edges in the bottom layer of the viewing window in the order given by `Snowflake._LOWEST_EDGES`."""
+    def lowest_edges(
+            self,
+            noise_model: str,
+            _include_timelike_lowest_edges: bool = True,
+    ) -> tuple[Edge, ...]:
+        """Return the edges in the bottom layer of the viewing window
+        in the order given by `Snowflake._LOWEST_EDGES`.
+
+        Input:
+        * `noise_model` the noise model of the code.
+        * `_include_timelike_lowest_edges` whether to include the purely timelike edges.
+        """
 
 
 class _Repetition(_BitstringConverter):
@@ -760,9 +781,12 @@ class _Repetition(_BitstringConverter):
         ones = {j for j, _ in syndrome}
         return ''.join('1' if j in ones else '0' for j in range(self.LENGTH))
     
-    def lowest_edges(self, noise_model):
+    def lowest_edges(self, noise_model, _include_timelike_lowest_edges=True):
+        up = tuple(((j, 0), (j, 1)) for j in range(self._D-1)) \
+            if _include_timelike_lowest_edges else ()
+        east = tuple(((j, 0), (j+1, 0)) for j in range(-1, self._D-1))
         if noise_model == 'phenomenological':
-            return tuple(((j, 0), (j+1, 0)) for j in range(-1, self._D-1))
+            return up + east
         else:
             raise NotImplementedError(f"Noise model {noise_model} not implemented for repetition code.")
 
@@ -797,10 +821,11 @@ class _Surface(_BitstringConverter):
             raise ValueError(f'Defect {defect} out of range for surface code of distance {self._D} with window height {self._WINDOW_HEIGHT}.')
         return (self._D-1 - i) * (self._D-1) + j
     
-    def lowest_edges(self, noise_model):
+    def lowest_edges(self, noise_model, _include_timelike_lowest_edges=True):
         d = self._D
         up = tuple(
-            ((i, j, 0), (i, j, 1)) for i in range(d) for j in range(d-1))
+            ((i, j, 0), (i, j, 1)) for i in range(d) for j in range(d-1)) \
+            if _include_timelike_lowest_edges else ()
         south_down = tuple(
             ((i, j, 1), (i+1, j, 0)) for i in range(d-1) for j in range(d-1))
         east_up = tuple(

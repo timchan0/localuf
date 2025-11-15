@@ -114,10 +114,10 @@ class Batch(Scheme):
 
     def get_logical_error(self, leftover):
         """Return logical error count parity in `leftover`."""
-        ct: int = 0
+        flip_count: int = 0
         for u, _ in leftover:
-            ct += (u[self._CODE.LONG_AXIS] == -1)
-        return ct % 2
+            flip_count += (u[self._CODE.LONG_AXIS] == -1)
+        return flip_count % 2
 
     def _sim_cycle_given_p(self, decoder: 'Decoder', p: float) -> int:
         """Simulate a decoding cycle given `p`.
@@ -190,12 +190,12 @@ class Global(Batch):
         """Count logical errors in `leftover`."""
         for e in leftover:
             self.pairs.load(e)
-        ct: int = 0
+        error_count: int = 0
         for u, v in self.pairs.as_set:
             pair_separation = abs(u[self._CODE.LONG_AXIS] - v[self._CODE.LONG_AXIS])
             if pair_separation == self._CODE.D:
-                ct += 1
-        return ct
+                error_count += 1
+        return error_count
 
 
 class _Streaming(Scheme):
@@ -271,8 +271,8 @@ class _Streaming(Scheme):
         Update `self.pairs` with error strings ending
         at the temporal boundary of the commit region.
         """
-        ct, self.pairs = self._LOGICAL_COUNTER.count(self.pairs)
-        return ct
+        error_count, self.pairs = self._LOGICAL_COUNTER.count(self.pairs)
+        return error_count
     
     def sim_cycles_given_weight(self, decoder, weight, n):
         raise NotImplementedError("Not implemented for streaming schemes.")

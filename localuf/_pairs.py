@@ -47,7 +47,7 @@ class Pairs:
         del self._dc[v]
 
     def load(self, e: Edge):
-        """Load edge `e` onto `dc`."""
+        """Load in edge `e`."""
         u, v = e
         if u in self:
             w = self[u]
@@ -94,20 +94,20 @@ class LogicalCounter:
         `pairs` a set of node pairs defining free anyon strings.
 
         Output:
-        * `ct` the number of logical error strings completed in `pairs`.
+        * `error_count` the number of logical error strings completed in `pairs`.
         * `new_pairs` the error strings in `pairs`
         ending at the temporal boundary of the commit region,
         lowered by commit height.
         """
-        ct: int = 0
+        error_count: int = 0
         new_pairs = Pairs()
         for u, v in pairs.as_set:
             pair_separation = abs(u[self._LONG_AXIS] - v[self._LONG_AXIS])
             if pair_separation == self._D:
-                ct += 1
+                error_count += 1
             elif not (pair_separation == 0 and u[self._LONG_AXIS] in {-1, self._D-1}):
                 new_pairs.load((
                     self._lower_node(u),
                     self._lower_node(v),
                 ))
-        return ct, new_pairs
+        return error_count, new_pairs

@@ -1,7 +1,7 @@
 import abc
 from functools import cached_property
 from collections import defaultdict
-from collections.abc import Iterable, Container
+from collections.abc import Collection, Iterable, Container, Sequence
 
 import numpy as np
 import pandas as pd
@@ -496,9 +496,9 @@ class Code(abc.ABC):
         syndrome: set[Node] | None = None,
         x_offset=constants.DEFAULT_X_OFFSET,
         with_labels: bool | None = None,
-        nodelist: Iterable[Node] | None = None,
-        node_size: float | Iterable[float] | None = None,
-        width: float | Iterable[float] | None = None,
+        nodelist: Sequence[Node] | None = None,
+        node_size: float | Collection[float] | None = None,
+        width: float | Collection[float] | None = None,
         boundary_color=constants.BLUE,
         defect_color=constants.RED,
         nondefect_color=constants.GREEN,
