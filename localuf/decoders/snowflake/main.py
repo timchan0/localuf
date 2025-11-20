@@ -211,6 +211,7 @@ class Snowflake(BaseUF):
             self,
             syndrome: set[Node],
             log_history: Literal[False, 'fine', 'coarse'] = False,
+            log_floor_history: bool = False,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             defects_possible: bool = True,
         ):
@@ -222,6 +223,7 @@ class Snowflake(BaseUF):
         * `log_history` whether to populate `history` attribute --
         'fine' logs each timestep;
         'coarse', only the final timestep of the growth round.
+        * `log_floor_history` whether to populate `floor_history` attribute.
         * `time_only` whether runtime includes a timestep
         for each drop, each grow, and each merging step ('all');
         each merging step only ('merging');
@@ -238,7 +240,7 @@ class Snowflake(BaseUF):
         `log_history` is 'fine' and `time_only` is `'all'`.
         """
         self._stage = Stage.DROP
-        if log_history:
+        if log_floor_history:
             self.floor_history.append(
                 ''.join(str(int(e.correction)) for e in self._LOWEST_EDGES))
         self.drop(syndrome)
@@ -613,7 +615,7 @@ class Snowflake(BaseUF):
             self,
             syndromes: list[str] | list[set[Node]],
             output_to_csv_file: str | None = None,
-            draw: bool = False,
+            draw: Literal[False, 'fine', 'coarse'] = False,
             margins=(0.2, 0.2),
             style: Literal['interactive', 'horizontal', 'vertical'] = 'interactive',
             **kwargs_for_draw_decode,
@@ -634,7 +636,8 @@ class Snowflake(BaseUF):
                 * surface code goes from west to east along each row, then from south to north.
         * `output_to_csv_file` the CSV file path to save the data in e.g. 'snowflake_data.csv'.
         Defaults to `None`, meaning no CSV file is saved.
-        * `draw` whether to draw the decoding process.
+        * `draw` whether to skip drawing the decoding process,
+        draw it finely or draw it coarsely.
         * `margins` margins for the drawing.
         * `style` how different drawing frames are laid out.
         Can be 'interactive', 'horizontal', or 'vertical'.
@@ -666,7 +669,7 @@ class Snowflake(BaseUF):
         
         self.init_history()
         for syndrome in syndrome_sets:
-            self.decode(syndrome, log_history='fine')
+            self.decode(syndrome, log_history=draw, log_floor_history=True)
         if draw:
             self.draw_decode(
                 margins=margins,
