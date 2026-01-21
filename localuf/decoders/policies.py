@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from localuf.decoders.luf.main import MacarNode, ActisNode, _Node
 
 class _PolicyMixin:
-    """Provides `_NODES` and `_growth` attributes."""
+    """Provides ``_NODES`` and ``_growth`` attributes."""
 
     def __init__(
             self,
@@ -25,8 +25,8 @@ class DigraphMaker(_PolicyMixin):
     """Maker of NetworkX digraph.
     
     Instance attributes:
-    * `_NODES` dictionary of nodes.
-    * `_growth` dictionary of growths.
+    * ``_NODES`` dictionary of nodes.
+    * ``_growth`` dictionary of growths.
     """
 
     @property
@@ -51,7 +51,7 @@ class DigraphMaker(_PolicyMixin):
     
 
 class DecodeDrawer:
-    """Provides `draw_decode`."""
+    """Provides ``draw_decode``."""
 
     def __init__(
             self,

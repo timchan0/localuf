@@ -28,29 +28,30 @@ def monte_carlo(
         capsize: float = 2,
         **kwargs_for_errorbar,
 ):
-    """Plot threshold data in `data`.
-
-    Input:
-    * `data` a DataFrame where each
-    column a (distance, probability);
+    """Plot threshold data in ``data``.
+    
+    
+    :param data: a DataFrame where each
+        column a (distance, probability);
     rows m, n indicate number of logical errors and samples, respectively.
-    * `title, xlabel, ylabel, legend` for plot.
-    * `alpha` significance level of confidence intervals.
-    * `method` method to compute confidence intervals.
-    For details on confidence intervals,
+    :param title: plot title.
+    :param xlabel: x-axis label.
+    :param ylabel: y-axis label.
+    :param legend: whether to show legend.
+    :param alpha: significance level of confidence intervals.
+    :param method: method to compute confidence intervals.
+        For details on confidence intervals,
     see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
-    * `base_color` a single color for all errorbars and their connecting lines.
-    Increasing distance is then shown by increasing opacity.
-    If `None`, each distance is shown by a different, fully opaque color.
-    * `capsize` length of error bar caps in points.
-    * `kwargs_for_errorbar` passed to `pyplot.errorbar`.
-
-    Output:
-    * `plotted` transposed `data` with additional columns `f, lo, hi`
-    storing respectively the mean, lower and upper confidence bounds of failure probability.
-    * `containers` a dictionary where each
-    key a distance;
-    value, the `ErrorbarContainer` for that distance.
+    :param base_color: a single color for all errorbars and their connecting lines.
+        Increasing distance is then shown by increasing opacity.
+    If ``None``, each distance is shown by a different, fully opaque color.
+    :param capsize: length of error bar caps in points.
+    :param kwargs_for_errorbar: passed to ``pyplot.errorbar``.
+    
+    
+    :returns:
+    * ``plotted`` transposed ``data`` with additional columns ``f, lo, hi`` storing respectively the mean, lower and upper confidence bounds of failure probability.
+    * ``containers`` a dictionary where each key a distance; value, the ``ErrorbarContainer`` for that distance.
     """
     containers: dict[int, ErrorbarContainer] = {}
     if base_color is None:
@@ -103,13 +104,13 @@ def subset_sample(
         alpha: float = 0.3,
         title: str = '',
 ):
-    """Plot failure probability from output of `get_failure_data_from_subset_sample`.
-
-    Input:
-    * `data` output of `get_failure_data_from_subset_sample`.
-    * `legend` whether to show legend.
-    * `alpha` transparency of confidence region.
-    * `title` plot title.
+    """Plot failure probability from output of ``get_failure_data_from_subset_sample``.
+    
+    
+    :param data: output of ``get_failure_data_from_subset_sample``.
+    :param legend: whether to show legend.
+    :param alpha: transparency of confidence region.
+    :param title: plot title.
     """
     for d, df in data.groupby(level='d'):
         df = df.droplevel('d')

@@ -3,12 +3,12 @@ from localuf.decoders.luf.constants import Stage
 
 
 class AlternativeMacarNodes(Nodes):
-    """Alternative to `MacarNodes` where `valid`
+    """Alternative to ``MacarNodes`` where ``valid``
     is an attribute rather than a property
     and is updated after every PRESYNCING stage.
-
-    Extends `Nodes`.
-    Designed to emulate faster than `MacarNodes` but empirically not.
+    
+    Extends ``Nodes``.
+    Designed to emulate faster than ``MacarNodes`` but empirically not.
     Hence currently unused.
     """
 
@@ -34,7 +34,7 @@ class AlternativeMacarNodes(Nodes):
         self.valid = False
 
     def update_valid(self):
-        """Update `valid` attribute. Call after every PRESYNCING stage."""
+        """Update ``valid`` attribute. Call after every PRESYNCING stage."""
         self.valid = not any(node.active for node in self.dc.values())
 
     def advance(self):

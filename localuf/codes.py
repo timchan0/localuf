@@ -17,8 +17,8 @@ from localuf._schemes import Batch
 
 class Repetition(Code):
     """The decoding graph of a repetition code.
-
-    Extends `Code` class.
+    
+    Extends ``Code`` class.
     """
 
     _LONG_AXIS = 0
@@ -96,11 +96,11 @@ class Repetition(Code):
 
 class Surface(Code):
     """The decoding graph of an unrotated surface code with boundaries.
-
-    Extends `Code` class.
-
+    
+    Extends ``Code`` class.
+    
     Additional instance properties:
-    * `DATA_QUBIT_COUNT` number of data qubits.
+    * ``DATA_QUBIT_COUNT`` number of data qubits.
     """
 
     _LONG_AXIS = 1
@@ -252,7 +252,7 @@ class Surface(Code):
         return n_edges, edges, edge_dict, merges
 
     def _substitute(self, e: Edge, merge_equivalent_boundary_nodes: bool = False) -> Edge:
-        """Return substitute edge for redundant edge `e`."""
+        """Return substitute edge for redundant edge ``e``."""
         d = self.D
         a = self.LONG_AXIS
         u, v = e

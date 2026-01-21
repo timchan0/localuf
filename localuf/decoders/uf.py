@@ -16,25 +16,25 @@ from localuf.decoders._base_uf import BaseUF
 class UF(BaseUF):
     """The original, algorithmic UF decoder.
     
-    Extends `BaseUF`.
+    Extends ``BaseUF``.
     Incompatible with the frugal decoding scheme.
-
+    
     Additional instance constants:
-    * `_FORESTER` decides whether to maintain a static or dynamic forest.
-    * `_INCLINATION` a class that decides which boundary the root should be on
-    when there is a percolating cluster
+    * ``_FORESTER`` decides whether to maintain a static or dynamic forest.
+    * ``_INCLINATION`` a class that decides which boundary the root should be on
+        when there is a percolating cluster
     i.e. one that spans opposite boundaries.
-    Has the `update_boundary` method.
-
+    Has the ``update_boundary`` method.
+    
     Additional instance attributes:
-    * `parents` maps each node in the decoding graph to its parent node.
-    * `clusters` maps each root node to the cluster of that root node.
-    Initially, EVERY node its own cluster; then, only grow active clusters.
-    * `active_clusters` the set of clusters
-    with odd defect count and no boundary node.
-    * `forest` the spanning forest after syndrome validation as a list of pairs (edge, node)
-    where node is the further endpoint from the root of the tree in the forest.
-    * `digraph` a NetworkX digraph of `forest`.
+    * ``parents`` maps each node in the decoding graph to its parent node.
+    * ``clusters`` maps each root node to the cluster of that root node.
+        Initially, EVERY node its own cluster; then, only grow active clusters.
+    * ``active_clusters`` the set of clusters
+        with odd defect count and no boundary node.
+    * ``forest`` the spanning forest after syndrome validation as a list of pairs (edge, node)
+        where node is the further endpoint from the root of the tree in the forest.
+    * ``digraph`` a NetworkX digraph of ``forest``.
     """
 
     def __init__(
@@ -43,23 +43,23 @@ class UF(BaseUF):
             dynamic: bool = False,
             inclination: Literal['default', 'west'] = 'default',
     ):
-        """Input:
-        * `code` the code to be decoded.
-        * `dynamic` whether the forest is dynamic or static.
-        Static forest is when the spanning forest of the erasure
+        """
+        :param code: the code to be decoded.
+        :param dynamic: whether the forest is dynamic or static.
+            Static forest is when the spanning forest of the erasure
         is grown only after syndrome validation;
         this implementation grows the spanning tree using depth-first search (DFS).
         Dynamic forest is when the spanning forest of the erasure
         is maintained throughout syndrome validation;
         this is equivalent to multi-source breadth-first search (BFS) where each defect is a source.
         Dynamic forests are further explained in https://doi.org/10.13140/RG.2.2.13495.96162, section 5.3.2.
-        This `dynamic` parameter has a big effect on the complementary gap:
+        This ``dynamic`` parameter has a big effect on the complementary gap:
         the gap of dynamic UF closely follows the log odds of success;
         the gap of static UF can be much larger.
         This is because for dynamic UF only, the spanning tree of each cluster
         connects any two defects in a low-weight path.
-        * `inclination` decides which boundary the root should be on when there is a percolating cluster.
-        'default' means prefer neither east nor west, essentially random.
+        :param inclination: decides which boundary the root should be on when there is a percolating cluster.
+            'default' means prefer neither east nor west, essentially random.
         'west' defines the root of a percolating cluster always at the west boundary.
         """
         if isinstance(code.SCHEME, Frugal):
@@ -78,8 +78,8 @@ class UF(BaseUF):
     def reset(self, no_boundaries=False):
         """Factory reset.
         
-        Additional inputs:
-        * `no_boundaries` whether to treat all boundary nodes as detectors too.
+        
+        :param no_boundaries: whether to treat all boundary nodes as detectors too.
         """
         super().reset()
         self.syndrome = set()
@@ -108,8 +108,8 @@ class UF(BaseUF):
             draw=False,
             fig_width: float | None = None,
     ):
-        """Additional inputs over `Decoder.decode()`:
-        * `fig_width` figure width.
+        """Additional inputs over ``Decoder.decode()``:
+        * ``fig_width`` figure width.
         """
         self.validate(syndrome, log_history=draw)
         self.peel()
@@ -126,27 +126,27 @@ class UF(BaseUF):
     ):
         """Calculate the complementary gap after decoding.
         
-        Assumes `self.decode()` has already been called.
-        If `self.CODE.MERGED_EQUIVALENT_BOUNDARY_NODES` is `False`,
-        raises a `ValueError`.
-
-        Input:
-        * `noise_level` a probability representing the noise strength.
-        This is needed to define nonuniform edge weights of the decoding graph
+        Assumes ``self.decode()`` has already been called.
+        If ``self.CODE.MERGED_EQUIVALENT_BOUNDARY_NODES`` is ``False``,
+        raises a ``ValueError``.
+        
+        
+        :param noise_level: a probability representing the noise strength.
+            This is needed to define nonuniform edge weights of the decoding graph
         in the circuit-level noise model.
-        If `None`, all edges are assumed to have weight 1.
-        * `draw` whether to draw the original and complementary corrections.
-        * `fig_width` figure width.
-        * `fig_height` figure height.
-        * `kwargs_for_networkx_draw` passed to `networkx.draw()`.
-
-        Output:
-        * `weight_2 - weight_1` the complementary gap.
-
+        If ``None``, all edges are assumed to have weight 1.
+        :param draw: whether to draw the original and complementary corrections.
+        :param fig_width: figure width.
+        :param fig_height: figure height.
+        :param kwargs_for_networkx_draw: passed to ``networkx.draw()``.
+        
+        
+        :returns: ``weight_2 - weight_1`` the complementary gap.
+        
         Side effects:
-        * `self` ends up in the final state after computing the complementary correction.
+        * ``self`` ends up in the final state after computing the complementary correction.
         * All clusters are blind to boundary nodes
-        so will stop growing only once they have an odd defect count.
+            so will stop growing only once they have an odd defect count.
         """
         if not self.CODE.MERGED_EQUIVALENT_BOUNDARY_NODES:
             raise ValueError('Complementary gap requires all equivalent boundary nodes in the decoding graph be merged.')
@@ -170,25 +170,25 @@ class UF(BaseUF):
         return weight_2 - weight_1
     
     def _weigh_correction(self, noise_level: None | float = None) -> float:
-        """Weigh `self.correction`.
-
-        Input:
-        * `noise_level` a probability representing the noise strength.
-        This is needed to define nonuniform edge weights of the decoding graph
+        """Weigh ``self.correction``.
+        
+        
+        :param noise_level: a probability representing the noise strength.
+            This is needed to define nonuniform edge weights of the decoding graph
         in the circuit-level noise model.
-        If `None`, all edges are assumed to have weight 1.
-
-        Output:
-        * The sum of the weights of the edges in `self.correction`.
+        If ``None``, all edges are assumed to have weight 1.
+        
+        
+        :returns: The sum of the weights of the edges in ``self.correction``.
         """
         edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
         return sum(edge_weights[e][1] for e in self.correction)
     
     def unclustered_node_fraction(self):
         """Compute the Unclustered Node Fraction DCS.
-
-        Output:
-        * `fraction` the fraction of nodes that are not in a cluster.
+        
+        
+        :returns: ``fraction`` the fraction of nodes that are not in a cluster.
         """
         clustered_node_count = sum(cluster.size
             for cluster in self.clusters.values() if cluster.size > 1)
@@ -244,7 +244,7 @@ class UF(BaseUF):
                 merge_ls.append(e)
 
     def _find(self, v: Node):
-        """Find root of `v` (w/ path compression).
+        """Find root of ``v`` (w/ path compression).
         
         From https://www.geeksforgeeks.org/union-by-rank-and-path-compression-in-union-find-algorithm/.
         """
@@ -253,19 +253,19 @@ class UF(BaseUF):
         return self.parents[v]
     
     def static_merge(self, cu: '_Cluster', cv: '_Cluster'):
-        """Merge clusters `cu` and `cv` along edge `uv` for static UF."""
+        """Merge clusters ``cu`` and ``cv`` along edge ``uv`` for static UF."""
         if cu != cv:
             self._union(cu, cv)
 
     def dynamic_merge(self, cu: '_Cluster', cv: '_Cluster', e: Edge):
-        """Merge clusters `cu` and `cv` along edge `uv` for dynamic UF."""
+        """Merge clusters ``cu`` and ``cv`` along edge ``uv`` for dynamic UF."""
         if cu == cv or (cu.boundary and cv.boundary):
             self.growth[e] = Growth.BURNT
         else:
             self._union(cu, cv)
 
     def _union(self, cu: '_Cluster', cv: '_Cluster'):
-        """Union clusters `cu` with `cv` (by weight)."""
+        """Union clusters ``cu`` with ``cv`` (by weight)."""
         if cu.size >= cv.size:
             larger, smaller = cu, cv
         else:
@@ -284,7 +284,7 @@ class UF(BaseUF):
             smaller: '_Cluster',
             old_larger_vision_length: int,
     ):
-        """Update attributes `clusters` and `active_clusters` after union of larger w/ smaller."""
+        """Update attributes ``clusters`` and ``active_clusters`` after union of larger w/ smaller."""
 
         # DELETE SMALLER CLUSTER
         del self.clusters[smaller.root]
@@ -313,9 +313,8 @@ class UF(BaseUF):
     def _make_forest(self):
         """Return a spanning forest of the validated erasure.
         
-        Output:
-        * `forest` a list of pairs (edge, node)
-        where the node is the further endpoint from the tree root.
+        
+        :returns: ``forest`` a list of pairs (edge, node) where the node is the further endpoint from the tree root.
         """
         forest: list[tuple[Edge, Node]] = []
         for cluster in self.clusters.values():
@@ -324,11 +323,10 @@ class UF(BaseUF):
         return forest
 
     def _make_tree(self, tree_root: Node):
-        """Return a spanning tree of the validated cluster, from `tree_root`.
+        """Return a spanning tree of the validated cluster, from ``tree_root``.
         
-        Output:
-        * `tree` a list of pairs (edge, node)
-        where the node is the further endpoint from the root.
+        
+        :returns: ``tree`` a list of pairs (edge, node) where the node is the further endpoint from the root.
         """
         discovered = {tree_root}
         stack = collections.deque([tree_root])
@@ -353,7 +351,7 @@ class UF(BaseUF):
     def digraph(self):
         """Return a NetworkX digraph representing the spanning forest after syndrome validation.
         
-        Note: Requires calling `peel()` first.
+        Note: Requires calling ``peel()`` first.
         """
         dig = nx.DiGraph()
         dig.add_nodes_from(self.CODE.NODES)
@@ -375,8 +373,8 @@ class UF(BaseUF):
         **kwargs_for_networkx_draw,
     ):
         """Draw spanning forest.
-
-        `kwargs_for_networkx_draw` passed to `networkx.draw()`.
+        
+        ``kwargs_for_networkx_draw`` passed to ``networkx.draw()``.
         
         Note: Not as informative as draw_peel().
         """
@@ -412,10 +410,10 @@ class UF(BaseUF):
         **kwargs_for_networkx_draw,
     ):
         """Draw forest and correction from peeling.
-
-        `kwargs_for_networkx_draw` passed to `networkx.draw()`.
         
-        Note: Requires calling `peel()` first.
+        ``kwargs_for_networkx_draw`` passed to ``networkx.draw()``.
+        
+        Note: Requires calling ``peel()`` first.
         """
         dig = self.digraph
         pos = self.CODE.get_pos(x_offset)
@@ -481,15 +479,15 @@ class UF(BaseUF):
 
 class BaseCluster(abc.ABC):
     """Abstract base class for the cluster in UF.
-
+    
     Mathematically, a cluster is a connected subgraph of the decoding graph.
     
     Attributes:
-    * `root` the representative of the cluster.
-    * `size` the number of nodes in the cluster.
-    * `odd` a Boolean to say if the number of defects in the cluster is odd.
-    * `boundary` the node in the cluster that is the surface boundary if it exists; else, None.
-    If `cluster.boundary` not None, cluster will never be active in future.
+    * ``root`` the representative of the cluster.
+    * ``size`` the number of nodes in the cluster.
+    * ``odd`` a Boolean to say if the number of defects in the cluster is odd.
+    * ``boundary`` the node in the cluster that is the surface boundary if it exists; else, None.
+        If ``cluster.boundary`` not None, cluster will never be active in future.
     If syndrome validation not dynamic, boundary may not be unique!
     """
 
@@ -505,12 +503,12 @@ class BaseCluster(abc.ABC):
 
 class _Cluster(BaseCluster):
     """A UF cluster that tracks which edges to grow next.
-
-    Extends `BaseCluster`.
+    
+    Extends ``BaseCluster``.
     
     Additional attributes:
-    * `vision` a set of active edges incident to the cluster
-    i.e. edges to be grown by the cluster in next growth round.
+    * ``vision`` a set of active edges incident to the cluster
+        i.e. edges to be grown by the cluster in next growth round.
     """
 
     def __init__(self, uf: UF, root: Node, no_boundaries=False):
@@ -526,7 +524,7 @@ class _Inclination(abc.ABC):
 
     @abc.abstractmethod
     def update_boundary(self, larger: BaseCluster, smaller: BaseCluster):
-        """Update the `boundary` attribute of the cluster `larger`."""
+        """Update the ``boundary`` attribute of the cluster ``larger``."""
 
 
 class _DefaultInclination(_Inclination):
@@ -551,7 +549,7 @@ class _WestInclination(_Inclination):
 class _Forester(abc.ABC):
     """Decides whether to maintain a static or dynamic forest.
     
-    See the `dynamic` kwarg of `UF.__init__` for details.
+    See the ``dynamic`` kwarg of ``UF.__init__`` for details.
     """
 
     def __init__(self, uf: UF):
@@ -559,13 +557,13 @@ class _Forester(abc.ABC):
 
     @abc.abstractmethod
     def merge(self, cu: _Cluster, cv: _Cluster, e: Edge):
-        """Merge clusters `cu` and `cv` along edge `e`."""
+        """Merge clusters ``cu`` and ``cv`` along edge ``e``."""
 
 
 class _StaticForester(_Forester):
     """Maintains a static forest.
     
-    Extends `_Forester`.
+    Extends ``_Forester``.
     """
 
     def merge(self, cu, cv, e):
@@ -574,8 +572,8 @@ class _StaticForester(_Forester):
 
 class _DynamicForester(_Forester):
     """Maintains a dynamic forest.
-
-    Extends `_Forester`.
+    
+    Extends ``_Forester``.
     """
 
     def merge(self, cu, cv, e):

@@ -4,19 +4,19 @@ from localuf.type_aliases import Node
 
 class NodeBUF(NodeUF):
     """The graph used by Bucket UF decoder in Huang2020.
-
-    Extends `decoders.NodeUF`.
-
+    
+    Extends ``decoders.NodeUF``.
+    
     Overriden attributes:
-    * `buckets` replaces `active_clusters`
-    and is a dictionary where each key a cluster size;
+    * ``buckets`` replaces ``active_clusters``
+        and is a dictionary where each key a cluster size;
     value, a set of all active clusters of that size.
-
+    
     Overriden methods:
-    * `reset`.
-    * `load`.
-    * `validate_syndrome`.
-    * `_update_self_after_union`.
+    * ``reset``.
+    * ``load``.
+    * ``validate_syndrome``.
+    * ``_update_self_after_union``.
     """
 
     def reset(self):

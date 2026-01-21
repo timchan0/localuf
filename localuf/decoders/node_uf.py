@@ -4,16 +4,16 @@ from localuf.constants import Growth
 
 class NodeUF(uf.UF):
     """The graph used by original UF decoder.
-
-    Extends `UF` class.
+    
+    Extends ``UF`` class.
     Overriden attributes:
-    * `clusters` and `active_clusters` now use `_NodeCluster` rather than `_Cluster`.
-
+    * ``clusters`` and ``active_clusters`` now use ``_NodeCluster`` rather than ``_Cluster``.
+    
     Overriden methods:
-    * `reset`.
-    * `_growth_round`.
-    * `_grow`.
-    * `_union`.
+    * ``reset``.
+    * ``_growth_round``.
+    * ``_grow``.
+    * ``_union``.
     """
 
     def reset(self):
@@ -80,11 +80,11 @@ class NodeUF(uf.UF):
 
 class _NodeCluster(uf.BaseCluster):
     """A UF cluster that tracks the nodes on its frontier.
-
-    Extends `BaseCluster`.
+    
+    Extends ``BaseCluster``.
     
     Additional attributes:
-    * `frontier` the detectors in the cluster that are incident to >=1 active edge.
+    * ``frontier`` the detectors in the cluster that are incident to >=1 active edge.
     """
 
     def __init__(self, uf: NodeUF, root: Node):

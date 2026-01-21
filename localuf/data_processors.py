@@ -1,4 +1,4 @@
-"""Module for functions to process numerical data, mainly from `sim`."""
+"""Module for functions to process numerical data, mainly from ``sim``."""
 
 from collections.abc import Callable
 from typing import Type
@@ -21,25 +21,25 @@ def get_failure_data(
         alpha=STANDARD_ERROR_ALPHA,
         method='wilson',
 ) -> DataFrame:
-    """Get failure stats from output of `sim.accuracy.monte_carlo`.
-
-    Input:
-    * `data` output from `sim.accuracy.monte_carlo`.
-    * `p_slice` slice of probabilities to restrict output to.
-    * `alpha` significance level of confidence intervals.
-    * `method` method to compute confidence intervals.
-    For details on confidence intervals,
+    """Get failure stats from output of ``sim.accuracy.monte_carlo``.
+    
+    
+    :param data: output from ``sim.accuracy.monte_carlo``.
+    :param p_slice: slice of probabilities to restrict output to.
+    :param alpha: significance level of confidence intervals.
+    :param method: method to compute confidence intervals.
+        For details on confidence intervals,
     see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
-
-    Output:
-    * `dT` a DataFrame where each row a (distance, probability);
-    columns are:
-    * `f` logical failure rate
-    * `lo` lower confidence bound of `f`
-    * `hi` upper confidence bound of `f`
-    * `x` log10(`p`)
-    * `y` log10(`f`)
-    * `yerr` half the confidence interval of `y`.
+    
+    
+    :returns:
+    * ``dT`` a DataFrame where each row a (distance, probability); columns are:
+    * ``f`` logical failure rate
+    * ``lo`` lower confidence bound of ``f``
+    * ``hi`` upper confidence bound of ``f``
+    * ``x`` log10(``p``)
+    * ``y`` log10(``f``)
+    * ``yerr`` half the confidence interval of ``y``.
     """
     dT: DataFrame = data.loc[:, (slice(None), p_slice)].T # type: ignore
     dT['f'] = dT.m / dT.n
@@ -60,15 +60,15 @@ def get_failure_data_from_subset_sample(
         alpha: float = STANDARD_ERROR_ALPHA,
         method='normal',
 ):
-    """Get failure stats from output of `sim.accuracy.subset_sample`.
+    """Get failure stats from output of ``sim.accuracy.subset_sample``.
     
     Output: a DataFrame indexed by (distance, probability),
     with columns:
-    * `f` logical error probability.
-    * `lo` lower bound of `f`.
-    * `hi` upper bound of `f`.
-
-    Side effects: adds columns `f`, `SE_lo`, `SE_hi` to `data`.
+    * ``f`` logical error probability.
+    * ``lo`` lower bound of ``f``.
+    * ``hi`` upper bound of ``f``.
+    
+    Side effects: adds columns ``f``, ``SE_lo``, ``SE_hi`` to ``data``.
     """
     data['f'] = data.m / data.n
     lo, hi = proportion_confint(data.m, data.n, alpha=alpha, method=method)
@@ -108,14 +108,12 @@ def get_failure_data_from_subset_sample(
 
 def get_log_runtime_data(data: DataFrame):
     """Get log runtime data from runtime data.
-
-    Input:
-    `data` output from `sim.runtime.batch`.
-
-    Output:
-    `log_data` a DataFrame where each
-    column a stat: `x`, `y`, or `yerr`;
-    row, a (probability, distance).
+    
+    
+    ``data`` output from ``sim.runtime.batch``.
+    
+    
+    :returns: ``log_data`` a DataFrame where each column a stat: ``x``, ``y``, or ``yerr``; row, a (probability, distance).
     """
     df: DataFrame = np.log10(data) # type: ignore
     log_data = DataFrame({
@@ -128,20 +126,21 @@ def get_log_runtime_data(data: DataFrame):
 
 def get_stats(log_data: DataFrame, missing='drop', **kwargs_for_WLS):
     """Get WLS (weighted least squares) stats from output of either
-    `get_log_runtime_data` OR `get_failure_data`.
-
-    Input:
-    * `log_data` output from `get_log_runtime_data` or `get_failure_data`.
-    * `missing, **kwargs_for_WLS` passed to `statsmodels.regression.linear_model.WLS`.
-
-    Output: `stats` a DataFrame where each row an x-value
+    ``get_log_runtime_data`` OR ``get_failure_data``.
+    
+    
+    :param log_data: output from ``get_log_runtime_data`` or ``get_failure_data``.
+    :param missing: passed to ``statsmodels.regression.linear_model.WLS``.
+    :param kwargs_for_WLS: passed to ``statsmodels.regression.linear_model.WLS``.
+    
+    Output: ``stats`` a DataFrame where each row an x-value
     (probability OR distance);
     columns are:
-    * `intercept`
-    * `se_intercept`
-    * `gradient`
-    * `se_gradient`
-    * `r_squared`
+    * ``intercept``
+    * ``se_intercept``
+    * ``gradient``
+    * ``se_gradient``
+    * ``r_squared``
     """
     records: list[tuple[
         int | float,
@@ -186,24 +185,24 @@ def add_ignored_timesteps(
     extra_steps_per_layer=2,
     layers_per_sample: Callable[[int], int] = lambda d: d,
 ):
-    """Add ignored timesteps to `data`.
-
-    Input:
-    * `data` a DataFrame where each
-    column a (distance, probability);
+    """Add ignored timesteps to ``data``.
+    
+    
+    :param data: a DataFrame where each
+        column a (distance, probability);
     row, a runtime sample.
-    * `extra_steps_per_layer` number of ignored timesteps per layer
-    in the decoding graph.
-    * `layers_per_sample` a function with input `d` that outputs
-    the measurement round count per sample.
-
-    E.g. if `data` is output of `sim.runtime.frugal` with `time_only='merging'`
+    :param extra_steps_per_layer: number of ignored timesteps per layer
+        in the decoding graph.
+    :param layers_per_sample: a function with input ``d`` that outputs
+        the measurement round count per sample.
+    
+    E.g. if ``data`` is output of ``sim.runtime.frugal`` with ``time_only='merging'``
     using Snowflake with the 1:1 schedule,
     the default kwargs of this function will convert it to
-    the analogous output of `sim.runtime.frugal` with `time_only='all'`.
+    the analogous output of ``sim.runtime.frugal`` with ``time_only='all'``.
     This is because the extra timesteps per layer are a drop and a grow.
     If using Snowflake with the 2:1 schedule,
-    set `extra_steps_per_layer=3` as there is one additional grow timestep.
+    set ``extra_steps_per_layer=3`` as there is one additional grow timestep.
     """
     dc = {(d, p): data[d, p] + extra_steps_per_layer*layers_per_sample(int(d))
         for d, p in data.columns}

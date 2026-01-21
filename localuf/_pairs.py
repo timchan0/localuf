@@ -3,7 +3,7 @@ from localuf.type_aliases import Edge, Node
 
 class Pairs:
     """A set of node pairs defining free anyon strings.
-
+    
     In form of a dictionary where there are two entries, u:v and v:u, per pair uv.
     """
 
@@ -47,7 +47,7 @@ class Pairs:
         del self._dc[v]
 
     def load(self, e: Edge):
-        """Load in edge `e`."""
+        """Load in edge ``e``."""
         u, v = e
         if u in self:
             w = self[u]
@@ -67,7 +67,7 @@ class Pairs:
 
 
 class LogicalCounter:
-    """Counts logical error strings in, and updates, `Pairs` instance."""
+    """Counts logical error strings in, and updates, ``Pairs`` instance."""
 
     def __init__(
             self,
@@ -82,22 +82,21 @@ class LogicalCounter:
         self._TIME_AXIS = time_axis
 
     def _lower_node(self, v: Node) -> Node:
-        """Move `v` down by commit height."""
+        """Move ``v`` down by commit height."""
         new_v = list(v)
         new_v[self._TIME_AXIS] -= self._COMMIT_HEIGHT
         return tuple(new_v)
 
     def count(self, pairs: Pairs):
-        """Count logical error strings in, and update `pairs`.
-
-        Input:
-        `pairs` a set of node pairs defining free anyon strings.
-
-        Output:
-        * `error_count` the number of logical error strings completed in `pairs`.
-        * `new_pairs` the error strings in `pairs`
-        ending at the future boundary of the commit region,
-        lowered by commit height.
+        """Count logical error strings in, and update ``pairs``.
+        
+        
+        ``pairs`` a set of node pairs defining free anyon strings.
+        
+        
+        :returns:
+        * ``error_count`` the number of logical error strings completed in ``pairs``.
+        * ``new_pairs`` the error strings in ``pairs`` ending at the future boundary of the commit region, lowered by commit height.
         """
         error_count: int = 0
         new_pairs = Pairs()

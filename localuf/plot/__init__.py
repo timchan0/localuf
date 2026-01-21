@@ -1,4 +1,4 @@
-"""Module for plotting numeric data from `sim`.
+"""Module for plotting numeric data from ``sim``.
 
 Available submodules:
 * accuracy

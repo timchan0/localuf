@@ -3,10 +3,10 @@ from localuf.type_aliases import Node
 
 class Determinant:
     """Base class for determining whether a node is a boundary.
-
+    
     Instance attributes:
-    * `D` code distance.
-    * `LONG_AXIS` that whose index runs from -1 to d-1 inclusive.
+    * ``D`` code distance.
+    * ``LONG_AXIS`` that whose index runs from -1 to d-1 inclusive.
     """
 
     def __init__(self, d: int, long_axis: int) -> None:
@@ -20,30 +20,30 @@ class Determinant:
     def LONG_AXIS(self): return self._LONG_AXIS
 
     def is_boundary(self, v: Node):
-        """See `_base_classes.Code.is_boundary`."""
+        """See ``_base_classes.Code.is_boundary``."""
         # `node` either (i, j) or (j, t) or (i, j, t).
         return v[self.LONG_AXIS] in {-1, self.D-1}
 
 
 class SpaceDeterminant(Determinant):
     """Determines only space boundaries.
-
-    Extends `Determinant`.
+    
+    Extends ``Determinant``.
     """
 
 
 class SpaceTimeDeterminant(Determinant):
     """Determines space and time boundaries.
-
-    Extends `Determinant`.
-
+    
+    Extends ``Determinant``.
+    
     Additional instance attributes:
-    * `TIME_AXIS` that which represents time.
-    * `WINDOW_HEIGHT` total height of sliding window.
-
+    * ``TIME_AXIS`` that which represents time.
+    * ``WINDOW_HEIGHT`` total height of sliding window.
+    
     Overriden methods:
-    * `__init__`
-    * `is_boundary`
+    * ``__init__``
+    * ``is_boundary``
     """
 
     def __init__(

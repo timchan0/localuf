@@ -1,4 +1,4 @@
-"""Plot runtime data from `sim.runtime`.
+"""Plot runtime data from ``sim.runtime``.
 
 Available functions:
 * mean
@@ -41,38 +41,35 @@ def mean(
         **kwargs,
 ):
     """Plot mean timestep count against code distance.
-
-    Input:
-    * `data` a DataFrame where each
-    column a (distance, probability);
+    
+    
+    :param data: a DataFrame where each
+        column a (distance, probability);
     row, a runtime sample.
-    * `title` plot title.
-    * `per_measurement_round` whether to divide runtime by measurement round count.
-    * `layers_per_sample` a function with input `d` that outputs
-    the measurement round count per row of `data`.
-    Affects output only if `per_measurement_round`.
-    * `yerr_shows` what errorbars show:
-    either `'sem'` for standard error,
-    or `'std'` for standard deviation.
-    * `noise_levels` sequence specifying which noise levels to plot, in case want to omit any.
-    * `base_color` a single color for all errorbars and their connecting lines.
-    Decreasing noise level is then shown by increasing opacity.
-    If `None`, each noise level is shown by a different, fully opaque color.
-    * `fill_between` whether to use `fill_between` instead of `errorbar`.
-    * `fill_alpha` alpha value for the filled area.
-    * `capsize` length of error bar caps in points.
-    * `quantile` optional quantile (in the interval [0, 1]) to line plot.
-    * `quantile_linestyle` linestyle for the quantile line.
-    * `**kwargs` passed to either `errorbar` or `fill_between`
-    depending on which is used.
-
-    Output:
-    * `data_copy` a copy of `data` with runtimes divided by distance
-    if `per_measurement_round`
-    else an exact deep copy of `data`.
-    * `containers` a dictionary where each
-    key a noise level;
-    value, the `ErrorbarContainer` for that noise level.
+    :param title: plot title.
+    :param per_measurement_round: whether to divide runtime by measurement round count.
+    :param layers_per_sample: a function with input ``d`` that outputs
+        the measurement round count per row of ``data``.
+    Affects output only if ``per_measurement_round``.
+    :param yerr_shows: what errorbars show:
+        either ``'sem'`` for standard error,
+    or ``'std'`` for standard deviation.
+    :param noise_levels: sequence specifying which noise levels to plot, in case want to omit any.
+    :param base_color: a single color for all errorbars and their connecting lines.
+        Decreasing noise level is then shown by increasing opacity.
+    If ``None``, each noise level is shown by a different, fully opaque color.
+    :param fill_between: whether to use ``fill_between`` instead of ``errorbar``.
+    :param fill_alpha: alpha value for the filled area.
+    :param capsize: length of error bar caps in points.
+    :param quantile: optional quantile (in the interval [0, 1]) to line plot.
+    :param quantile_linestyle: linestyle for the quantile line.
+    :param kwargs: passed to either ``errorbar`` or ``fill_between``
+        depending on which is used.
+    
+    
+    :returns:
+    * ``data_copy`` a copy of ``data`` with runtimes divided by distance if ``per_measurement_round`` else an exact deep copy of ``data``.
+    * ``containers`` a dictionary where each key a noise level; value, the ``ErrorbarContainer`` for that noise level.
     """
     containers: dict[float, ErrorbarContainer | list[Line2D]] = {}
     ds: Index[int] = data.columns.get_level_values('d').unique()
@@ -232,21 +229,21 @@ def distributions(
         supxlabel_y: float = 0.15,
         **kwargs_for_ylabel,
 ):
-    """Histogram runtime distributions for each DataFrame in `data`.
-
-    Input:
-    * `data` sequence of DataFrames. In each DataFrame, each
-    column a (distance, probability);
+    """Histogram runtime distributions for each DataFrame in ``data``.
+    
+    
+    :param data: sequence of DataFrames. In each DataFrame, each
+        column a (distance, probability);
     row, a runtime sample.
-    * `p` noise level associated to the runtimes histogrammed.
-    * `bins` bin count in each histogram.
-    If an int, use same bin count for all entries in `data`.
+    :param p: noise level associated to the runtimes histogrammed.
+    :param bins: bin count in each histogram.
+        If an int, use same bin count for all entries in ``data``.
     If any bin count is 0, set bin width to 1.
-    * `global_range` whether to use same bins for all distances within a DataFrame.
-    * `quantile` the quantile (in the interval [0, 1]) to draw as a horizontal red line.
-    Default is 1 i.e. the maximum of the sample.
-    * `supxlabel_y` y-coordinate for the figure x-label.
-    * `**kwargs_for_ylabel` passed to `plt.ylabel` for the leftmost subplot in each row.
+    :param global_range: whether to use same bins for all distances within a DataFrame.
+    :param quantile: the quantile (in the interval [0, 1]) to draw as a horizontal red line.
+        Default is 1 i.e. the maximum of the sample.
+    :param supxlabel_y: y-coordinate for the figure x-label.
+    :param kwargs_for_ylabel: passed to ``plt.ylabel`` for the leftmost subplot in each row.
     """
     if isinstance(bins, int):
         bins = itertools.repeat(bins)
@@ -303,10 +300,10 @@ def violin(
         errorbar_kwargs: None | dict = None,
         **kwargs_for_violinplot,
 ):
-    """Violin plot of runtime distributions for a given `p`.
+    """Violin plot of runtime distributions for a given ``p``.
     
-    Input:
-    * `capsize` length of error bar caps in points.
+    
+    :param capsize: length of error bar caps in points.
     """
     df: DataFrame = data.xs(p, level='p', axis=1) # type: ignore
     if errorbar_kwargs is None: errorbar_kwargs = {}

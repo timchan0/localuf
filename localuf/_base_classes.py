@@ -15,47 +15,47 @@ from localuf.noise import CircuitLevel, CodeCapacity, Phenomenological
 
 class Code(abc.ABC):
     """The decoding graph G = (V, E) of a CSS code.
-
-    Atttributes (all are constants):
-    * `D` code distance.
-    * `MERGED_EQUIVALENT_BOUNDARY_NODES` whether
-    all nodes that represent the same boundary are merged.
+    
+    Attributes (all are constants):
+    * ``D`` code distance.
+    * ``MERGED_EQUIVALENT_BOUNDARY_NODES`` whether
+        all nodes that represent the same boundary are merged.
     This results in a decoding graph with
     as many boundary nodes as there are boundaries.
-    * `SCHEME` the decoding scheme.
-    * `N_EDGES` number of edges in G.
-    * `EDGES` a tuple of edges of G.
+    * ``SCHEME`` the decoding scheme.
+    * ``N_EDGES`` number of edges in G.
+    * ``EDGES`` a tuple of edges of G.
     Use tuple instead of generator so can repeatedly iterate through.
-    * `NODES` a tuple of nodes of G.
-    * `NODE_COUNT` number of nodes in G.
-    * `NOISE` noise model.
-    * `TIME_AXIS` that which represents time.
-    * `LONG_AXIS` that whose index runs from -1 to d-1 inclusive.
-    * `DIMENSION` of G.
-    * `INCIDENT_EDGES` maps each node to a set of incident edges.
-    * `DETECTORS` a tuple of all detectors of G.
-    * `DETECTOR_COUNT` number of detectors in G.
-    * `BOUNDARY_NODES` a tuple of all boundary nodes of G.
-    * `GRAPH` a NetworkX graph of G.
-
-    G represents: if `NOISE`...
+    * ``NODES`` a tuple of nodes of G.
+    * ``NODE_COUNT`` number of nodes in G.
+    * ``NOISE`` noise model.
+    * ``TIME_AXIS`` that which represents time.
+    * ``LONG_AXIS`` that whose index runs from -1 to d-1 inclusive.
+    * ``DIMENSION`` of G.
+    * ``INCIDENT_EDGES`` maps each node to a set of incident edges.
+    * ``DETECTORS`` a tuple of all detectors of G.
+    * ``DETECTOR_COUNT`` number of detectors in G.
+    * ``BOUNDARY_NODES`` a tuple of all boundary nodes of G.
+    * ``GRAPH`` a NetworkX graph of G.
     
-    `'code capacity'`: the code, where each
+    G represents: if ``NOISE`` is...
+    
+    ``'code capacity'``: the code, where each
     * detector represents a measure-Z qubit;
     * edge, a data qubit i.e. possible bitflip location.
-
-    `'phenomenological'`:
-    `window_height+1` measurement rounds of the code,
+    
+    ``'phenomenological'``:
+    ``window_height+1`` measurement rounds of the code,
     where each
     * detector represents the difference between two consecutive measurements
-    of a measure-Z qubit at a given point in time;
+        of a measure-Z qubit at a given point in time;
     * horizontal edge, a possible time at which a data qubit could bitflip;
     * vertical edge, a possible faulty measurement
-    (i.e. measure-Z qubit recording the wrong parity with some probability `q`)
-    location.
-    First AND last round assumed to be perfect (hence no future boundary edges).
-
-    `'circuit-level'`: same as `'phenomenological'`
+        (i.e. measure-Z qubit recording the wrong parity with some probability ``q``)
+        location.
+        First AND last round assumed to be perfect (hence no future boundary edges).
+    
+    ``'circuit-level'``: same as ``'phenomenological'``
     but each edge represents a possible pair of defects
     that could have resulted from one fault.
     """
@@ -78,31 +78,38 @@ class Code(abc.ABC):
             monolingual: bool = False,
             _merge_redundant_edges: bool = True,
     ):
-        """Input:
-        * `d` code distance.
-        * `noise` noise model.
-        * `scheme` the decoding scheme.
-        * `window_height` total layer count in the time direction.
-        Affects only batch and global batch decoding schemes.
-        Default value is `d`.
-        * `commit_height` (`buffer_height`) the layer count in the time direction
-        that is committed (not committed).
-        Affects only forward and frugal decoding schemes.
-        Default value is `d` for forward scheme
-        and `1` (`2*(d//2)`) for frugal scheme.
-        * `merge_equivalent_boundary_nodes` whether to merge
-        all nodes that represent the same boundary.
-        This results in a decoding graph with
-        as many boundary nodes as there are boundaries.
-
-        The following 4 inputs affect only circuit-level noise:
-        * `parametrization` defines relative fault probabilities of
-        1- and 2-qubit gates, and prep/measurement.
-        * `demolition` whether measurement destroys the ancilla the qubit state
-        which hence needs to be initialized for next measurement cycle.
-        * `monolingual` whether can prep/measure in only Z basis
-        hence X-basis prep/measurement needs Hadamard gates.
-        * `_merge_redundant_edges` whether to merge redundant boundary edges.
+        """
+        :param d: code distance.
+        :param noise: noise model.
+        :param scheme: the decoding scheme.
+        :param window_height: total layer count in the time direction.
+            Affects only batch and global batch decoding schemes.
+        Default value is ``d``.
+        :param commit_height: the layer count in the time direction
+            that is committed.
+            Affects only forward and frugal decoding schemes.
+            Default value is ``d`` for forward scheme
+            and ``1`` (``2*(d//2)``) for frugal scheme.
+        :param buffer_height: the layer count in the time direction
+            that is not committed.
+            Affects only forward and frugal decoding schemes.
+            Default value is ``d`` for forward scheme
+            and ``1`` (``2*(d//2)``) for frugal scheme.
+        :param merge_equivalent_boundary_nodes: whether to merge
+            all nodes that represent the same boundary.
+            This results in a decoding graph with
+            as many boundary nodes as there are boundaries.
+        :param parametrization: defines relative fault probabilities of
+            1- and 2-qubit gates, and prep/measurement.
+            Affects only circuit-level noise.
+        :param demolition: whether measurement destroys the ancilla qubit state
+            which hence needs to be initialized for next measurement cycle.
+            Affects only circuit-level noise.
+        :param monolingual: whether can prep/measure in only Z basis
+            hence X-basis prep/measurement needs Hadamard gates.
+            Affects only circuit-level noise.
+        :param _merge_redundant_edges: whether to merge redundant boundary edges.
+            Affects only circuit-level noise.
         """
         self._D = d
         self._MERGED_EQUIVALENT_BOUNDARY_NODES = merge_equivalent_boundary_nodes
@@ -218,8 +225,9 @@ class Code(abc.ABC):
         merge_equivalent_boundary_nodes: bool,
     ) -> tuple[int, tuple[Edge, ...]]:
         """Edges of G for code capacity noise model.
-
-        Output:
+        
+        
+        :returns:
         * number of edges in G.
         * tuple of edges of G.
         """
@@ -234,15 +242,16 @@ class Code(abc.ABC):
     ) -> tuple[int, tuple[Edge, ...]]:
         """Edges of decoding graph G or viewing window W for phenomenological noise model.
         
-        Input:
-        * `h` window height.
-        * `future_boundary` whether top of graph has future boundary.
-        True for W, False for G.
-        * `t_start` the time index of the bottom layer.
-        * `merge_equivalent_boundary_nodes` whether to merge
-        all nodes that represent the same boundary.
-
-        Output:
+        
+        :param h: window height.
+        :param future_boundary: whether top of graph has future boundary.
+            True for W, False for G.
+        :param t_start: the time index of the bottom layer.
+        :param merge_equivalent_boundary_nodes: whether to merge
+            all nodes that represent the same boundary.
+        
+        
+        :returns:
         * number of edges in the graph.
         * a tuple of edges of the graph.
         """
@@ -261,38 +270,34 @@ class Code(abc.ABC):
         dict[EdgeType, tuple[Edge, ...]],
         dict[Edge, Edge] | None,
     ]:
-        """Return inputs for `noise.CircuitLevel`.
-
-        Additional inputs over `_phenomenological_edges`:
-        * `_merge_redundant_edges` whether to merge redundant boundary edges.
-        Automatically `True` if `merge_equivalent_boundary_nodes` is `True`.
-
-        Output:
-        * `n_edges` number of edges in the graph.
-        * `edges` a tuple of edges of the graph which excludes the redundant edges
-        if `_merge_redundant_edges` is `True`.
-        * `edge_dict` maps from edge type
-        (i.e. orientation and location)
-        to tuple of all edges of that type.
-        Always includes redundant edges.
-        Inter-key order matters as used by `noise.forcers.ForceByEdge.force_error`.
-        * `merges` maps each redundant edge to its substitute.
+        """Return inputs for ``noise.CircuitLevel``.
+        
+        Additional inputs over ``_phenomenological_edges``:
+        * ``_merge_redundant_edges`` whether to merge redundant boundary edges.
+            Automatically ``True`` if ``merge_equivalent_boundary_nodes`` is ``True``.
+        
+        
+        :returns:
+        * ``n_edges`` number of edges in the graph.
+        * ``edges`` a tuple of edges of the graph which excludes the redundant edges if ``_merge_redundant_edges`` is ``True``.
+        * ``edge_dict`` maps from edge type (i.e. orientation and location) to tuple of all edges of that type. Always includes redundant edges. Inter-key order matters as used by ``noise.forcers.ForceByEdge.force_error``.
+        * ``merges`` maps each redundant edge to its substitute.
         """
 
     @abc.abstractmethod
     def _future_boundary_nodes(self, h: int) -> list[Node]:
         """Return list of boundary nodes at top of viewing window.
         
-        Input: `h` window height.
+        Input: ``h`` window height.
         """
 
     @abc.abstractmethod
     def _redundant_boundary_nodes(self, h: int) -> list[Node]:
         """Return list of additional boundary nodes due to unmerged redundant edges.
-
+        
         Used only by circuit-level noise.
         
-        Input: `h` window height.
+        Input: ``h`` window height.
         """
 
     @property
@@ -350,11 +355,11 @@ class Code(abc.ABC):
         return tuple(v for v in self.NODES if self.is_boundary(v))
 
     def is_boundary(self, v: Node):
-        """Determine whether `v` a boundary node."""
+        """Determine whether ``v`` a boundary node."""
         return self.SCHEME.is_boundary(v)
 
     def neighbors(self, v: Node):
-        """Return neighbors of `v`.
+        """Return neighbors of ``v``.
         
         Never actually used but if do,
         change to @cached_property.
@@ -367,40 +372,37 @@ class Code(abc.ABC):
 
     @staticmethod
     def traverse_edge(e: Edge, u: Node):
-        """Return node at other end of edge `e`."""
+        """Return node at other end of edge ``e``."""
         v = e[1] if u == e[0] else e[0]
         return v
     
     def raise_node(self, v: Node, delta_t: int = 1) -> Node:
-        """Move `v` up by `delta_t`."""
+        """Move ``v`` up by ``delta_t``."""
         # tuple unpacking is marginally slower
         new_v = list(v)
         new_v[self.TIME_AXIS] += delta_t
         return tuple(new_v)
     
     def raise_edge(self, e: Edge, delta_t: int = 1) -> Edge:
-        """Move `e` up by `delta_t`."""
+        """Move ``e`` up by ``delta_t``."""
         return tuple(self.raise_node(v, delta_t) for v in e) # type: ignore
 
     def make_error(self, p: float, exclude_future_boundary: bool = False):
         """Sample edges from freshly discovered region.
-
-        Input:
-        * `p` characteristic noise level if circuit-level noise;
-        else, bitflip probability.
-        Should be in [0, 1], though no check is done to ensure this.
-        * `exclude_future_boundary` whether to exclude future boundary edges
-        from being sampled for the new error in the freshly discovered region.
-        Set to `True` if you want to emulate the end of a memory experiment,
-        where the data qubits are measured and the last syndrome sheet is obtained
-        from classically taking parities of these measurement outcomes
-        (so there is no measurement error).
-
-        Output:
-        The set of bitflipped edges in the freshly discovered region.
-        Each edge bitflips with
-        probability defined by its multiplicity if circuit-level noise; else,
-        probability `p`.
+        
+        
+        :param p: characteristic noise level if circuit-level noise;
+            else, bitflip probability.
+            Should be in [0, 1], though no check is done to ensure this.
+        :param exclude_future_boundary: whether to exclude future boundary edges
+            from being sampled for the new error in the freshly discovered region.
+            Set to ``True`` if you want to emulate the end of a memory experiment,
+            where the data qubits are measured and the last syndrome sheet is obtained
+            from classically taking parities of these measurement outcomes
+            (so there is no measurement error).
+        
+        
+        :returns: The set of bitflipped edges in the freshly discovered region. Each edge bitflips with probability defined by its multiplicity if circuit-level noise; else, probability ``p``.
         """
         error = self.NOISE.make_error(p)
         if exclude_future_boundary:
@@ -415,22 +417,22 @@ class Code(abc.ABC):
     def get_syndrome(self, error: set[Edge]):
         """Get syndrome from error configuration.
         
-        Input:
-        `error` a set of bitflipped edges.
-
-        Output:
-        `syndrome` a set of defects.
+        
+        ``error`` a set of bitflipped edges.
+        
+        
+        :returns: ``syndrome`` a set of defects.
         """
         return self.get_verbose_syndrome(error).difference(self.BOUNDARY_NODES)
 
     def get_verbose_syndrome(self, error: set[Edge]):
         """Get syndrome, treating boundary nodes as detectors too.
         
-        Input:
-        `error` a set of bitflipped edges.
-
-        Output:
-        `verbose_syndrome` a set of defects.
+        
+        ``error`` a set of bitflipped edges.
+        
+        
+        :returns: ``verbose_syndrome`` a set of defects.
         """
         # Note: Implementing `verbose_syndrome` as a set we add to and remove from is
         # empirically faster than as a dictionary w/ a key for each measure-Z qubit
@@ -444,13 +446,12 @@ class Code(abc.ABC):
     @staticmethod
     def compose_errors(*errors: set[Edge]):
         """Sequentially compose any number of errors.
-
-        Input: `errors` a tuple (error1, error2, ...) where each
+        
+        :param errors: a tuple (error1, error2, ...) where each
         error a set of bitflipped edges.
-
-        Output:
-        A set of edges representing the sequential composition
-        of all errors in `errors`.
+        
+        
+        :returns: A set of edges representing the sequential composition of all errors in ``errors``.
         """
         composition: set[Edge] = set()
         for error in errors:
@@ -459,14 +460,12 @@ class Code(abc.ABC):
 
     def get_logical_error(self, leftover: set[Edge]):
         """Whether leftover implements logical X.
-
-        Input:
-        * `leftover` a set of bitflipped edges.
         
-        Output:
-        * logical error count parity if scheme is batch
-        else logical error count if scheme is scheme is global batch
-        else logical error count in commit region if scheme is forward.
+        
+        :param leftover: a set of bitflipped edges.
+        
+        
+        :returns: logical error count parity if scheme is batch else logical error count if scheme is scheme is global batch else logical error count in commit region if scheme is forward.
         """
         return self.SCHEME.get_logical_error(leftover)
     
@@ -507,23 +506,26 @@ class Code(abc.ABC):
         **kwargs_for_networkx_draw,
     ):
         """Draw G using matplotlib.
-
-        Input:
-        * `error` a set of edges. Default is empty set.
-        * `syndrome` a set of defects. Default is that produced by `error`.
-        * `x_offset` the ratio of out-of-screen to along-screen distance.
-        * `with_labels` whether to draw labels on each node.
-        * `nodelist` the subset of nodes to draw. Default is all nodes i.e. `self.NODES`.
-        * `node_size` size of nodes.
-        * `width` line width of edges.
-        * `{boundary, defect, nondefect, error}_color` string specifying
-        color of {boundary nodes, defects, nondefects, bitflipped edges, unflipped edges}.
-        * `kwargs_for_networkx_draw` modifies/adds keyword arguments to `networkx.draw()`.
-
+        
+        
+        :param error: a set of edges. Default is empty set.
+        :param syndrome: a set of defects. Default is that produced by ``error``.
+        :param x_offset: the ratio of out-of-screen to along-screen distance.
+        :param with_labels: whether to draw labels on each node.
+        :param nodelist: the subset of nodes to draw. Default is all nodes i.e. ``self.NODES``.
+        :param node_size: size of nodes.
+        :param width: line width of edges.
+        :param boundary_color: string specifying color of boundary nodes.
+        :param defect_color: string specifying color of defects.
+        :param nondefect_color: string specifying color of nondefects.
+        :param error_color: string specifying color of bitflipped edges.
+        :param non_error_color: string specifying color of unflipped edges.
+        :param kwargs_for_networkx_draw: modifies/adds keyword arguments to ``networkx.draw()``.
+        
         Draws: G, where
         * bitflipped edges thick red; else, thin black
         * boundary nodes blue; defects red; else, green.
-
+        
         Output: The NetworkX graph of G.
         """
         import networkx as nx
@@ -579,13 +581,13 @@ class Code(abc.ABC):
         x_offset: float = constants.DEFAULT_X_OFFSET,
         nodelist: None | Iterable[Node] = None,
     ) -> dict[Node, Coord]:
-        """Compute coordinates of each node G for `draw()`.
-
-        Input:
-        * `x_offset` the ratio of out-of-screen to along-screen distance.
-        * `nodelist` the nodes to draw. Default is `self.NODES`.
+        """Compute coordinates of each node G for ``draw()``.
         
-        Output: `pos` a dictionary where each key a node index; value, position coordinate.
+        
+        :param x_offset: the ratio of out-of-screen to along-screen distance.
+        :param nodelist: the nodes to draw. Default is ``self.NODES``.
+        
+        Output: ``pos`` a dictionary where each key a node index; value, position coordinate.
         E.g. for surface code w/ perfect measurements,
         convert each matrix index to position coords via
         (i, j) -> (x, y) = (j, -i).
@@ -600,16 +602,17 @@ class Code(abc.ABC):
             nodelist: Iterable[Node] | None = None,
             show_boundary_defects=True,
     ):
-        """Return a list of colors each node should be for `draw()`.
+        """Return a list of colors each node should be for ``draw()``.
         
-        Input:
-        * `syndrome` a set of defects.
-        * `{boundary, defect, nondefect}_color` string specifying
-        color of {boundary nodes, defects, nondefects}.
-        * `nodelist` the nodes to draw. Default is all nodes i.e. `self.NODES`.
-        * `show_boundary_defects` whether to boundary nodes can be defects.
-
-        Output: List of colors for each node in `nodelist`.
+        
+        :param syndrome: a set of defects.
+        :param boundary_color: string specifying color of boundary nodes.
+        :param defect_color: string specifying color of defects.
+        :param nondefect_color: string specifying color of nondefects.
+        :param nodelist: the nodes to draw. Default is all nodes i.e. ``self.NODES``.
+        :param show_boundary_defects: whether to boundary nodes can be defects.
+        
+        Output: List of colors for each node in ``nodelist``.
         """
         if nodelist is None:
             nodelist = self.NODES
@@ -630,17 +633,17 @@ class Code(abc.ABC):
 
 class Decoder(abc.ABC):
     """Base class for decoders.
-
+    
     Instance attributes (1 constant):
-    * `CODE` the code to be decoded.
-    * `correction` a set of edges comprising the correction.
+    * ``CODE`` the code to be decoded.
+    * ``correction`` a set of edges comprising the correction.
     """
 
     @property
     def CODE(self): return self._CODE
 
     def __init__(self, code: Code):
-        """Input: `code` the code to be decoded."""
+        """Input: ``code`` the code to be decoded."""
         self._CODE = code
         self.correction: set[Edge]
 
@@ -655,35 +658,34 @@ class Decoder(abc.ABC):
             **kwargs,
     ) -> None | int | tuple[int, int]:
         """Decode syndrome.
-
-        Input:
-        * `syndrome` the set of defects.
-        * `draw` whether to draw.
-        * `log_history` whether keep track of state history.
-
-        Correction stored in `self.correction`.
+        
+        
+        :param syndrome: the set of defects.
+        :param draw: whether to draw.
+        :param log_history: whether keep track of state history.
+        
+        Correction stored in ``self.correction``.
         """
 
     @abc.abstractmethod
     def draw_decode(self, **kwargs_for_networkx_draw):
         """Draw all stages of decoding.
-    
-        Input: `kwargs_for_networkx_draw` passed to `NetworkX.draw`
-        e.g. `margins=(0.1, 0.1)`.
+        
+        Input: ``kwargs_for_networkx_draw`` passed to ``NetworkX.draw``
+        e.g. ``margins=(0.1, 0.1)``.
         """
 
     def subset_sample(self, p: float, n: int, tol: float = 5e-1):
         """Simulate decoding cycles for each error subset.
-
-        Input:
-        * `p` noise level.
-        * `n` number of decoding cycles per subset.
-        * `tol` how much cutoff error we can tolerate,
-        as a fraction of the mean.
-
-        Output:
-        * A pandas DataFrame indexed by `weight`
-        with columns `['subset prob', 'survival prob', 'm', 'n']`.
+        
+        
+        :param p: noise level.
+        :param n: number of decoding cycles per subset.
+        :param tol: how much cutoff error we can tolerate,
+            as a fraction of the mean.
+        
+        
+        :returns: A pandas DataFrame indexed by ``weight`` with columns ``['subset prob', 'survival prob', 'm', 'n']``.
         """
         subset_probs = self.CODE.NOISE.subset_probabilities(p)
         mean, mn, weights = 0, [], []

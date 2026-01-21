@@ -24,20 +24,20 @@ class Noise(abc.ABC):
     @property
     @abc.abstractmethod
     def ALL_WEIGHTS(self) -> Iterable[int] | tuple[tuple[int, ...], ...]:
-        """All possible `force_error` inputs."""
+        """All possible ``force_error`` inputs."""
     
     @property
     @abc.abstractmethod
     def ALL_WEIGHTS_INDEX(self) -> pd.Index:
-        """`ALL_WEIGHTS` as pandas Index."""
+        """``ALL_WEIGHTS`` as pandas Index."""
 
     @abc.abstractmethod
     def make_error(self, p: float) -> set[Edge]:
-        """See `Code.make_error`."""
+        """See ``Code.make_error``."""
 
     @abc.abstractmethod
     def force_error(self, weight: int | tuple[int, ...]) -> set[Edge]:
-        """Make error of weight `weight`."""
+        """Make error of weight ``weight``."""
     
     @abc.abstractmethod
     def subset_probability(
@@ -45,18 +45,17 @@ class Noise(abc.ABC):
         weights: Iterable[int] | tuple[tuple[int, ...], ...],
         p: float,
     ) -> Iterable[float]:
-        """Return probability of any error of weight `weight`, for `weight` in `weights`."""
+        """Return probability of any error of weight ``weight``, for ``weight`` in ``weights``."""
 
     def subset_probabilities(self, p: float, survival: bool = True):
         """Return DataFrame containing probabilities of each subset.
-
-        Input:
-        * `p` noise level.
-        * `survival` whether to compute survival probability column.
-
-        Output:
-        * DataFrame indexed by subset weight,
-        with columns `['subset prob', 'survival prob']`.
+        
+        
+        :param p: noise level.
+        :param survival: whether to compute survival probability column.
+        
+        
+        :returns: DataFrame indexed by subset weight, with columns ``['subset prob', 'survival prob']``.
         """
         subset_prob = self.subset_probability(self.ALL_WEIGHTS, p)
         df = pd.DataFrame({'subset prob': subset_prob}, index=self.ALL_WEIGHTS_INDEX)
@@ -72,15 +71,15 @@ class Noise(abc.ABC):
         noise_level: None | float,
     ) -> dict[Edge, tuple[float, float]]:
         """Return map from edge to its flip probability and weight.
-
-        Input:
-        * `noise_level` a probability that represents the noise strength.
-        This is needed to define nonuniform edge weights of the decoding graph
+        
+        
+        :param noise_level: a probability that represents the noise strength.
+            This is needed to define nonuniform edge weights of the decoding graph
         in the circuit-level noise model.
-        If `None`, all edges have flip probability 0 and weight 1.
-
-        Output:
-        * map from edge to the pair (flip probability, weight).
+        If ``None``, all edges have flip probability 0 and weight 1.
+        
+        
+        :returns: map from edge to the pair (flip probability, weight).
         """
 
     @staticmethod
@@ -90,19 +89,19 @@ class Noise(abc.ABC):
 
 
 class _Uniform(Noise):
-    """Base class for noise model where each edge has flip probability `p`.
-
-    Extends `Noise`.
-
+    """Base class for noise model where each edge has flip probability ``p``.
+    
+    Extends ``Noise``.
+    
     Attributes:
-    * `EDGES` the edges of the freshly discovered region after a window raise
-    if scheme is streaming; else,
+    * ``EDGES`` the edges of the freshly discovered region after a window raise
+        if scheme is streaming; else,
     the edges of G.
     """
 
     def __init__(self, edges: tuple[Edge, ...]):
-        """Input:
-        `edges` the edges of the freshly discovered region after a window raise
+        """
+        ``edges`` the edges of the freshly discovered region after a window raise
         if scheme is streaming; else,
         the edges of G.
         """
@@ -115,9 +114,9 @@ class _Uniform(Noise):
         return {e for e in self.EDGES if random.random() < p}
     
     def force_error(self, weight: int):
-        """Bitlfip exactly `weight` edges in G.
-
-        Input: `weight` between 0 and `len(self.EDGES)`.
+        """Bitlfip exactly ``weight`` edges in G.
+        
+        Input: ``weight`` between 0 and ``len(self.EDGES)``.
         Output: The set of bitflipped edges.
         """
         return set(random.sample(self.EDGES, weight))
@@ -151,8 +150,8 @@ class _Uniform(Noise):
 
 class CodeCapacity(_Uniform):
     """Code capacity noise model.
-
-    Extends `_Uniform`.
+    
+    Extends ``_Uniform``.
     """
 
     def __str__(self) -> str:
@@ -161,8 +160,8 @@ class CodeCapacity(_Uniform):
 
 class Phenomenological(_Uniform):
     """Phenomenological noise model.
-
-    Extends `_Uniform`.
+    
+    Extends ``_Uniform``.
     """
 
     def __str__(self) -> str:
@@ -171,21 +170,21 @@ class Phenomenological(_Uniform):
 
 class CircuitLevel(Noise):
     """Circuit-level depolarizing noise model.
-
+    
     Class attributes:
-    * `_DEFAULT_MULTIPLICITIES` maps from edge type to multiplicity vector
-    e.g. `{'S': (4, 2, 1, 0), ...}`.
-    * `_ALL_COEFFICIENTS` maps from parametrization name
-    to 4-vector c such that pi = c*p.
-
+    * ``_DEFAULT_MULTIPLICITIES`` maps from edge type to multiplicity vector
+        e.g. ``{'S': (4, 2, 1, 0), ...}``.
+    * ``_ALL_COEFFICIENTS`` maps from parametrization name
+        to 4-vector c such that pi = c*p.
+    
     Private attributes:
-    * `_EDGES` maps from multiplicity vector (as a tuple) to tuple of edges
-    e.g. `{(4, 2, 1, 0): (e1, ...), ...}`.
-    Order matters as used by `ForceByEdge.force_error`.
-    The union of all edge tuples in `_EDGES` is the freshly discovered region after a window raise
+    * ``_EDGES`` maps from multiplicity vector (as a tuple) to tuple of edges
+        e.g. ``{(4, 2, 1, 0): (e1, ...), ...}``.
+    Order matters as used by ``ForceByEdge.force_error``.
+    The union of all edge tuples in ``_EDGES`` is the freshly discovered region after a window raise
     if scheme is streaming; else, the edges of G.
-    * `_COEFFICIENTS` a 4-vector c such that pi = c*p.
-    * `_FORCER` method for forcing error.
+    * ``_COEFFICIENTS`` a 4-vector c such that pi = c*p.
+    * ``_FORCER`` method for forcing error.
     """
 
     _DEFAULT_MULTIPLICITIES: dict[EdgeType, FourInts] = {
@@ -221,16 +220,16 @@ class CircuitLevel(Noise):
             merges: dict[Edge, Edge] | None = None,
             force_by: Literal['pair', 'edge'] = 'pair',
     ):
-        """Input:
-        * `edge_dict` maps from edge type to tuple of edges.
-        The union of all edge tuples in `edge_dict` is the freshly discovered region after a window raise
+        """
+        :param edge_dict: maps from edge type to tuple of edges.
+            The union of all edge tuples in ``edge_dict`` is the freshly discovered region after a window raise
         if scheme is streaming; else, the edges of G.
-        * `parametrization` name of parametrization.
-        * `demolition` whether ancilla qubit measurement demolishes state.
-        * `monolingual` whether measurements are native in only one basis.
-        * `merges` maps from each redundant edge to its substitute.
-        * `force_by` whether `force_error()` makes an error based on the weight of each pair or edge type.
-        See `noise.forcers` for more details.
+        :param parametrization: name of parametrization.
+        :param demolition: whether ancilla qubit measurement demolishes state.
+        :param monolingual: whether measurements are native in only one basis.
+        :param merges: maps from each redundant edge to its substitute.
+        :param force_by: whether ``force_error()`` makes an error based on the weight of each pair or edge type.
+            See ``noise.forcers`` for more details.
         """
         self._EDGES = self._make_edges(edge_dict, demolition, monolingual, merges)
         self._COEFFICIENTS = self._ALL_COEFFICIENTS[parametrization]
@@ -246,7 +245,7 @@ class CircuitLevel(Noise):
         monolingual: bool,
         merges: dict[Edge, Edge] | None,
     ):
-        """Return `_EDGES` instance attribute."""
+        """Return ``_EDGES`` instance attribute."""
         multiplicities = cls._make_multiplicities(demolition, monolingual)
         edges: defaultdict[FourInts, list[Edge]] = defaultdict(list)
         if merges is None:
@@ -264,7 +263,7 @@ class CircuitLevel(Noise):
     def _make_multiplicities(cls, demolition: bool, monolingual: bool):
         """Return map from edge type to multiplicity vector.
         
-        E.g. `{'S': np.array((4, 2, 1, 0)), ...}`.
+        E.g. ``{'S': np.array((4, 2, 1, 0)), ...}``.
         """
         multiplicities: dict[EdgeType, MultiplicityVector] = {
             edge_type: np.array(m)
@@ -346,18 +345,18 @@ class CircuitLevel(Noise):
         return result
 
     def _pi(self, noise_level: float) -> FourFloats:
-        """Return 4-vector probability `pi = c*noise_level`."""
+        """Return 4-vector probability ``pi = c*noise_level``."""
         return tuple(c*noise_level for c in self._COEFFICIENTS) # type: ignore
     
     @cache
     def _get_flip_probabilities(self, noise_level: float) -> dict[FourInts, float]:
         """Return map from multiplicity to flip probability.
         
-        Input:
-        * `noise_level` a probability that represents the noise strength.
-
-        Output:
-        * map from multiplicity to a flip probability.
+        
+        :param noise_level: a probability that represents the noise strength.
+        
+        
+        :returns: map from multiplicity to a flip probability.
         """
         pi = self._pi(noise_level)
         return {m: MultisetHandler.pr(m, pi) for m in self._EDGES.keys()}

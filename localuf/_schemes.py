@@ -18,15 +18,15 @@ if TYPE_CHECKING:
 
 class Scheme(abc.ABC):
     """Abstract base class for decoding scheme of a CSS code.
-
+    
     Attributes:
-    * `_CODE` the CSS code.
-    * `_DETERMINANT` object to determine whether a node is a boundary.
-    * `WINDOW_HEIGHT` total height of decoding graph G or sliding window W.
+    * ``_CODE`` the CSS code.
+    * ``_DETERMINANT`` object to determine whether a node is a boundary.
+    * ``WINDOW_HEIGHT`` total height of decoding graph G or sliding window W.
     """
 
     def __init__(self, code: 'Code'):
-        """Input: `code` the CSS code."""
+        """Input: ``code`` the CSS code."""
         self._CODE = code
         self._DETERMINANT: Determinant
 
@@ -37,10 +37,10 @@ class Scheme(abc.ABC):
 
     @abc.abstractmethod
     def get_logical_error(self, leftover: set[Edge]) -> int:
-        """See `Code.get_logical_error`."""
+        """See ``Code.get_logical_error``."""
 
     def is_boundary(self, v: Node):
-        """See `Code.is_boundary`."""
+        """See ``Code.is_boundary``."""
         return self._DETERMINANT.is_boundary(v)
 
     @abc.abstractmethod
@@ -51,16 +51,16 @@ class Scheme(abc.ABC):
         n: int,
         **kwargs,
     ) -> tuple[int, int | float]:
-        """Simulate `n` (equivalent) decoding cycles given `p`.
-
-        Input:
-        * `decoder` the decoder.
-        * `p` noise level.
-        * positive integer `n` is
-        decoding cycle count if scheme is 'batch' or 'forward'
+        """Simulate ``n`` (equivalent) decoding cycles given ``p``.
+        
+        
+        :param decoder: the decoder.
+        :param p: noise level.
+        :param n: is
+            decoding cycle count if scheme is 'batch' or 'forward'
         else slenderness := (layer count / code distance),
         where layer count := measurement round count + 1.
-
+        
         Output: tuple of (failure count, decoding cycle count
         if noise is code capacity else slenderness).
         """
@@ -72,26 +72,26 @@ class Scheme(abc.ABC):
             weight: int | tuple[int, ...],
             n: int,
     ) -> tuple[int, int]:
-        """Simulate `n` decoding cycles given `weight`.
-
-        Input:
-        * `decoder` the decoder.
-        * `weight` the weight of the error.
-        * `n` decoding cycle count.
-
-        Output: tuple of (failure count, `n`).
+        """Simulate ``n`` decoding cycles given ``weight``.
+        
+        
+        :param decoder: the decoder.
+        :param weight: the weight of the error.
+        :param n: decoding cycle count.
+        
+        Output: tuple of (failure count, ``n``).
         """
 
 
 class Batch(Scheme):
     """Batch decoding scheme.
-
-    Extends `Scheme`.
-
+    
+    Extends ``Scheme``.
+    
     Overriden methods:
-    * `run`
-    * `sim_cycles_given_weight`
-    * `get_logical_error`
+    * ``run``
+    * ``sim_cycles_given_weight``
+    * ``get_logical_error``
     """
 
     @staticmethod
@@ -99,7 +99,7 @@ class Batch(Scheme):
         return 'batch'
 
     def __init__(self, code: 'Code', window_height: int):
-        """Additional inputs: `window_height` the height of the batch."""
+        """Additional inputs: ``window_height`` the height of the batch."""
         super().__init__(code)
         self._WINDOW_HEIGHT = window_height
         self._DETERMINANT = SpaceDeterminant(code.D, code.LONG_AXIS)
@@ -114,31 +114,31 @@ class Batch(Scheme):
             else self.WINDOW_HEIGHT * n / self._CODE.D)
 
     def get_logical_error(self, leftover):
-        """Return logical error count parity in `leftover`."""
+        """Return logical error count parity in ``leftover``."""
         flip_count: int = 0
         for u, _ in leftover:
             flip_count += (u[self._CODE.LONG_AXIS] == -1)
         return flip_count % 2
 
     def _sim_cycle_given_p(self, decoder: 'Decoder', p: float) -> int:
-        """Simulate a decoding cycle given `p`.
-
-        Input:
-        * `decoder` the decoder.
-        * `p` noise level.
-
-        Output: `0` if success else `1`.
+        """Simulate a decoding cycle given ``p``.
+        
+        
+        :param decoder: the decoder.
+        :param p: noise level.
+        
+        Output: ``0`` if success else ``1``.
         """
         error = self._CODE.make_error(p)
         return self._sim_cycle_given_error(decoder, error)
 
     def _sim_cycle_given_error(self, decoder: 'Decoder', error: set[Edge]):
-        """Simulate a decoding cycle given `error`.
-
-        Input:
-        * `error` the set of bitflipped edges.
-
-        Output: `0` if success else `1`.
+        """Simulate a decoding cycle given ``error``.
+        
+        
+        :param error: the set of bitflipped edges.
+        
+        Output: ``0`` if success else ``1``.
         """
         syndrome = self._CODE.get_syndrome(error)
         decoder.reset()
@@ -156,16 +156,16 @@ class Batch(Scheme):
 
 class Global(Batch):
     """Global batch decoding scheme.
-
-    Extends `Batch`.
-
+    
+    Extends ``Batch``.
+    
     Additional attributes:
-    * `pairs` a set of node pairs defining free anyon strings.
-    Used to count logical error strings.
-
+    * ``pairs`` a set of node pairs defining free anyon strings.
+        Used to count logical error strings.
+    
     Overriden methods:
-    * `get_logical_error`
-    * `run`
+    * ``get_logical_error``
+    * ``run``
     """
 
     @staticmethod
@@ -188,7 +188,7 @@ class Global(Batch):
         return m, n
 
     def get_logical_error(self, leftover: set[Edge]):
-        """Count logical errors in `leftover`."""
+        """Count logical errors in ``leftover``."""
         for e in leftover:
             self.pairs.load(e)
         error_count: int = 0
@@ -202,21 +202,21 @@ class Global(Batch):
 class _Streaming(Scheme):
     """Abstract base class for stream decoding schemes.
     
-    Extends `Scheme`.
-
+    Extends ``Scheme``.
+    
     Additional attributes:
-    * `_COMMIT_HEIGHT` the height of the commit region.
-    * `_BUFFER_HEIGHT` the height of the buffer region.
-    * `_COMMIT_EDGES` the edges of the commit region.
-    * `_BUFFER_EDGES` the edges of the buffer region.
-    * `pairs` a set of node pairs defining free anyon strings.
-    Used to count logical error strings.
-    * `_LOGICAL_COUNTER` for `get_logical_error`.
-    * `step_counts` a list in which each entry is the decoder timestep count of `d` decoding cycles.
-    Populated when `run` is called.
-
+    * ``_COMMIT_HEIGHT`` the height of the commit region.
+    * ``_BUFFER_HEIGHT`` the height of the buffer region.
+    * ``_COMMIT_EDGES`` the edges of the commit region.
+    * ``_BUFFER_EDGES`` the edges of the buffer region.
+    * ``pairs`` a set of node pairs defining free anyon strings.
+        Used to count logical error strings.
+    * ``_LOGICAL_COUNTER`` for ``get_logical_error``.
+    * ``step_counts`` a list in which each entry is the decoder timestep count of ``d`` decoding cycles.
+        Populated when ``run`` is called.
+    
     Overriden methods:
-    * `get_logical_error`
+    * ``get_logical_error``
     """
 
     def __init__(
@@ -226,10 +226,10 @@ class _Streaming(Scheme):
             buffer_height: int,
             commit_edges: tuple[Edge, ...],
     ):
-        """Additional inputs:
-        * `commit_height` the height of the commit region.
-        * `buffer_height` the height of the buffer region.
-        * `commit_edges` the edges in the commit region.
+        """
+        :param commit_height: the height of the commit region.
+        :param buffer_height: the height of the buffer region.
+        :param commit_edges: the edges in the commit region.
         """
         super().__init__(code)
         self._COMMIT_HEIGHT = commit_height
@@ -262,14 +262,12 @@ class _Streaming(Scheme):
 
     def get_logical_error(self):
         """Count logical errors completed in current commit.
-
-        Output:
-        The number of logical errors,
-        i.e. paths between opposite boundaries,
-        completed by the leftover in the current commit region.
-
+        
+        
+        :returns: The number of logical errors, i.e. paths between opposite boundaries, completed by the leftover in the current commit region.
+        
         Side effect:
-        Update `self.pairs` with error strings ending
+        Update ``self.pairs`` with error strings ending
         at the future boundary of the commit region.
         """
         error_count, self.pairs = self._LOGICAL_COUNTER.count(self.pairs)
@@ -281,16 +279,16 @@ class _Streaming(Scheme):
 
 class Forward(_Streaming):
     """Forward decoding scheme. Also known as overlapping recovery method.
-
-    Extends `_Streaming`.
-
+    
+    Extends ``_Streaming``.
+    
     Additional attributes:
-    * `history` a list of tuples (error, leftover, artificial defects) for each cycle.
-
+    * ``history`` a list of tuples (error, leftover, artificial defects) for each cycle.
+    
     Overriden methods:
-    * `reset`
-    * `get_logical_error`
-    * `run`
+    * ``reset``
+    * ``get_logical_error``
+    * ``run``
     """
 
     step_counts: list[int | tuple[int, int] | None]
@@ -310,14 +308,14 @@ class Forward(_Streaming):
             p: float,
             exclude_future_boundary: bool = False,
     ):
-        """Lower `buffer_leftover` by commit height
-        and sample edges from freshly discovered region with probability `p`.
-
-        Input:
-        * `buffer_leftover` the current error in the buffer region.
-        * `p` probability for an edge to bitflip.
-        * `exclude_future_boundary` passed to `self._CODE.make_error`.
-
+        """Lower ``buffer_leftover`` by commit height
+        and sample edges from freshly discovered region with probability ``p``.
+        
+        
+        :param buffer_leftover: the current error in the buffer region.
+        :param p: probability for an edge to bitflip.
+        :param exclude_future_boundary: passed to ``self._CODE.make_error``.
+        
         Output: The set of bitflipped edges.
         """
         # lower `buffer_leftover` by commit height
@@ -329,17 +327,16 @@ class Forward(_Streaming):
         return seen | unseen
 
     def _get_leftover(self, error: set[Edge], correction: set[Edge]):
-        """Sequentially compose `error` and commit region of `correction`.
-
-        Input:
-        * `error` the set of bitflipped edges in the window.
-        * `correction` the decoder output for the whole window.
-
-        Output:
-        * `commit_leftover` the leftover,
-        i.e. sequential composition of `error` and `correction`,
-        in the commit region.
-        * `buffer_leftover` the part of `error` in the buffer region.
+        """Sequentially compose ``error`` and commit region of ``correction``.
+        
+        
+        :param error: the set of bitflipped edges in the window.
+        :param correction: the decoder output for the whole window.
+        
+        
+        :returns:
+        * ``commit_leftover`` the leftover, i.e. sequential composition of ``error`` and ``correction``, in the commit region.
+        * ``buffer_leftover`` the part of ``error`` in the buffer region.
         """
         commit_leftover = error.intersection(self._COMMIT_EDGES) ^ correction.intersection(self._COMMIT_EDGES)
         buffer_leftover = error.intersection(self._BUFFER_EDGES)
@@ -347,9 +344,9 @@ class Forward(_Streaming):
 
     def get_logical_error(self, commit_leftover: set[Edge]):
         """Count logical errors completed in current commit.
-
-        Additional input over `_Streaming.get_logical_error`:
-        `commit_leftover` the leftover in the commit region.
+        
+        Additional input over ``_Streaming.get_logical_error``:
+        ``commit_leftover`` the leftover in the commit region.
         """
         for e in commit_leftover:
             self.pairs.load(e)
@@ -360,13 +357,13 @@ class Forward(_Streaming):
             commit_leftover: set[Edge],
             error: set[Edge],
     ):
-        """Get syndrome of `error` accounting for artificial defects due to previous commit."""
+        """Get syndrome of ``error`` accounting for artificial defects due to previous commit."""
         artificial_defects = self._get_artificial_defects(commit_leftover)
         return self._CODE.get_syndrome(error) ^ artificial_defects
 
     def _get_artificial_defects(self, commit_leftover: set[Edge]):
-        """Get artificial defects due to `commit_leftover`.
-
+        """Get artificial defects due to ``commit_leftover``.
+        
         See Skoric et al. [arXiv:2209.08552v2, Section I B]
         for artificial defect definition.
         """
@@ -377,16 +374,13 @@ class Forward(_Streaming):
     def _make_error_in_buffer_region(self, p: float):
         """Sample edges from buffer region.
         
-        Input:
-        `p` characteristic probability if circuit-level noise;
+        
+        ``p`` characteristic probability if circuit-level noise;
         else, bitflip probability.
-
-        Output:
-        The set of bitflipped edges in the buffer region.
-        Each edge bitflips with
-        probability defined by its multiplicity if circuit-level noise; else,
-        probability `p`.
-
+        
+        
+        :returns: The set of bitflipped edges in the buffer region. Each edge bitflips with probability defined by its multiplicity if circuit-level noise; else, probability ``p``.
+        
         TODO: test this method.
         """
         if self._COMMIT_HEIGHT >= self._BUFFER_HEIGHT:
@@ -407,16 +401,16 @@ class Forward(_Streaming):
             log_history=False,
             **kwargs_for_draw_run,
     ):
-        """Simulate `n` decoding cycles (in the steady state) given `p`, for analysing accuracy and throughput.
+        """Simulate ``n`` decoding cycles (in the steady state) given ``p``, for analysing accuracy and throughput.
         
-        Input:
-        * `decoder` the decoder.
-        * `p` noise level.
-        * positive integer `n` is decoding cycle count in the steady state.
-
+        
+        :param decoder: the decoder.
+        :param p: noise level.
+        :param n: is decoding cycle count in the steady state.
+        
         Output: tuple of (failure count, slenderness).
-
-        Side effect: Populate `self.step_counts` with `n` entries,
+        
+        Side effect: Populate ``self.step_counts`` with ``n`` entries,
         each being the step count of one decoding cycle in the steady state.
         """
         log_history |= draw
@@ -458,7 +452,7 @@ class Forward(_Streaming):
         x_offset=constants.STREAM_X_OFFSET,
         subplot_hspace=-0.1,
     ):
-        """Draw the history of `self.run`."""
+        """Draw the history of ``self.run``."""
         import matplotlib.pyplot as plt
         column_count, row_count = len(self.history), 2
         if fig_width is None:
@@ -482,16 +476,16 @@ class Forward(_Streaming):
 
 class Frugal(_Streaming):
     """Frugal decoding scheme.
-
-    Extends `_Streaming`.
-
+    
+    Extends ``_Streaming``.
+    
     Additional attributes:
-    * `error` a set of edges.
-    * `_future_boundary_syndrome` the set of defects in the future boundary of the viewing window.
-
+    * ``error`` a set of edges.
+    * ``_future_boundary_syndrome`` the set of defects in the future boundary of the viewing window.
+    
     Overriden methods:
-    * `reset`
-    * `run`
+    * ``reset``
+    * ``run``
     """
 
     @staticmethod
@@ -517,13 +511,15 @@ class Frugal(_Streaming):
             **kwargs,
     ) -> int:
         """Advance 1 decoding cycle.
-
-        Input:
-        * `prob` instantaneous noise level.
-        * `decoder` the frugal-compatible decoder to use.
-        * `exclude_future_boundary` passed to `self._CODE.make_error`.
-        * `log_history, time_only, defects_possible` arguments of `decoder.decode`.
-
+        
+        
+        :param prob: instantaneous noise level.
+        :param decoder: the frugal-compatible decoder to use.
+        :param exclude_future_boundary: passed to ``self._CODE.make_error``.
+        :param log_history: forwarded to ``decoder.decode``.
+        :param time_only: forwarded to ``decoder.decode``.
+        :param defects_possible: forwarded to ``decoder.decode``.
+        
         Output: number of decoder timesteps to complete decoding cycle.
         """
         self._raise_window()
@@ -535,9 +531,9 @@ class Frugal(_Streaming):
         return decoder.decode(syndrome, **kwargs) # type: ignore
 
     def _raise_window(self):
-        """Raise window by `self._COMMIT_HEIGHT` layers.
-
-        TODO: store `lowness, next_edge` as attributes of each edge.
+        """Raise window by ``self._COMMIT_HEIGHT`` layers.
+        
+        TODO: store ``lowness, next_edge`` as attributes of each edge.
         """
         next_error: set[Edge] = set()
         for e in self.error:
@@ -550,13 +546,13 @@ class Frugal(_Streaming):
         self.error = next_error
 
     def _load(self, error: set[Edge]):
-        """Load incremental `error`.
-
-        Input: `error` the incremental error, which should never intersect `self.error`.
+        """Load incremental ``error``.
         
-        Output: `syndrome` the incremental syndrome due to `error`.
+        Input: ``error`` the incremental error, which should never intersect ``self.error``.
         
-        Side effect: Update `self.error` and `self.future_boundary_syndrome`.
+        Output: ``syndrome`` the incremental syndrome due to ``error``.
+        
+        Side effect: Update ``self.error`` and ``self.future_boundary_syndrome``.
         """
         self.error |= error
         syndrome = {self._CODE.raise_node(v, delta_t=-self._COMMIT_HEIGHT)
@@ -580,16 +576,16 @@ class Frugal(_Streaming):
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
-        """Simulate `n*d` decoding cycles (in the steady state) given `p`.
-
-        Input:
-        * `decoder` the decoder.
-        * `p` noise level.
-        * positive integer `n` is decoding cycle count in the steady state.
-        * `draw` whether to draw.
-        * `log_history` whether to populate `history` attribute.
-        * `time_only` whether runtime includes a timestep
-        for each drop, each grow, and each merging step ('all');
+        """Simulate ``n*d`` decoding cycles (in the steady state) given ``p``.
+        
+        
+        :param decoder: the decoder.
+        :param p: noise level.
+        :param n: is decoding cycle count in the steady state.
+        :param draw: whether to draw.
+        :param log_history: whether to populate ``history`` attribute.
+        :param time_only: whether runtime includes a timestep
+            for each drop, each grow, and each merging step ('all');
         each merging step only ('merging');
         or each unrooting step only ('unrooting').
         Note: if commit height is 1 and window height is d,
@@ -597,14 +593,14 @@ class Frugal(_Streaming):
         [for a total step count increase of 2d(n-1)]
         in the case of Snowflake with the 1:1 schedule.
         In the case of the 2:1 schedule, the increase of each step count is 3d.
-        This can be done post-run via `add_ignored_timesteps`.
-        * `kwargs_for_draw_decode` passed to `decoder.draw_decode`
-        e.g. `margins=(0.1, 0.1)`.
-
+        This can be done post-run via ``add_ignored_timesteps``.
+        :param kwargs_for_draw_decode: passed to ``decoder.draw_decode``
+            e.g. ``margins=(0.1, 0.1)``.
+        
         Output: tuple of (failure count, slenderness := (total layer count) / (code distance)).
-
-        Side effect: Populate `self.step_counts` with `n` entries,
-        each being the step count of `d` decoding cycles in the steady state.
+        
+        Side effect: Populate ``self.step_counts`` with ``n`` entries,
+        each being the step count of ``d`` decoding cycles in the steady state.
         """
         d = self._CODE.D
         self.reset()
@@ -656,16 +652,15 @@ class Frugal(_Streaming):
             **kwargs_for_draw_decode,
     ):
         """Sample the latency of the decoder in the frugal decoding scheme.
-
-        This runs a memory experiment of `self.WINDOW_HEIGHT+1` measurement rounds
-        i.e. `self.WINDOW_HEIGHT+2` sheets of syndrome data are produced.
+        
+        This runs a memory experiment of ``self.WINDOW_HEIGHT+1`` measurement rounds
+        i.e. ``self.WINDOW_HEIGHT+2`` sheets of syndrome data are produced.
         Assumes commit height is 1.
-
-        Inputs same as in `run`.
-
-        Output:
-        * `latency` the number of timesteps from receiving the last measurement round
-        to outputting the final correction.
+        
+        Inputs same as in ``run``.
+        
+        
+        :returns: ``latency`` the number of timesteps from receiving the last measurement round to outputting the final correction.
         """
         self.reset()
         decoder.reset()

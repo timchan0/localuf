@@ -18,44 +18,44 @@ from localuf.decoders._base_uf import direction, BaseUF
 
 class Snowflake(BaseUF):
     """Snowflake decoder based on UF.
-
-    Extends `BaseUF`.
+    
+    Extends ``BaseUF``.
     Incompatible with code capacity noise model.
     Compatible only with frugal scheme.
-
+    
     Class constants:
-    `BW_DEFAULT_NODE_SIZE` the default node size for black-and-white drawing.
+    ``BW_DEFAULT_NODE_SIZE`` the default node size for black-and-white drawing.
     
     Additional instance attributes:
-    * `NODES` a dictionary of nodes.
-    * `EDGES` ditto for edges.
-    * `_pointer_digraph` a NetworkX digraph representing the fully grown edges used by pointers,
-    the set of its edges as directed edges,
+    * ``NODES`` a dictionary of nodes.
+    * ``EDGES`` ditto for edges.
+    * ``_pointer_digraph`` a NetworkX digraph representing the fully grown edges used by pointers,
+        the set of its edges as directed edges,
     the set of its edges as undirected edges.
-    * `_stage` the current stage of the decoder.
-    Only used for `draw_growth` when `show_global = True`.
-    * `_LOWEST_EDGES` a tuple of the edges in the bottom layer of the viewing window.
-    For repetition code, the edges are ordered
+    * ``_stage`` the current stage of the decoder.
+        Only used for ``draw_growth`` when ``show_global = True``.
+    * ``_LOWEST_EDGES`` a tuple of the edges in the bottom layer of the viewing window.
+        For repetition code, the edges are ordered
     first by type (up, east)
     then by y-coordinate (west to east).
     For surface code, the edges are ordered
     first by type (up, south_down, east_up, south_east_up, south, east),
     then by x-coordinate (north to south), then by y-coordinate (west to east).
-    If `__init__` was called with `_include_timelike_lowest_edges = False`,
+    If ``__init__`` was called with ``_include_timelike_lowest_edges = False``,
     the purely timelike (i.e. 'up') edges are excluded.
-    * `floor_history` a list of bitstrings representing
-    the correction output from the bottom layer at each drop.
-    The order of the bits is given by `self._LOWEST_EDGES`.
-
+    * ``floor_history`` a list of bitstrings representing
+        the correction output from the bottom layer at each drop.
+    The order of the bits is given by ``self._LOWEST_EDGES``.
+    
     Overriden methods:
-    * `reset`.
-    * `decode`.
-    * `draw_growth`.
-    * `draw_decode`.
+    * ``reset``.
+    * ``decode``.
+    * ``draw_growth``.
+    * ``draw_decode``.
     
     Uses not:
-    * `_growth` attribute.
-    * `erasure` attribute.
+    * ``_growth`` attribute.
+    * ``erasure`` attribute.
     """
 
     BW_DEFAULT_NODE_SIZE = 360
@@ -69,19 +69,19 @@ class Snowflake(BaseUF):
             _neighbor_order: Iterable[direction] | None = None,
             _include_timelike_lowest_edges: bool = True,
     ):
-        """Input:
-        * `code` the code to be decoded.
-        * `merger` decides whether nodes flood before syncing (fast) or vice versa (slow) in a merging step.
-        Setting this to `'slow'` helps break down merging for visualisation.
-        * `schedule` the cluster growth schedule.
-        * `unrooter` the type of unrooting process to use.
-        If `'full'`, each node in the amputated cluster resets its CID and pointer
+        """
+        :param code: the code to be decoded.
+        :param merger: decides whether nodes flood before syncing (fast) or vice versa (slow) in a merging step.
+            Setting this to ``'slow'`` helps break down merging for visualisation.
+        :param schedule: the cluster growth schedule.
+        :param unrooter: the type of unrooting process to use.
+            If ``'full'``, each node in the amputated cluster resets its CID and pointer
         so that the pointer tree structure can be rebuilt from scratch,
         via further merging timesteps.
-        If `'simple'`, the node at breaking point only
+        If ``'simple'``, the node at breaking point only
         establishes the shortest path to a boundary.
-        * `_neighbor_order` optionally customizes the order in which each node checks its neighbors.
-        For the repetition code, this should be an iterable of the four directions
+        :param _neighbor_order: optionally customizes the order in which each node checks its neighbors.
+            For the repetition code, this should be an iterable of the four directions
         ('W', 'E', 'D', 'U') in some order.
         For the surface code, this should be an iterable of the twelve directions
         ('NWD', 'N', 'NU', 'WD', 'W', 'D', 'U', 'E', 'EU', 'SD', 'S', 'SEU') in some order.
@@ -90,9 +90,9 @@ class Snowflake(BaseUF):
         but if you accidentally exclude a relevant direction
         then no node will ever check that direction for growing, flooding, nor syncing.
         So it is safest to include all twelve directions even if some are not used.
-        If `_neighbor_order` is not specified, the orders listed above are used.
-        * `_include_timelike_lowest_edges` whether to include
-        the purely timelike (i.e. 'up') edges in `self._LOWEST_EDGES`.
+        If ``_neighbor_order`` is not specified, the orders listed above are used.
+        :param _include_timelike_lowest_edges: whether to include
+            the purely timelike (i.e. 'up') edges in ``self._LOWEST_EDGES``.
         """
         if isinstance(code.NOISE, CodeCapacity):
             raise ValueError('Snowflake incompatible with code capacity noise model.')
@@ -176,13 +176,13 @@ class Snowflake(BaseUF):
                 return 2*d*h + d*(d-1)*(h-1 - t) + d*j + i
             
     def init_history(self):
-        """Initialize `history` and `floor_history` attributes."""
+        """Initialize ``history`` and ``floor_history`` attributes."""
         super().init_history()
         self.floor_history: list[str] = []
         
     @cache
     def id_below(self, id_: int):
-        """Return ID of node below node with ID `id_`.
+        """Return ID of node below node with ID ``id_``.
         
         Answer valid only for nodes not on bottom layer of viewing window.
         In implementation this function would be stored in each node.
@@ -217,27 +217,25 @@ class Snowflake(BaseUF):
         ):
         """Perform a decoding cycle i.e. a growth round.
         
-        Input:
-        * `syndrome` the syndrome in the new region discovered by the window raise
-        i.e. all defects in `syndrome` have the time coordinate `self.CODE.SCHEME.WINDOW_HEIGHT-1`.
-        * `log_history` whether to populate `history` attribute --
-        'fine' logs each timestep;
+        
+        :param syndrome: the syndrome in the new region discovered by the window raise
+            i.e. all defects in ``syndrome`` have the time coordinate ``self.CODE.SCHEME.WINDOW_HEIGHT-1``.
+        :param log_history: whether to populate ``history`` attribute --
+            'fine' logs each timestep;
         'coarse', only the final timestep of the growth round.
-        * `log_floor_history` whether to populate `floor_history` attribute.
-        * `time_only` whether runtime includes a timestep
-        for each drop, each grow, and each merging step ('all');
+        :param log_floor_history: whether to populate ``floor_history`` attribute.
+        :param time_only: whether runtime includes a timestep
+            for each drop, each grow, and each merging step ('all');
         each merging step only ('merging');
         or each unrooting step only ('unrooting').
-        * `defects_possible` whether to expect there may be defects in the viewing window
-        in the current or any future timestep.
-        If `False`, the decoder will perform only 'drop',
+        :param defects_possible: whether to expect there may be defects in the viewing window
+            in the current or any future timestep.
+        If ``False``, the decoder will perform only 'drop',
         and will skip 'grow' and 'merge' stages.
         This is useful at the end of the memory experiment after the final syndrome data has come in.
-
-        Output:
-        * `t` number of timesteps to complete decoding cycle.
-        Equals the increase in `len(self.history)` if
-        `log_history` is 'fine' and `time_only` is `'all'`.
+        
+        
+        :returns: ``t`` number of timesteps to complete decoding cycle. Equals the increase in ``len(self.history)`` if ``log_history`` is 'fine' and ``time_only`` is ``'all'``.
         """
         self._stage = Stage.DROP
         if log_floor_history:
@@ -254,7 +252,7 @@ class Snowflake(BaseUF):
             return 1 if time_only == 'all' else 0
     
     def drop(self, syndrome: set[Node]):
-        """Make all nodes perform a `drop` i.e. raise window by a layer."""
+        """Make all nodes perform a ``drop`` i.e. raise window by a layer."""
         # SLIDE EDGES DOWN
         for edge in self.EDGES.values():
             edge.CONTACT.drop()
@@ -268,10 +266,10 @@ class Snowflake(BaseUF):
             node.update_after_drop()
 
     def _load(self, syndrome: set[Node]):
-        """Load `syndrome` onto decoder.
+        """Load ``syndrome`` onto decoder.
         
         I.e. top sheet inherits the new measurement round results.
-        Note do not set `active` as `defect`
+        Note do not set ``active`` as ``defect``
         else nodes in top sheet of viewing window will grow.
         This growth would be premature as there are no edges above these nodes,
         leading to uneven cluster shapes.
@@ -285,15 +283,16 @@ class Snowflake(BaseUF):
         log_history: Literal[False, 'fine', 'coarse'],
         time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
     ):
-        """Make all nodes perform `merging` until none are busy.
+        """Make all nodes perform ``merging`` until none are busy.
         
         Emergent effect: merge touching clusters, push defects to roots.
         
-        Input:
-        * `whole` whether to perform `MERGING_WHOLE` or `MERGING_HALF` stage.
-        * `log_history, time_only` as in `decode` inputs.
         
-        Output: `t` number of timesteps to complete growth round.
+        :param whole: whether to perform ``MERGING_WHOLE`` or ``MERGING_HALF`` stage.
+        :param log_history: as in ``decode`` inputs.
+        :param time_only: as in ``decode`` inputs.
+        
+        Output: ``t`` number of timesteps to complete growth round.
         """
         t = -1 if time_only == 'merging' else 1 if time_only == 'all' else 0
 
@@ -319,15 +318,13 @@ class Snowflake(BaseUF):
     ):
         """Return the labels dictionary for the drawer.
         
-        Input:
-        * `show_global` whether to prepend the global label to the top-left node label.
-        * `show_2_1_schedule_variables` whether to show
-        node variables specific to the 2:1 cluster growth schedule.
         
-        Output:
-        `result` a dictionary where each
-        key a node index as a tuple;
-        value, the label for the node at that index.
+        :param show_global: whether to prepend the global label to the top-left node label.
+        :param show_2_1_schedule_variables: whether to show
+            node variables specific to the 2:1 cluster growth schedule.
+        
+        
+        :returns: ``result`` a dictionary where each key a node index as a tuple; value, the label for the node at that index.
         """
         result = {v: node.label(show_2_1_schedule_variables)
                   for v, node in self.NODES.items()}
@@ -574,9 +571,9 @@ class Snowflake(BaseUF):
         """Return a NetworkX digraph representing the fully grown edges used by pointers,
         the set of its edges as directed edges,
         the set of its edges as undirected edges.
-        TODO: this is a temporary fix of `_DigraphMaker.pointer_digraph`.
-        i.e. `self.__init__` used to have the line
-        `self._DIGRAPH_MAKER = DigraphMaker(self.NODES, self.growth)`.
+        TODO: this is a temporary fix of ``_DigraphMaker.pointer_digraph``.
+        i.e. ``self.__init__`` used to have the line
+        ``self._DIGRAPH_MAKER = DigraphMaker(self.NODES, self.growth)``.
         """
         dig = nx.DiGraph()
         dig.add_nodes_from(self.NODES.keys())
@@ -622,40 +619,33 @@ class Snowflake(BaseUF):
     ):
         """Generate output in the form of bitstrings.
         
-        Input:
-        * `syndromes` the input of Snowflake.
-        This can either be...
-            * a list of sets of coordinates,
-            each set representing a syndrome,
-            each coordinate specifying a defect.
-            The vertical (i.e. time) coordinate of each defect must be `self.CODE.SCHEME.WINDOW_HEIGHT-1`.
-            * a list of syndrome vectors,
-            each a string of '0's and '1's.
-            The ordering of the nodes for the...
-                * repetition code goes from west to east.
-                * surface code goes from west to east along each row, then from south to north.
-        * `output_to_csv_file` the CSV file path to save the data in e.g. 'snowflake_data.csv'.
-        Defaults to `None`, meaning no CSV file is saved.
-        * `draw` whether to skip drawing the decoding process,
-        draw it finely or draw it coarsely.
-        * `margins` margins for the drawing.
-        * `style` how different drawing frames are laid out.
-        Can be 'interactive', 'horizontal', or 'vertical'.
-        * `kwargs_for_draw_decode` additional keyword arguments for `decoder.draw_decode()`.
+        
+        :param syndromes: the input of Snowflake.
+            This can either be a list of sets of coordinates (each set representing a syndrome;
+            each coordinate specifying a defect), or a list of syndrome vectors (strings of '0's
+            and '1's). The vertical (i.e. time) coordinate of each defect must be
+            ``self.CODE.SCHEME.WINDOW_HEIGHT-1``.
 
-        Output:
-        * The output of Snowflake.
-        This is a list of strings, each representing
-        the edges in the bottom layer that are flipped just before each drop.
-        The ordering of the edges is given by `self._LOWEST_EDGES`.
-        INCONSISTENCY: for the repetition code,
-        the purely timelike edges in the last layer are excluded from `self._LOWEST_EDGES`;
-        the spacelike edges are ordered from west to east.
+            For syndrome vectors, the ordering of the nodes is:
 
+            - repetition code: west to east.
+            - surface code: west to east along each row, then from south to north.
+        :param output_to_csv_file: the CSV file path to save the data in e.g. 'snowflake_data.csv'.
+            Defaults to ``None``, meaning no CSV file is saved.
+        :param draw: whether to skip drawing the decoding process,
+            draw it finely or draw it coarsely.
+        :param margins: margins for the drawing.
+        :param style: how different drawing frames are laid out.
+            Can be 'interactive', 'horizontal', or 'vertical'.
+        :param kwargs_for_draw_decode: additional keyword arguments for ``decoder.draw_decode()``.
+        
+        
+        :returns: The output of Snowflake. This is a list of strings, each representing the edges in the bottom layer that are flipped just before each drop. The ordering of the edges is given by ``self._LOWEST_EDGES``. INCONSISTENCY: for the repetition code, the purely timelike edges in the last layer are excluded from ``self._LOWEST_EDGES``; the spacelike edges are ordered from west to east.
+        
         Side effects:
-        * If `output_to_csv_file` is not None, the input and output of Snowflake
-        are saved in a CSV file at path `output_to_csv_file`.
-        * If `draw` is True, the decoding process is drawn.
+        * If ``output_to_csv_file`` is not None, the input and output of Snowflake
+            are saved in a CSV file at path ``output_to_csv_file``.
+        * If ``draw`` is True, the decoding process is drawn.
         """
         first_syndrome, *_ = syndromes
         if type(first_syndrome) is str:
@@ -698,9 +688,9 @@ class _BitstringConverter(abc.ABC):
         """The expected length of the syndrome vector."""
 
     def __init__(self, d: int, window_height: int):
-        """Input:
-        * `d` the code distance.
-        * `window_height` the height of the viewing window.
+        """
+        :param d: the code distance.
+        :param window_height: the height of the viewing window.
         """
         self._D = d
         self._WINDOW_HEIGHT = window_height
@@ -711,11 +701,11 @@ class _BitstringConverter(abc.ABC):
         ) -> list[set[Node]]:
         """Convert a sequence of syndrome vectors to a list of sets of defects.
         
-        Input:
-        * `vectors` a sequence of syndrome vectors, each a string of '0's and '1's.
-
-        Output:
-        * A list of sets of defects, each set corresponding to a syndrome vector.
+        
+        :param vectors: a sequence of syndrome vectors, each a string of '0's and '1's.
+        
+        
+        :returns: A list of sets of defects, each set corresponding to a syndrome vector.
         """
         return [self._syndrome_vector_to_set(vector) for vector in vectors]
 
@@ -726,7 +716,7 @@ class _BitstringConverter(abc.ABC):
         ) -> set[Node]:
         """Convert a syndrome vector to a set of defects.
         
-        The ordering of the nodes is stated in `Snowflake.generate_output` docstring.
+        The ordering of the nodes is stated in ``Snowflake.generate_output`` docstring.
         """
 
     def sets_to_syndrome_vectors(
@@ -735,12 +725,11 @@ class _BitstringConverter(abc.ABC):
         ) -> list[str]:
         """Convert a sequence of sets of defects to a list of syndrome vectors.
         
-        Input:
-        * `syndromes` a sequence of sets of defects.
-
-        Output:
-        * A list of syndrome vectors, each a string of '0's and '1's,
-        each corresponding to a set of defects.
+        
+        :param syndromes: a sequence of sets of defects.
+        
+        
+        :returns: A list of syndrome vectors, each a string of '0's and '1's, each corresponding to a set of defects.
         """
         return [self._set_to_syndrome_vector(syndrome) for syndrome in syndromes]
 
@@ -751,7 +740,7 @@ class _BitstringConverter(abc.ABC):
     ) -> str:
         """Convert a set of defects to a syndrome vector.
         
-        The ordering of the nodes is stated in `Snowflake.generate_output` docstring.
+        The ordering of the nodes is stated in ``Snowflake.generate_output`` docstring.
         """
 
     @abc.abstractmethod
@@ -761,11 +750,11 @@ class _BitstringConverter(abc.ABC):
             _include_timelike_lowest_edges: bool = True,
     ) -> tuple[Edge, ...]:
         """Return the edges in the bottom layer of the viewing window
-        in the order given by `Snowflake._LOWEST_EDGES`.
-
-        Input:
-        * `noise_model` the noise model of the code.
-        * `_include_timelike_lowest_edges` whether to include the purely timelike edges.
+        in the order given by ``Snowflake._LOWEST_EDGES``.
+        
+        
+        :param noise_model: the noise model of the code.
+        :param _include_timelike_lowest_edges: whether to include the purely timelike edges.
         """
 
 
@@ -806,7 +795,7 @@ class _Surface(_BitstringConverter):
         return {self._bit_position_to_defect(position) for position, bit in enumerate(vector) if bit == '1'}
     
     def _bit_position_to_defect(self, position: int) -> Node:
-        """Convert bit position `position` to defect coordinate (i, j, t)."""
+        """Convert bit position ``position`` to defect coordinate (i, j, t)."""
         return (
             self._D-1 - (position // (self._D-1)),
             position % (self._D-1),
@@ -848,10 +837,10 @@ class _Surface(_BitstringConverter):
 
 
 class NodeEdgeMixin(abc.ABC):
-    """Mixin class for `_Node` and `_Edge`.
+    """Mixin class for ``_Node`` and ``_Edge``.
     
     Instance attributes:
-    * `SNOWFLAKE` the decoder the node or edge belongs to.
+    * ``SNOWFLAKE`` the decoder the node or edge belongs to.
     """
 
     _SNOWFLAKE: Snowflake
@@ -862,27 +851,27 @@ class NodeEdgeMixin(abc.ABC):
 
 class _Node(NodeEdgeMixin):
     """Node for Snowflake.
-
-    Extends `NodeEdgeMixin`.
+    
+    Extends ``NodeEdgeMixin``.
     
     Additional instance attributes:
-    * `INDEX` index of node.
-    * `ID` the unique ID of node.
-    * `FRIENDSHIP` the type of connection the node has for communicating.
-    * `NEIGHBORS` a dictionary where each
-    key a pointer string;
+    * ``INDEX`` index of node.
+    * ``ID`` the unique ID of node.
+    * ``FRIENDSHIP`` the type of connection the node has for communicating.
+    * ``NEIGHBORS`` a dictionary where each
+        key a pointer string;
     value, a tuple of the form (edge, index of edge which is neighbor).
-    * `_IS_BOUNDARY` whether node is a boundary node.
-    * `_MERGER` the provider for the `merging` method.
-    * `UNROOTER` the type of unrooting process used.
-    * `active, whole, cid, defect, pointer, grown, unrooted, busy`
-    explained in [arXiv:2406.01701, C.1].
-    * The variables in the above bulletpoint, save `busy`,
-    each have `next_` versions for next timestep.
-    * `access` refers to neighbors along fully grown edges.
-    In the form of a dictionary of where each
+    * ``_IS_BOUNDARY`` whether node is a boundary node.
+    * ``_MERGER`` the provider for the ``merging`` method.
+    * ``UNROOTER`` the type of unrooting process used.
+    * ``active, whole, cid, defect, pointer, grown, unrooted, busy``
+        explained in [arXiv:2406.01701, C.1].
+    * The variables in the above bulletpoint, save ``busy``,
+        each have ``next_`` versions for next timestep.
+    * ``access`` refers to neighbors along fully grown edges.
+        In the form of a dictionary of where each
     key a pointer string;
-    value, the `_Node` object in the direction of that pointer.
+    value, the ``_Node`` object in the direction of that pointer.
     """
 
     def __init__(
@@ -892,11 +881,11 @@ class _Node(NodeEdgeMixin):
             merger: Literal['fast', 'slow'] = 'fast',
             unrooter: Literal['full', 'simple'] = 'full',
         ) -> None:
-        """Input:
-        * `snowflake` the decoder the node belongs to.
-        * `index` index of node.
-        * `merger` decides whether to flood before syncing (fast) or vice versa (slow) in a merging step.
-        * `unrooter` the type of unrooting process to use.
+        """
+        :param snowflake: the decoder the node belongs to.
+        :param index: index of node.
+        :param merger: decides whether to flood before syncing (fast) or vice versa (slow) in a merging step.
+        :param unrooter: the type of unrooting process to use.
         """
         self._SNOWFLAKE = snowflake
         self._INDEX = index
@@ -995,8 +984,8 @@ class _Node(NodeEdgeMixin):
     def update_after_drop(self):
         """Update unphysicals after a drop.
         
-        Set `[attribute]` := `next_[attribute]`.
-        For nodes in top sheet of viewing window, this equals `reset`.
+        Set ``[attribute]`` := ``next_[attribute]``.
+        For nodes in top sheet of viewing window, this equals ``reset``.
         """
         self.defect = self.next_defect
         self.active = self.next_active
@@ -1011,7 +1000,7 @@ class _Node(NodeEdgeMixin):
         # `next_whole` as always overwritten in `drop` before next used in `update_after_drop`
 
     def grow(self):
-        """Call `grow` if active, then find broken pointers.
+        """Call ``grow`` if active, then find broken pointers.
         
         Used only in 1:1 schedule.
         """
@@ -1020,7 +1009,7 @@ class _Node(NodeEdgeMixin):
         self.FRIENDSHIP.find_broken_pointers()
 
     def grow_whole(self):
-        """Call `grow` if active and whole, then find broken pointers."""
+        """Call ``grow`` if active and whole, then find broken pointers."""
         if self.active and self.whole:
             self._grow()
             self.grown = True
@@ -1028,7 +1017,7 @@ class _Node(NodeEdgeMixin):
         self.FRIENDSHIP.find_broken_pointers()
 
     def grow_half(self):
-        """Call `grow` if active and half and not yet grown in current decoding cycle."""
+        """Call ``grow`` if active and half and not yet grown in current decoding cycle."""
         self.unrooted = False
         self.next_unrooted = False
         if self.active and not self.whole and not self.grown:
@@ -1066,7 +1055,7 @@ class _Node(NodeEdgeMixin):
         self._MERGER.merging(whole)
 
     def syncing(self):
-        """Update `active` depending on, and push defect to, pointee."""
+        """Update ``active`` depending on, and push defect to, pointee."""
         detector_defect = not self._IS_BOUNDARY and self.defect
         if self.pointer == 'C':
             self.next_active = detector_defect
@@ -1084,14 +1073,14 @@ class _Node(NodeEdgeMixin):
             self.busy = True
 
     def flooding(self, whole: bool):
-        """Update `pointer, cid, unrooted, grown` depending on access."""
+        """Update ``pointer, cid, unrooted, grown`` depending on access."""
         if whole:
             self.UNROOTER.flooding_whole()
         else:
             self.UNROOTER.flooding_half()
 
     def update_after_merging(self):
-        """`next_{cid, defect, active, unrooted, grown}` -> `{cid, defect, active, unrooted, grown}`."""
+        """``next_{cid, defect, active, unrooted, grown}`` -> ``{cid, defect, active, unrooted, grown}``."""
         self.cid = self.next_cid
         self.defect = self.next_defect
         self.active = self.next_active
@@ -1107,10 +1096,10 @@ class _Node(NodeEdgeMixin):
 
 class Friendship(abc.ABC):
     """The type of connection for communicating
-    `defect, active, cid, pointer` information.
+    ``defect, active, cid, pointer`` information.
     
     Instance attributes (1 constant):
-    * `NODE` the node which has this friendship.
+    * ``NODE`` the node which has this friendship.
     """
 
     def __init__(self, node: _Node) -> None:
@@ -1133,10 +1122,10 @@ class Friendship(abc.ABC):
 class NodeFriendship(Friendship):
     """Friendship with node immediately below.
     
-    Extends `Friendship`.
-
+    Extends ``Friendship``.
+    
     Instance attributes (1 constant):
-    * `DROPEE` the node immediately below.
+    * ``DROPEE`` the node immediately below.
     """
 
     def __init__(self, node: _Node) -> None:
@@ -1160,9 +1149,9 @@ class NodeFriendship(Friendship):
 
 class TopSheetFriendship(NodeFriendship):
     """Friendship for nodes in top sheet of viewing window.
-        
-    Extends `NodeFriendship`.
-    After a drop, these nodes must reset `next_active` and `next_defect`.
+    
+    Extends ``NodeFriendship``.
+    After a drop, these nodes must reset ``next_active`` and ``next_defect``.
     """
 
     def drop(self):
@@ -1174,7 +1163,7 @@ class TopSheetFriendship(NodeFriendship):
 class NothingFriendship(Friendship):
     """Friendship with nothing immediately below.
     
-    Extends `Friendship`.
+    Extends ``Friendship``.
     Only nodes whose time index is 0 have this friendship.
     """
 
@@ -1184,20 +1173,20 @@ class NothingFriendship(Friendship):
 
 
 class _Merger(abc.ABC):
-    """The class providing `_Node.merging`."""
+    """The class providing ``_Node.merging``."""
 
     def __init__(self, node: _Node) -> None:
         self._NODE = node
 
     @abc.abstractmethod
     def merging(self):
-        """See `_Node.merging`."""
+        """See ``_Node.merging``."""
 
 
 class _SlowMerger(_Merger):
-    """Provider for `_Node.merging` which syncs before it floods.
+    """Provider for ``_Node.merging`` which syncs before it floods.
     
-    Extends `_Merger`.
+    Extends ``_Merger``.
     """
 
     def merging(self, whole: bool):
@@ -1206,9 +1195,9 @@ class _SlowMerger(_Merger):
 
 
 class _FastMerger(_Merger):
-    """Provider for `_Node.merging` which floods before it syncs.
+    """Provider for ``_Node.merging`` which floods before it syncs.
     
-    Extends `_Merger`.
+    Extends ``_Merger``.
     """
 
     def merging(self, whole: bool):
@@ -1229,23 +1218,24 @@ class _Schedule(abc.ABC):
         time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
     ) -> int:
         """Perform the rest of the decoding cycle after drop.
-
-        Input:
-        * `log_history, time_only` as in `decode` inputs.
         
-        Output:
-        `t` number of timesteps to complete decoding cycle.
+        
+        :param log_history: as in ``decode`` inputs.
+        :param time_only: as in ``decode`` inputs.
+        
+        
+        :returns: ``t`` number of timesteps to complete decoding cycle.
         """
 
     @abc.abstractmethod
     def grow(self):
-        """Make all nodes perform a `grow`."""
+        """Make all nodes perform a ``grow``."""
 
 
 class _OneOne(_Schedule):
     """The 1:1 cluster growth schedule.
     
-    Extends `_Schedule`.
+    Extends ``_Schedule``.
     """
 
     def finish_decode(self, log_history, time_only):
@@ -1269,7 +1259,7 @@ class _OneOne(_Schedule):
 class _TwoOne(_Schedule):
     """The 2:1 cluster growth schedule.
     
-    Extends `_Schedule`.
+    Extends ``_Schedule``.
     """
 
     def finish_decode(self, log_history, time_only):
@@ -1301,11 +1291,11 @@ class _Unrooter(abc.ABC):
     """Abstract base class for the type of unrooting process to use.
     
     Instance constants:
-    * `_NODE` the node which has this unrooter.
+    * ``_NODE`` the node which has this unrooter.
     """
 
     def __init__(self, node: _Node):
-        """Input: `node` the node the unrooter belongs to."""
+        """Input: ``node`` the node the unrooter belongs to."""
         self._NODE = node
 
     @abc.abstractmethod
@@ -1314,22 +1304,22 @@ class _Unrooter(abc.ABC):
 
     @abc.abstractmethod
     def flooding_whole(self):
-        """Update `pointer, cid, unrooted, grown` depending on access."""
+        """Update ``pointer, cid, unrooted, grown`` depending on access."""
 
     def flooding_half(self):
-        """Update `pointer, cid` depending on access."""
+        """Update ``pointer, cid`` depending on access."""
         for pointer, neighbor in self._NODE.access.items():
             self._compare_cid(pointer, neighbor)
 
     def _compare_cid(self, pointer: direction, neighbor: _Node):
-        """Update `next_cid` depending on `neighbor.cid`."""
+        """Update ``next_cid`` depending on ``neighbor.cid``."""
         if neighbor.cid < self._NODE.next_cid:
             self._NODE.busy = True
             self._NODE.pointer = pointer
             self._NODE.next_cid = neighbor.cid
 
     def _check_grown(self, neighbor: _Node):
-        """Update `next_grown` depending on `neighbor.grown`."""
+        """Update ``next_grown`` depending on ``neighbor.grown``."""
         if neighbor.grown and not self._NODE.next_grown:
             self._NODE.busy = True
             self._NODE.next_grown = True
@@ -1341,7 +1331,7 @@ class _FullUnrooter(_Unrooter):
     This is so that the pointer tree structure can be rebuilt from scratch,
     via further merging timesteps.
     
-    Extends `_Unrooter`.
+    Extends ``_Unrooter``.
     """
 
     def start(self):
@@ -1372,10 +1362,10 @@ class _FullUnrooter(_Unrooter):
 class _SimpleUnrooter(_Unrooter):
     """Simple unrooting process where the node at breaking point only establishes the shortest path to a boundary.
     
-    Extends `_Unrooter`.
-
+    Extends ``_Unrooter``.
+    
     Additional instance constants:
-    * `_CLOSEST_BOUNDARY_DIRECTION` the direction toward the closest boundary.
+    * ``_CLOSEST_BOUNDARY_DIRECTION`` the direction toward the closest boundary.
     """
 
     def __init__(self, node: _Node):
@@ -1410,21 +1400,21 @@ class _SimpleUnrooter(_Unrooter):
 
 class _Edge(NodeEdgeMixin):
     """Edge for Snowflake.
-
-    Extends `NodeEdgeMixin`.
+    
+    Extends ``NodeEdgeMixin``.
     
     Additional instance attributes:
-    * `INDEX` index of edge.
-    * `CONTACT` the type of connection the edge has for communicating.
-    Analogous to `FRIENDSHIP` for nodes.
-    * `growth` its growth value.
-    * `correction` whether it is in the correction.
+    * ``INDEX`` index of edge.
+    * ``CONTACT`` the type of connection the edge has for communicating.
+        Analogous to ``FRIENDSHIP`` for nodes.
+    * ``growth`` its growth value.
+    * ``correction`` whether it is in the correction.
     """
 
     def __init__(self, snowflake: Snowflake, index: Edge) -> None:
-        """Input:
-        * `snowflake` the decoder the edge belongs to.
-        * `INDEX` index of edge.
+        """
+        :param snowflake: the decoder the edge belongs to.
+        :param INDEX: index of edge.
         """
         self._SNOWFLAKE = snowflake
         self._INDEX = index
@@ -1456,9 +1446,9 @@ class _Edge(NodeEdgeMixin):
     def update_after_drop(self):
         """Update unphysicals after a drop.
         
-        Set `[attribute]` := `next_[attribute]`.
-        For edges in `self.CODE.SCHEME.BUFFER_EDGES`,
-        this equals `reset`.
+        Set ``[attribute]`` := ``next_[attribute]``.
+        For edges in ``self.CODE.SCHEME.BUFFER_EDGES``,
+        this equals ``reset``.
         """
         self.growth = self.next_growth
         self.correction = self.next_correction
@@ -1466,10 +1456,10 @@ class _Edge(NodeEdgeMixin):
 
 class _Contact(abc.ABC):
     """The type of connection for communicating
-    `growth, correction` information.
+    ``growth, correction`` information.
     
     Instance attributes (1 constant):
-    * `EDGE` the edge which has this contact.
+    * ``EDGE`` the edge which has this contact.
     """
 
     def __init__(self, edge: _Edge) -> None:
@@ -1486,10 +1476,10 @@ class _Contact(abc.ABC):
 class EdgeContact(_Contact):
     """Contact with edge immediately below.
     
-    Extends `_Contact`.
-
+    Extends ``_Contact``.
+    
     Instance attributes (1 constant):
-    * `DROPEE` the edge immediately below.
+    * ``DROPEE`` the edge immediately below.
     """
 
     def __init__(self, edge: _Edge) -> None:
@@ -1509,7 +1499,7 @@ class EdgeContact(_Contact):
 class FloorContact(_Contact):
     """Contact for edges in commit region.
     
-    Extends `_Contact`.
+    Extends ``_Contact``.
     Only edges in the bottom sheet of the viewing window
     have this contact.
     """

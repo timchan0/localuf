@@ -1,4 +1,4 @@
-"""Classes for `noise.CircuitLevel.force_error`.
+"""Classes for ``noise.CircuitLevel.force_error``.
 
 This method samples an error from the set of all errors of a given weight
 where weight can be an integer or a vector of integers
@@ -22,8 +22,8 @@ class _BaseForcer(abc.ABC):
     """Abstract base class for all forcers.
     
     Instance attributes:
-    * `_EDGES` maps each multiplicity 4-vector
-    to the corresponding subset as a list of edges.
+    * ``_EDGES`` maps each multiplicity 4-vector
+        to the corresponding subset as a list of edges.
     """
 
     def __init__(self, edges: dict[FourInts, list[Edge]]) -> None:
@@ -31,12 +31,12 @@ class _BaseForcer(abc.ABC):
 
     @abc.abstractmethod
     def force_error(self, weight: tuple[int, ...]) -> set[Edge]:
-        """Make error whose weight in pair/edge subset `k` is `weight[k]`."""
+        """Make error whose weight in pair/edge subset ``k`` is ``weight[k]``."""
 
     @property
     @abc.abstractmethod
     def ALL_WEIGHTS(self) -> tuple[tuple[int, ...], ...]:
-        """All possible `force_error` inputs."""
+        """All possible ``force_error`` inputs."""
     
     @abc.abstractmethod
     def subset_probability(
@@ -44,25 +44,29 @@ class _BaseForcer(abc.ABC):
         weights: tuple[tuple[int, ...], ...],
         pi: FourFloats,
     ) -> Iterable[float]:
-        """Compute probability of each subset characterized by `weight` in `weights`.
+        """Compute probability of each subset characterized by ``weight`` in ``weights``.
         
-        See `Noise.subset_probability`.
+        See ``Noise.subset_probability``.
         
-        Input:
-        * `weights` a tuple of inputs to `force_error`.
-        * `pi` a 4-tuple of probabilities.
-
-        Output:
-        `probs` an iterable of probabilities where each corresponds to a `weight` in `weights`.
-
-        Example for `ForceByPairBalanced`:
-        * `weights = ((0, 0), (0, 1), (1, 0), (1, 1))`
-        * `B_k = B(n=len(self.PAIR_POPULATIONS[k]), p=pi[k])`
-        * `probs` = (\n
-                `B_0(0) * B_1(0)`,\n
-                `B_0(0) * B_1(1)`,\n
-                `B_0(1) * B_1(0)`,\n
-                `B_0(1) * B_1(1)`,
+        
+        :param weights: a tuple of inputs to ``force_error``.
+        :param pi: a 4-tuple of probabilities.
+        
+        
+        :returns: ``probs`` an iterable of probabilities where each corresponds to a ``weight`` in ``weights``.
+        
+        Example for ``ForceByPairBalanced``:
+        * ``weights = ((0, 0), (0, 1), (1, 0), (1, 1))``
+        * ``B_k = B(n=len(self.PAIR_POPULATIONS[k]), p=pi[k])``
+        * ``probs`` = (
+        
+        ``B_0(0) * B_1(0)``,
+        
+        ``B_0(0) * B_1(1)``,
+        
+        ``B_0(1) * B_1(0)``,
+        
+        ``B_0(1) * B_1(1)``,
         )
         """
 
@@ -70,14 +74,14 @@ class _BaseForcer(abc.ABC):
 class _BaseForceByPair(_BaseForcer):
     """Base class for forcers whose error subsets are distinguished by the weight of each pair type.
     
-    Extends `_BaseForcer`.
+    Extends ``_BaseForcer``.
     """
 
     PAIR_POPULATIONS: tuple[list[Edge], ...]
     """Population for each pair type."""
 
     def force_error(self, weight: tuple[int, ...]):
-        """Make error whose weight in pair subset `k` is `weight[k]`."""
+        """Make error whose weight in pair subset ``k`` is ``weight[k]``."""
         error: set[Edge] = set()
         for pairs, w in zip(self.PAIR_POPULATIONS, weight, strict=True):
             sample = random.sample(pairs, w)
@@ -109,7 +113,7 @@ class _BaseForceByPair(_BaseForcer):
 
     @property
     def _PAIR_POPULATIONS(self):
-        """Helper property for `PAIR_POPULATIONS`."""
+        """Helper property for ``PAIR_POPULATIONS``."""
         populations: list[list[Edge]] = []
         for k in range(4):
             pairs = []
@@ -122,8 +126,8 @@ class _BaseForceByPair(_BaseForcer):
 class ForceByPair(_BaseForceByPair):
     """Forcer whose error subsets are distinguished by the weight of each of the 4 pair types.
     
-    Extends `_BaseForceByPair`.
-    Use when `parametrization != 'balanced'`.
+    Extends ``_BaseForceByPair``.
+    Use when ``parametrization != 'balanced'``.
     In this class, each weight is a 4-tuple of integers.
     """
     
@@ -133,10 +137,10 @@ class ForceByPair(_BaseForceByPair):
 
 
 class ForceByPairBalanced(_BaseForceByPair):
-    """Same as `ForceByPair` but aggregating the last 3 pair subsets.
-
-    Extends `_BaseForceByPair`.
-    Use when `parametrization == 'balanced'`.
+    """Same as ``ForceByPair`` but aggregating the last 3 pair subsets.
+    
+    Extends ``_BaseForceByPair``.
+    Use when ``parametrization == 'balanced'``.
     In this class, each weight is a 2-tuple of integers.
     """
     
@@ -149,12 +153,12 @@ class ForceByPairBalanced(_BaseForceByPair):
 class ForceByEdge(_BaseForcer):
     """Forcer whose error subsets are distinguished by the weight of each of the 13 edge types.
     
-    Slower than `ForceByPair` as there are 13 edge types but only 4 pair types.
+    Slower than ``ForceByPair`` as there are 13 edge types but only 4 pair types.
     Hence, use is discouraged.
     """
 
     def force_error(self, weight: tuple[int, ...]):
-        """Make error whose weight in edge subset `k` is `weight[k]`."""
+        """Make error whose weight in edge subset ``k`` is ``weight[k]``."""
         error: set[Edge] = set()
         try:
             for subset, w in zip(self._EDGES.values(), weight, strict=True):

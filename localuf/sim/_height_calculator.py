@@ -1,4 +1,4 @@
-"""Provide `get_heights` function."""
+"""Provide ``get_heights`` function."""
 
 from collections.abc import Callable
 
@@ -12,14 +12,14 @@ def get_heights(
         get_commit_height: Callable[[int], int] | None,
         get_buffer_height: Callable[[int], int] | None,
 ):
-    """Get height inputs for `Code.__init__` based on decoding scheme and multipliers.
+    """Get height inputs for ``Code.__init__`` based on decoding scheme and multipliers.
     
-    Input:
-    * `d` code distance.
-    * `global_batch_slenderness` the slenderness in case `scheme == 'global batch'`.
-    * `scheme` decoding scheme.
-    * `get_commit_height` a function with input `d` that outputs commit height.
-    * `get_buffer_height` a function with input `d` that outputs buffer height.
+    
+    :param d: code distance.
+    :param global_batch_slenderness: the slenderness in case ``scheme == 'global batch'``.
+    :param scheme: decoding scheme.
+    :param get_commit_height: a function with input ``d`` that outputs commit height.
+    :param get_buffer_height: a function with input ``d`` that outputs buffer height.
     """
     window_height = d*global_batch_slenderness if scheme == 'global batch' else None
 

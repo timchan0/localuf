@@ -36,32 +36,30 @@ def monte_carlo(
         **kwargs_for_decoder_class,
 ):
     """Make threshold data for any decoder.
-
-    Input:
-    * `sample_counts` a dictionary where each
-    key a code distance;
+    
+    
+    :param sample_counts: a dictionary where each
+        key a code distance;
     value, a list of (noise level, sample count) pairs.
-    If `scheme` is 'global batch',
+    If ``scheme`` is 'global batch',
     sample count must be the same for all noise levels of a given distance.
-    For a more detailed definition of 'sample', see `_base_classes.Scheme.run`.
-    * `code_class` the class of the code.
-    * `decoder_class` the class of the decoder.
-    * inputs with same name as for `Code.__init__` serve the same purpose.
-    In global batch scheme, the decoding graph is `d*n` layers tall i.e.
-    as tall as the (entire) decoding graph would be in forward scheme with commit height `d`.
-    * `kwargs_for_decoder_class` are for `decoder_class`.
-
+    For a more detailed definition of 'sample', see ``_base_classes.Scheme.run``.
+    :param code_class: the class of the code.
+    :param decoder_class: the class of the decoder.
+    :param inputs: with same name as for ``Code.__init__`` serve the same purpose.
+        In global batch scheme, the decoding graph is ``d*n`` layers tall i.e.
+    as tall as the (entire) decoding graph would be in forward scheme with commit height ``d``.
+    :param kwargs_for_decoder_class: are for ``decoder_class``.
+    
     The following 2 inputs affect only forward and frugal decoding schemes:
-    * `get_commit_height` a function with input `d` that outputs commit height
-    e.g. `lambda d: 2*(d//2)`.
-    If `None`, commit height is `d` for forward scheme and `1` for frugal scheme.
-    * `get_buffer_height` a function with input `d` that outputs buffer height.
-    If `None`, buffer height is `d` for forward scheme and `2*(d//2)` for frugal scheme.
-
-    Output:
-    `df` a DataFrame where each
-    column a (distance, probability);
-    rows 'm', 'n' indicate number of logical errors and samples, respectively.
+    * ``get_commit_height`` a function with input ``d`` that outputs commit height
+        e.g. ``lambda d: 2*(d//2)``.
+    If ``None``, commit height is ``d`` for forward scheme and ``1`` for frugal scheme.
+    * ``get_buffer_height`` a function with input ``d`` that outputs buffer height.
+        If ``None``, buffer height is ``d`` for forward scheme and ``2*(d//2)`` for frugal scheme.
+    
+    
+    :returns: ``df`` a DataFrame where each column a (distance, probability); rows 'm', 'n' indicate number of logical errors and samples, respectively.
     """
     dc: dict[tuple[int, float], tuple[int, int | float]] = {}
     for d, list_ in sample_counts.items():
@@ -93,9 +91,9 @@ def monte_carlo(
 
 
 def monte_carlo_results_to_sample_counts(results: DataFrame):
-    """Convert `monte_carlo` output to its first input.
+    """Convert ``monte_carlo`` output to its first input.
     
-    Assumes row 'n' of `results` is the input of `_base_classes.Scheme.run`.
+    Assumes row 'n' of ``results`` is the input of ``_base_classes.Scheme.run``.
     """
     sample_counts: dict[int, list[tuple[float, int]]] = {}
     for (d, p), (_, n) in results.items(): # type: ignore
@@ -114,12 +112,16 @@ def monte_carlo_pymatching(
         **kwargs_for_code_class,
 ):
     """Make threshold data for PyMatching decoder.
-
-    Input:
-    * `ds, ps, ns, code_class, noise` same as for `monte_carlo`.
-    * `**kwargs_for_code_class` for `code_class`.
-
-    Output same as for `monte_carlo`.
+    
+    
+    :param ds: same as for ``monte_carlo``.
+    :param ps: same as for ``monte_carlo``.
+    :param ns: same as for ``monte_carlo``.
+    :param code_class: same as for ``monte_carlo``.
+    :param noise: same as for ``monte_carlo``.
+    :param kwargs_for_code_class: for ``code_class``.
+    
+    Output same as for ``monte_carlo``.
     """
     if isinstance(ns, int):
         ns = [ns] * len(ps)
@@ -161,8 +163,8 @@ def monte_carlo_special(
     """Make threshold data where
     code noise model is circuit-level;
     decoder noise model, phenomenological.
-
-    Input & output same as for `monte_carlo`.
+    
+    Input & output same as for ``monte_carlo``.
     """
     if isinstance(ns, int):
         ns = [ns] * len(ps)
@@ -199,12 +201,8 @@ def subset_sample(
 ):
     """Make threshold data for any decoder using subset sampling.
     
-    Output:
-    `df` a DataFrame indexed by (distance, error weight), with columns:
-    * 'subset prob' probability of error of that weight, given distance.
-    * 'survival prob' complement of cumulative sum of 'subset prob'.
-    * 'm' failure count.
-    * 'n' shot count.
+    
+    :returns: ``df`` a DataFrame indexed by (distance, error weight), with columns: * 'subset prob' probability of error of that weight, given distance. * 'survival prob' complement of cumulative sum of 'subset prob'. * 'm' failure count. * 'n' shot count.
     """
     ls = []
     for d in ds:
