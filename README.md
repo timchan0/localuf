@@ -37,3 +37,5 @@ pip install -e .
 ## Usage
 
 See `demo_notebooks/intro.ipynb`.
+The first section is a demo of the Macar and Actis decoders.
+The second section is a demo of the Snowflake decoder.

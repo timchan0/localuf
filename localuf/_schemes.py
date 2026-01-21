@@ -56,13 +56,22 @@ class Scheme(abc.ABC):
         
         :param decoder: the decoder.
         :param p: noise level.
-        :param n: is
-            decoding cycle count if scheme is 'batch' or 'forward'
-        else slenderness := (layer count / code distance),
-        where layer count := measurement round count + 1.
+        :param n: depends on the decoding scheme.
+            If the scheme is 'batch',
+            then ``n`` is decoding cycle count.
+            If the scheme is 'global batch',
+            then ``n`` is slenderness := (layer count / code distance),
+            where layer count := measurement round count + 1.
+            If the scheme is 'forward',
+            then ``n`` is the number of decoding cycles in the steady state.
+            If the scheme is 'frugal',
+            then ``n`` is decoding cycle count in the steady state, divided by the code distance.
+            For Snowflake, the there is 1 decoding cycle per stabiliser measurement round.
         
-        Output: tuple of (failure count, decoding cycle count
-        if noise is code capacity else slenderness).
+        :returns:
+        * logical error count.
+        * decoding cycle count
+        if noise is code capacity; else, (total layer count / code distance).
         """
 
     @abc.abstractmethod
@@ -581,7 +590,8 @@ class Frugal(_Streaming):
         
         :param decoder: the decoder.
         :param p: noise level.
-        :param n: is decoding cycle count in the steady state.
+        :param n: is decoding cycle count in the steady state, divided by the code distance.
+            For Snowflake, the there is 1 decoding cycle per stabiliser measurement round.
         :param draw: whether to draw.
         :param log_history: whether to populate ``history`` attribute.
         :param time_only: whether runtime includes a timestep
