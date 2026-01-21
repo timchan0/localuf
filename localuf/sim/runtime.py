@@ -85,6 +85,11 @@ def forward(
 ):
     """Make runtime data of Macar under forward decoding scheme.
 
+    Use this function to analyse throughput.
+    Latency can be analysed using `sim.runtime.batch`,
+    since the final decoding window of a memory experiment
+    resembles that of a batch decoding window.
+
     Input:
     * `ds, ps, n, noise, kwargs_for_Surface` same as for `batch`.
     * `get_commit_height` a function with input `d` that outputs commit height

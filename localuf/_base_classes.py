@@ -53,7 +53,7 @@ class Code(abc.ABC):
     * vertical edge, a possible faulty measurement
     (i.e. measure-Z qubit recording the wrong parity with some probability `q`)
     location.
-    First AND last round assumed to be perfect (hence no temporal boundary edges).
+    First AND last round assumed to be perfect (hence no future boundary edges).
 
     `'circuit-level'`: same as `'phenomenological'`
     but each edge represents a possible pair of defects
@@ -130,7 +130,7 @@ class Code(abc.ABC):
                 else:  # noise == 'circuit-level'
                     self._N_EDGES, self._EDGES, edge_dict, merges = self._circuit_level_edges(
                         h=h,
-                        temporal_boundary=False,
+                        future_boundary=False,
                         _merge_redundant_edges=_merge_redundant_edges,
                         merge_equivalent_boundary_nodes=merge_equivalent_boundary_nodes,
                     )
@@ -167,17 +167,17 @@ class Code(abc.ABC):
             else:  # noise == 'circuit-level'
                 self._N_EDGES, self._EDGES, *_ = self._circuit_level_edges(
                     h=h,
-                    temporal_boundary=True,
+                    future_boundary=True,
                     _merge_redundant_edges=_merge_redundant_edges,
                 )
                 _, commit_edges, *_ = self._circuit_level_edges(
                     h=commit_height,
-                    temporal_boundary=True,
+                    future_boundary=True,
                     _merge_redundant_edges=_merge_redundant_edges,
                 )
                 *_, fresh_edge_dict, fresh_merges = self._circuit_level_edges(
                     h=commit_height,
-                    temporal_boundary=True,
+                    future_boundary=True,
                     _merge_redundant_edges=_merge_redundant_edges,
                     t_start=buffer_height,
                 )
@@ -228,7 +228,7 @@ class Code(abc.ABC):
     def _phenomenological_edges(
         self,
         h: int,
-        temporal_boundary: bool,
+        future_boundary: bool,
         t_start=0,
         merge_equivalent_boundary_nodes=False,
     ) -> tuple[int, tuple[Edge, ...]]:
@@ -236,7 +236,7 @@ class Code(abc.ABC):
         
         Input:
         * `h` window height.
-        * `temporal_boundary` whether top of graph has temporal boundary.
+        * `future_boundary` whether top of graph has future boundary.
         True for W, False for G.
         * `t_start` the time index of the bottom layer.
         * `merge_equivalent_boundary_nodes` whether to merge
@@ -251,7 +251,7 @@ class Code(abc.ABC):
     def _circuit_level_edges(
             self,
             h: int,
-            temporal_boundary: bool,
+            future_boundary: bool,
             _merge_redundant_edges: bool,
             t_start=0,
             merge_equivalent_boundary_nodes=False,
@@ -280,7 +280,7 @@ class Code(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _temporal_boundary_nodes(self, h: int) -> list[Node]:
+    def _future_boundary_nodes(self, h: int) -> list[Node]:
         """Return list of boundary nodes at top of viewing window.
         
         Input: `h` window height.
@@ -382,14 +382,14 @@ class Code(abc.ABC):
         """Move `e` up by `delta_t`."""
         return tuple(self.raise_node(v, delta_t) for v in e) # type: ignore
 
-    def make_error(self, p: float, exclude_temporal_boundary_edges: bool = False):
+    def make_error(self, p: float, exclude_future_boundary: bool = False):
         """Sample edges from freshly discovered region.
 
         Input:
         * `p` characteristic noise level if circuit-level noise;
         else, bitflip probability.
         Should be in [0, 1], though no check is done to ensure this.
-        * `exclude_temporal_boundary_edges` whether to exclude temporal boundary edges
+        * `exclude_future_boundary` whether to exclude future boundary edges
         from being sampled for the new error in the freshly discovered region.
         Set to `True` if you want to emulate the end of a memory experiment,
         where the data qubits are measured and the last syndrome sheet is obtained
@@ -403,7 +403,7 @@ class Code(abc.ABC):
         probability `p`.
         """
         error = self.NOISE.make_error(p)
-        if exclude_temporal_boundary_edges:
+        if exclude_future_boundary:
             excluded_edges: set[Edge] = set()
             for e in error:
                 for v in e:

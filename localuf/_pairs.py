@@ -96,7 +96,7 @@ class LogicalCounter:
         Output:
         * `error_count` the number of logical error strings completed in `pairs`.
         * `new_pairs` the error strings in `pairs`
-        ending at the temporal boundary of the commit region,
+        ending at the future boundary of the commit region,
         lowered by commit height.
         """
         error_count: int = 0

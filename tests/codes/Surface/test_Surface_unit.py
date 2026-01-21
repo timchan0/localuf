@@ -158,7 +158,7 @@ class TestCircuitLevelEdges:
     def helper(
             self,
             surface: Surface,
-            temporal_boundary: bool,
+            future_boundary: bool,
             merge_equivalent_boundary_nodes=False,
     ):
         """Output:
@@ -171,7 +171,7 @@ class TestCircuitLevelEdges:
         Inter-key order matters as used by `noise.forcers.ForceByEdge.force_error`.
         """
         d, h = surface.D, surface.SCHEME.WINDOW_HEIGHT
-        layer_count = h if temporal_boundary else h-1
+        layer_count = h if future_boundary else h-1
         len_merges = 2 * layer_count * (2*d-1)
         horizontal_edge_count = h * surface.DATA_QUBIT_COUNT
         u_per_layer = d*(d-1)
@@ -179,7 +179,7 @@ class TestCircuitLevelEdges:
 
         n_edges, edges, edge_dict, merges = surface._circuit_level_edges(
             h=h,
-            temporal_boundary=temporal_boundary,
+            future_boundary=future_boundary,
             _merge_redundant_edges=True,
             merge_equivalent_boundary_nodes=merge_equivalent_boundary_nodes,
         )
@@ -205,7 +205,7 @@ class TestCircuitLevelEdges:
 
             n_edges, edges, edge_dict_False, merges = surface._circuit_level_edges(
                 h=h,
-                temporal_boundary=temporal_boundary,
+                future_boundary=future_boundary,
                 _merge_redundant_edges=False,
             )
 
@@ -222,7 +222,7 @@ class TestCircuitLevelEdges:
         return d, layer_count, edge_dict
 
 
-    def test_temporal_boundary_False(self, sfCL: Surface):
+    def test_future_boundary_False(self, sfCL: Surface):
         d, layer_count, edge_dict = self.helper(sfCL, False)
 
         eu_edge_NS = tuple(((i, j, t), (i, j+1, t+1)) for i in ( 0, d-1) for j in range(   d-2) for t in range(layer_count))
@@ -241,7 +241,7 @@ class TestCircuitLevelEdges:
         assert len(edge_dict['SEU']) == (d-1) * d * layer_count
 
 
-    def test_temporal_boundary_True(self, sfCL_OL: Surface):
+    def test_future_boundary_True(self, sfCL_OL: Surface):
         d, layer_count, edge_dict = self.helper(sfCL_OL, True)
 
         eu_edge_NS = tuple(((i, j, t), (i, j+1, t+1)) for i in ( 0, d-1) for j in range(   d-2) for t in range(layer_count))
@@ -263,12 +263,12 @@ class TestCircuitLevelEdges:
         commit_height = sfCL_OL_scheme._COMMIT_HEIGHT
         n_commit_edges, commit_edges, commit_edge_dict, commit_merges = code._circuit_level_edges(
             h=commit_height,
-            temporal_boundary=True,
+            future_boundary=True,
             _merge_redundant_edges=_merge_redundant_edges,
         )
         n_fresh_edges, fresh_edges, fresh_edge_dict, fresh_merges = code._circuit_level_edges(
             h=commit_height,
-            temporal_boundary=True,
+            future_boundary=True,
             _merge_redundant_edges=_merge_redundant_edges,
             t_start=buffer_height,
         )

@@ -9,6 +9,7 @@ import itertools
 
 from matplotlib import pyplot as plt
 from matplotlib.container import ErrorbarContainer
+import numpy as np
 from pandas import DataFrame
 from statsmodels.stats.proportion import proportion_confint
 
@@ -69,6 +70,8 @@ def monte_carlo(
         alpha=alpha,
         method=method,
     )
+    # next line is a fix for when m = 0 then sometimes lo > 0
+    plotted['lo'] = np.min(plotted[['lo', 'f']], axis=1)
     for (d, df), color in zip(plotted.groupby(level='d'), colors):
         df = df.droplevel('d')
         container = plt.errorbar(

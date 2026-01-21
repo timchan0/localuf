@@ -1,4 +1,5 @@
 from itertools import product
+import math
 from unittest import mock
 
 import pytest
@@ -179,9 +180,8 @@ class TestRun:
     
     def test_zero_cycles(self, forward: Forward):
         decoder = UF(forward._CODE)
-        m, slenderness = forward.run(decoder, 1, 0)
-        assert m == 0
-        assert slenderness == 0
+        with pytest.raises(ValueError):
+            forward.run(decoder, 1, 0)
 
     @pytest.mark.parametrize("n", range(1, 4), ids=lambda x: f"n{x}")
     def test_commit_equals_buffer(self, forward: Forward, n: int):
@@ -189,6 +189,7 @@ class TestRun:
         p = 0.5
         cleanse_count = forward.WINDOW_HEIGHT // forward._COMMIT_HEIGHT
         commit_leftover = set()
+        decoding_cycle_count = n+1 + cleanse_count
         with (
             mock.patch(
             "localuf._schemes.Forward._make_error_in_buffer_region",
@@ -209,19 +210,20 @@ class TestRun:
         ) as mock_gle,
         ):
             m, slenderness = forward.run(uf, p, n)
-            assert m == n-1 + cleanse_count
-            layer_count = forward._BUFFER_HEIGHT + (n-1)*forward._COMMIT_HEIGHT
+            assert m == decoding_cycle_count
+            layer_count = forward._BUFFER_HEIGHT + (n+1)*forward._COMMIT_HEIGHT
             assert slenderness == layer_count / forward._CODE.D
             mock_meibr.assert_called_once_with(p)
-            assert mock_me.call_args_list == (n-1)*[mock.call(set(), p)] \
-                + cleanse_count*[mock.call(set(), 0)]
-            assert mock_gad.call_args_list == [mock.call(commit_leftover)] * (n-1 + cleanse_count)
-            assert mock_gs.call_args_list == [mock.call(mock_me.return_value)] * (n-1 + cleanse_count)
+            assert mock_me.call_args_list == n*[mock.call(set(), p, exclude_future_boundary=False)] \
+                + [mock.call(set(), p, exclude_future_boundary=True)] \
+                + cleanse_count * [mock.call(set(), 0, exclude_future_boundary=False)]
+            assert mock_gad.call_args_list == [mock.call(commit_leftover)] * decoding_cycle_count
+            assert mock_gs.call_args_list == [mock.call(mock_me.return_value)] * decoding_cycle_count
             syndrome = mock_gs.return_value ^ mock_gad.return_value
-            assert mock_reset.call_args_list == [mock.call()] * (n-1 + cleanse_count)
-            assert mock_decode.call_args_list == [mock.call(syndrome)] * (n-1 + cleanse_count)
-            assert mock_gl.call_args_list == [mock.call(mock_me.return_value, uf.correction)] * (n-1 + cleanse_count)
-            assert mock_gle.call_args_list == [mock.call(commit_leftover)] * (n-1 + cleanse_count)
+            assert mock_reset.call_args_list == [mock.call()] * decoding_cycle_count
+            assert mock_decode.call_args_list == [mock.call(syndrome)] * decoding_cycle_count
+            assert mock_gl.call_args_list == [mock.call(mock_me.return_value, uf.correction)] * decoding_cycle_count
+            assert mock_gle.call_args_list == [mock.call(commit_leftover)] * decoding_cycle_count
 
 
 def test_make_error(forward3F: Forward):

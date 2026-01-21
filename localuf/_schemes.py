@@ -1,6 +1,7 @@
 import abc
 from abc import abstractmethod
 import itertools
+import math
 from typing import Literal, TYPE_CHECKING
 
 from localuf import constants
@@ -269,7 +270,7 @@ class _Streaming(Scheme):
 
         Side effect:
         Update `self.pairs` with error strings ending
-        at the temporal boundary of the commit region.
+        at the future boundary of the commit region.
         """
         error_count, self.pairs = self._LOGICAL_COUNTER.count(self.pairs)
         return error_count
@@ -303,13 +304,19 @@ class Forward(_Streaming):
         try: del self.history
         except: pass
 
-    def _make_error(self, buffer_leftover: set[Edge], p: float):
+    def _make_error(
+            self,
+            buffer_leftover: set[Edge],
+            p: float,
+            exclude_future_boundary: bool = False,
+    ):
         """Lower `buffer_leftover` by commit height
         and sample edges from freshly discovered region with probability `p`.
 
         Input:
         * `buffer_leftover` the current error in the buffer region.
         * `p` probability for an edge to bitflip.
+        * `exclude_future_boundary` passed to `self._CODE.make_error`.
 
         Output: The set of bitflipped edges.
         """
@@ -318,7 +325,7 @@ class Forward(_Streaming):
         for e in buffer_leftover:
             seen.add(self._CODE.raise_edge(e, -self._COMMIT_HEIGHT))
         # populate freshly discovered region with new errors
-        unseen = self._CODE.make_error(p)
+        unseen = self._CODE.make_error(p, exclude_future_boundary=exclude_future_boundary)
         return seen | unseen
 
     def _get_leftover(self, error: set[Edge], correction: set[Edge]):
@@ -385,7 +392,7 @@ class Forward(_Streaming):
         if self._COMMIT_HEIGHT >= self._BUFFER_HEIGHT:
             error = self._CODE.make_error(p)
         else:
-            rep_count = self._BUFFER_HEIGHT // self._COMMIT_HEIGHT + 1
+            rep_count = math.ceil(self._BUFFER_HEIGHT / self._COMMIT_HEIGHT)
             error: set[Edge] = set()
             for _ in itertools.repeat(None, rep_count):
                 error = self._make_error(error, p)
@@ -400,35 +407,37 @@ class Forward(_Streaming):
             log_history=False,
             **kwargs_for_draw_run,
     ):
-        """Simulate `n` decoding cycles given `p`.
+        """Simulate `n` decoding cycles (in the steady state) given `p`, for analysing accuracy and throughput.
         
         Input:
         * `decoder` the decoder.
         * `p` noise level.
-        * positive integer `n` is decoding cycle count.
+        * positive integer `n` is decoding cycle count in the steady state.
 
         Output: tuple of (failure count, slenderness).
 
-        Side effect: Populate `self.step_counts` with `n-1` entries,
-        each being the step count of one decoding cycle.
+        Side effect: Populate `self.step_counts` with `n` entries,
+        each being the step count of one decoding cycle in the steady state.
         """
         log_history |= draw
         self.reset()
-        if n == 0: return 0, 0
+        if n < 1: raise ValueError("n must be positive integer.")
         m = 0
         commit_leftover: set[Edge] = set()
         buffer_leftover = self._make_error_in_buffer_region(p)
         # `cleanse_count` additional decoding cycles ensures window is free of defects
         cleanse_count = self.WINDOW_HEIGHT // self._COMMIT_HEIGHT
-        # Be F the last freshly discovered region of edges that can flip,
-        # then `cleanse_count` is the number of decoding cycles needed for F to be committed.
+        # If F is the last freshly discovered region of edges that can flip (that excludes a future boundary),
+        # then `cleanse_count` is the number of decoding cycles needed for F to be fully in the commit region.
+        # If F includes the future boundary, then need 1 more than this.
         if log_history:
             self.history: list[tuple[set[Edge], set[Edge], set[Node]]] = []
-        for prob, time in itertools.chain(
-            itertools.repeat((p, True), n-1),
-            itertools.repeat((0, False), cleanse_count),
+        for prob, time, exclude_future_boundary in itertools.chain(
+            itertools.repeat((p, True, False), n),
+            itertools.repeat((p, False, True), 1),
+            itertools.repeat((0, False, False), cleanse_count),
         ):
-            error = self._make_error(buffer_leftover, prob)
+            error = self._make_error(buffer_leftover, prob, exclude_future_boundary=exclude_future_boundary)
             artificial_defects = self._get_artificial_defects(commit_leftover)
             syndrome = self._CODE.get_syndrome(error) ^ artificial_defects
             decoder.reset()
@@ -441,7 +450,7 @@ class Forward(_Streaming):
             m += self.get_logical_error(commit_leftover)
         if draw:
             self._draw_run(**kwargs_for_draw_run)
-        return m, (self._BUFFER_HEIGHT + (n-1)*self._COMMIT_HEIGHT) / self._CODE.D
+        return m, (self._BUFFER_HEIGHT + (n+1)*self._COMMIT_HEIGHT) / self._CODE.D
 
     def _draw_run(
         self,
@@ -460,7 +469,7 @@ class Forward(_Streaming):
         ))
         for k, (error, leftover, artificial_defects) in enumerate(self.history, start=1):
             for l, edges in enumerate((error, leftover)):
-                plt.subplot(row_count, column_count, column_count*l+k)
+                plt.subplot(row_count, column_count, column_count*l + k)
                 self._CODE.draw(
                     edges,
                     syndrome=self._CODE.get_syndrome(edges) ^ artificial_defects,
@@ -478,7 +487,7 @@ class Frugal(_Streaming):
 
     Additional attributes:
     * `error` a set of edges.
-    * `_temporal_boundary_syndrome` the set of defects in the temporal boundary of the viewing window.
+    * `_future_boundary_syndrome` the set of defects in the future boundary of the viewing window.
 
     Overriden methods:
     * `reset`
@@ -492,19 +501,19 @@ class Frugal(_Streaming):
     def __init__( self, code, commit_height, buffer_height, commit_edges):
         super().__init__(code, commit_height, buffer_height, commit_edges)
         self.error: set[Edge] = set()
-        self._temporal_boundary_syndrome: set[Node] = set()
+        self._future_boundary_syndrome: set[Node] = set()
         self.step_counts: list[int]
 
     def reset(self):
         super().reset()
         self.error.clear()
-        self._temporal_boundary_syndrome.clear()
+        self._future_boundary_syndrome.clear()
 
     def advance(
             self,
             prob: float,
             decoder: 'Decoder',
-            exclude_temporal_boundary_edges: bool = False,
+            exclude_future_boundary: bool = False,
             **kwargs,
     ) -> int:
         """Advance 1 decoding cycle.
@@ -512,7 +521,7 @@ class Frugal(_Streaming):
         Input:
         * `prob` instantaneous noise level.
         * `decoder` the frugal-compatible decoder to use.
-        * `exclude_temporal_boundary_edges` passed to `self._CODE.make_error`.
+        * `exclude_future_boundary` passed to `self._CODE.make_error`.
         * `log_history, time_only, defects_possible` arguments of `decoder.decode`.
 
         Output: number of decoder timesteps to complete decoding cycle.
@@ -520,7 +529,7 @@ class Frugal(_Streaming):
         self._raise_window()
         error = self._CODE.make_error(
             prob,
-            exclude_temporal_boundary_edges=exclude_temporal_boundary_edges,
+            exclude_future_boundary=exclude_future_boundary,
         )
         syndrome = self._load(error)
         return decoder.decode(syndrome, **kwargs) # type: ignore
@@ -547,18 +556,18 @@ class Frugal(_Streaming):
         
         Output: `syndrome` the incremental syndrome due to `error`.
         
-        Side effect: Update `self.error` and `self.temporal_boundary_syndrome`.
+        Side effect: Update `self.error` and `self.future_boundary_syndrome`.
         """
         self.error |= error
         syndrome = {self._CODE.raise_node(v, delta_t=-self._COMMIT_HEIGHT)
-            for v in self._temporal_boundary_syndrome}
-        self._temporal_boundary_syndrome.clear()
+            for v in self._future_boundary_syndrome}
+        self._future_boundary_syndrome.clear()
         for e in error:
             for v in e:
                 if not self.is_boundary(v):
                     syndrome.symmetric_difference_update({v})
-                elif v[self._CODE.TIME_AXIS] == self.WINDOW_HEIGHT:  # in temporal boundary
-                    self._temporal_boundary_syndrome.symmetric_difference_update({v})
+                elif v[self._CODE.TIME_AXIS] == self.WINDOW_HEIGHT:  # in future boundary
+                    self._future_boundary_syndrome.symmetric_difference_update({v})
         return syndrome
 
     def run(
@@ -571,19 +580,20 @@ class Frugal(_Streaming):
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
-        """Simulate `n*d` decoding cycles given `p`.
+        """Simulate `n*d` decoding cycles (in the steady state) given `p`.
 
         Input:
         * `decoder` the decoder.
         * `p` noise level.
-        * positive integer `n` is slenderness := (layer count) / (code distance).
+        * positive integer `n` is decoding cycle count in the steady state.
         * `draw` whether to draw.
         * `log_history` whether to populate `history` attribute.
         * `time_only` whether runtime includes a timestep
         for each drop, each grow, and each merging step ('all');
         each merging step only ('merging');
         or each unrooting step only ('unrooting').
-        Note: changing from 'merging' to 'all' simply increases each step count by 2d
+        Note: if commit height is 1 and window height is d,
+        then changing from 'merging' to 'all' simply increases each step count by 2d
         [for a total step count increase of 2d(n-1)]
         in the case of Snowflake with the 1:1 schedule.
         In the case of the 2:1 schedule, the increase of each step count is 3d.
@@ -591,30 +601,41 @@ class Frugal(_Streaming):
         * `kwargs_for_draw_decode` passed to `decoder.draw_decode`
         e.g. `margins=(0.1, 0.1)`.
 
-        Output: tuple of (failure count, `n`).
+        Output: tuple of (failure count, slenderness := (total layer count) / (code distance)).
 
-        Side effect: Populate `self.step_counts` with `n-1` entries,
-        each being the step count of `d` decoding cycles.
+        Side effect: Populate `self.step_counts` with `n` entries,
+        each being the step count of `d` decoding cycles in the steady state.
         """
         d = self._CODE.D
         self.reset()
-        if n == 0: return 0, 0
+        if n < 1: raise ValueError("n must be positive integer.")
         decoder.reset()
         if draw:
             log_history = draw
         if log_history:
             decoder.init_history() # type: ignore
         m = 0
-        for prob, advance_count, time in itertools.chain(
-            ((p, d, False),),
-            itertools.repeat((p, d, True), n-1),
-            ((0, 2*self.WINDOW_HEIGHT, False),),
+        transient_count = math.ceil(self.WINDOW_HEIGHT / self._COMMIT_HEIGHT)
+        # require `transient_count` decoding cycles to reach steady state
+        cleanse_count = 2 * self.WINDOW_HEIGHT
+        # require `cleanse_count` decoding cycles after receiving last sheet of syndrome
+        # to guarantee last defect is annihilated
+        # TODO: tighten this bound
+        # Note: cleanse_count = math.ceil(self.WINDOW_HEIGHT / self._COMMIT_HEIGHT) does NOT work
+        # as the committed correction will be incomplete
+        for prob, advance_count, time, exclude_future_boundary in itertools.chain(
+            ((p, transient_count, False, False),),
+            itertools.repeat((p, d, True, False), n),
+            ((p, d-1, False, False),),
+            ((p, 1, False, True),),
+            ((0, cleanse_count, False, False),),
         ):
             step_count = 0
             for _ in itertools.repeat(None, advance_count):
                 step_count += self.advance(
                     prob,
                     decoder,
+                    exclude_future_boundary=exclude_future_boundary,
                     log_history=log_history,
                     time_only=time_only,
                 )
@@ -623,7 +644,7 @@ class Frugal(_Streaming):
                 self.step_counts.append(step_count)
         if draw:
             decoder.draw_decode(**kwargs_for_draw_decode)
-        return m, n
+        return m, transient_count / d + n + 1
     
     def sample_latency(
             self,
@@ -634,7 +655,7 @@ class Frugal(_Streaming):
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
-        """Sample the latency of the decoder.
+        """Sample the latency of the decoder in the frugal decoding scheme.
 
         This runs a memory experiment of `self.WINDOW_HEIGHT+1` measurement rounds
         i.e. `self.WINDOW_HEIGHT+2` sheets of syndrome data are produced.
@@ -664,7 +685,7 @@ class Frugal(_Streaming):
             step_count = self.advance(
                 prob,
                 decoder,
-                exclude_temporal_boundary_edges=include_in_latency,
+                exclude_future_boundary=include_in_latency,
                 log_history=log_history,
                 time_only=time_only,
                 defects_possible=defects_possible,

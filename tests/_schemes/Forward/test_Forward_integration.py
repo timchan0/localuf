@@ -11,10 +11,10 @@ def test_get_syndrome(forward_rp: Forward):
 def test_run(forward_rp: Forward):
     uf = UF(forward_rp._CODE)
     for n in range(1, 4):
-        assert forward_rp.run(uf, 0, n) == (0, n)
+        assert forward_rp.run(uf, 0, n) == (0, n+2)
         a, b = forward_rp.run(uf, 1, n)
         assert a != 0
-        assert b == n
+        assert b == n+2
 
 
 def test_make_error(forward3F: Forward):

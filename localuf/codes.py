@@ -34,12 +34,12 @@ class Repetition(Code):
     def _phenomenological_edges(
             self,
             h,
-            temporal_boundary,
+            future_boundary,
             t_start=0,
             merge_equivalent_boundary_nodes=False,
     ) -> tuple[int, tuple[Edge, ...]]:
         d = self.D
-        layer_count = h if temporal_boundary else h-1
+        layer_count = h if future_boundary else h-1
         n_edges = h*d + layer_count*(d-1)
         if merge_equivalent_boundary_nodes:
             j_edges = [((-1, 0), (0, t)) for t in range(t_start, t_start+h)] \
@@ -50,7 +50,7 @@ class Repetition(Code):
         t_edges = (((j, t), (j, t+1)) for j in range(d-1) for t in range(t_start, t_start+layer_count))
         return n_edges, (*j_edges, *t_edges)
 
-    def _temporal_boundary_nodes(self, h) -> list[Node]:
+    def _future_boundary_nodes(self, h) -> list[Node]:
         return [(j, h) for j in range(self.D-1)]
     
     def _redundant_boundary_nodes(self, h):
@@ -70,7 +70,7 @@ class Repetition(Code):
                 return 2*t
             elif j == d-1:  # on east boundary
                 return 2*t + 1
-            elif t == h:  # on temporal boundary
+            elif t == h:  # on future boundary
                 spatial_boundary_count = 2*h
                 return spatial_boundary_count + j
             else:  # not a boundary
@@ -128,12 +128,12 @@ class Surface(Code):
     def _phenomenological_edges(
             self,
             h,
-            temporal_boundary,
+            future_boundary,
             t_start=0,
             merge_equivalent_boundary_nodes=False,
     ) -> tuple[int, tuple[Edge, ...]]:
         d = self.D
-        layer_count = h if temporal_boundary else h-1
+        layer_count = h if future_boundary else h-1
         n_edges = h * self.DATA_QUBIT_COUNT + layer_count * d*(d-1)
         i_edges = (((i, j, t), (i+1, j, t)) for i in range(d-1) for j in range(    d-1) for t in range(t_start, t_start+h))
         if merge_equivalent_boundary_nodes:
@@ -145,7 +145,7 @@ class Surface(Code):
         t_edges = (((i, j, t), (i, j, t+1)) for i in range(d  ) for j in range(    d-1) for t in range(t_start, t_start+layer_count))
         return n_edges, (*i_edges, *j_edges, *t_edges)
 
-    def _temporal_boundary_nodes(self, h) -> list[Node]:
+    def _future_boundary_nodes(self, h) -> list[Node]:
         d = self.D
         return [(i, j, h) for i in range(d) for j in range(d-1)]
     
@@ -156,7 +156,7 @@ class Surface(Code):
     def _circuit_level_edges(
             self,
             h: int,
-            temporal_boundary: bool,
+            future_boundary: bool,
             _merge_redundant_edges: bool,
             t_start=0,
             merge_equivalent_boundary_nodes=False,
@@ -168,7 +168,7 @@ class Surface(Code):
     ]:
         d = self.D
         j_ranges = ((-1,), range(d-2), (d-2,))
-        if temporal_boundary:
+        if future_boundary:
             layer_count = h
             t_ranges = (
                 range(t_start-1, t_start-1+layer_count),
@@ -304,7 +304,7 @@ class Surface(Code):
                 return 2*h*i + t
             elif j == d-1:  # on east boundary
                 return (2*i + 1) * h + t
-            elif t == h:  # on temporal boundary
+            elif t == h:  # on future boundary
                 spatial_boundary_count = 2*d*h
                 return spatial_boundary_count + (d-1)*i + j
             else:  # not a boundary

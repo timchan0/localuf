@@ -1,3 +1,4 @@
+import math
 from unittest import mock
 
 import pytest
@@ -48,13 +49,13 @@ def test_reset(frugal3: Frugal):
     e = ((-1, 0), (0, 0))
     frugal3.error = {e}
     frugal3.step_counts = [2]
-    frugal3._temporal_boundary_syndrome = {(0, 3)}
+    frugal3._future_boundary_syndrome = {(0, 3)}
     with mock.patch("localuf._pairs.Pairs.reset") as mock_reset:
         frugal3.reset()
         mock_reset.assert_called_once_with()
     assert frugal3.error == set()
     assert frugal3.step_counts == []
-    assert frugal3._temporal_boundary_syndrome == set()
+    assert frugal3._future_boundary_syndrome == set()
 
 
 def test_get_logical_error_repetition(rp_frugal: Frugal):
@@ -117,7 +118,7 @@ def test_advance(frugal3: Frugal):
     ):
         assert frugal3.advance(p, Snowflake(frugal3._CODE)) == 2
         rw.assert_called_once_with()
-        me.assert_called_once_with(p, exclude_temporal_boundary_edges=False)
+        me.assert_called_once_with(p, exclude_future_boundary=False)
         mock_load.assert_called_once_with(set())
         mock_decode.assert_called_once_with(set())
 
@@ -163,7 +164,7 @@ def test_load(rp_frugal: Frugal):
     )
     error: set[Edge] = set(edges[1:])
     rp_frugal.error = set(edges[:1])
-    rp_frugal._temporal_boundary_syndrome = {(1, h)}
+    rp_frugal._future_boundary_syndrome = {(1, h)}
     syndrome = rp_frugal._load(error)
     assert rp_frugal.error == set(edges)
     assert syndrome == {
@@ -174,23 +175,25 @@ def test_load(rp_frugal: Frugal):
         (1, h-1),
         (2, h-1),
     }
-    assert rp_frugal._temporal_boundary_syndrome == {(0, h)}
+    assert rp_frugal._future_boundary_syndrome == {(0, h)}
 
 
 class TestRun:
 
     def test_zero_slenderness(self, frugal3: Frugal):
         decoder = Snowflake(frugal3._CODE)
-        m, slenderness = frugal3.run(decoder, 1, 0)
-        assert m == 0
-        assert slenderness == 0
+        with pytest.raises(ValueError):
+            frugal3.run(decoder, 1, 0)
 
     @pytest.mark.parametrize("n", range(1, 4))
     def test_run(self, frugal3: Frugal, n: int):
+        d = frugal3._CODE.D
         decoder = Snowflake(frugal3._CODE)
         p = 1/2
-        raise_count = frugal3._CODE.D * n
-        height = frugal3._CODE.SCHEME.WINDOW_HEIGHT
+        transient_count = math.ceil(frugal3.WINDOW_HEIGHT / frugal3._COMMIT_HEIGHT)
+        steady_state_raise_count = (n+1) * d
+        cleanse_count = 2 * frugal3.WINDOW_HEIGHT
+        raise_count = transient_count + steady_state_raise_count + cleanse_count
         with (
             mock.patch("localuf._schemes.Frugal.reset") as mock_reset,
             mock.patch("localuf.decoders.Snowflake.reset") as snow_reset,
@@ -202,13 +205,16 @@ class TestRun:
             mock.patch("localuf.decoders.snowflake.Snowflake.init_history") as ih,
             mock.patch("localuf.decoders.snowflake.Snowflake.draw_decode") as dd,
         ):
-            assert frugal3.run(decoder, p, n) == (raise_count + 2*height, n)
+            failure_count, slenderness = frugal3.run(decoder, p, n)
+            assert failure_count == raise_count
+            assert slenderness == (transient_count + steady_state_raise_count) / d
             mock_reset.assert_called_once_with()
             snow_reset.assert_called_once_with()
             assert mock_advance.call_args_list == \
-                raise_count * [mock.call(p, decoder, log_history=False, time_only='merging')] \
-                + 2*height * [mock.call(0, decoder, log_history=False, time_only='merging')]
-            assert gle.call_args_list == (raise_count + 2*height) * [mock.call()]
+                (transient_count + d*n + d-1) * [mock.call(p, decoder, exclude_future_boundary=False, log_history=False, time_only='merging')] \
+                + [mock.call(p, decoder, exclude_future_boundary=True, log_history=False, time_only='merging')] \
+                + cleanse_count * [mock.call(0, decoder, exclude_future_boundary=False, log_history=False, time_only='merging')]
+            assert gle.call_args_list == raise_count * [mock.call()]
             ih.assert_not_called()
             dd.assert_not_called()
 

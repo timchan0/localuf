@@ -50,24 +50,24 @@ class ConcreteCode(Code):
     def _phenomenological_edges(
             self,
             h,
-            temporal_boundary,
+            future_boundary,
             merge_equivalent_boundary_nodes,
     ):
         return super()._phenomenological_edges(
             h,
-            temporal_boundary,
+            future_boundary,
             merge_equivalent_boundary_nodes,
         )
 
     def _circuit_level_edges(
             self,
             h,
-            temporal_boundary,
+            future_boundary,
             _merge_redundant_edges,
             merge_equivalent_boundary_nodes,
     ): pass
 
-    def _temporal_boundary_nodes(self, h): pass
+    def _future_boundary_nodes(self, h): pass
 
     def _redundant_boundary_nodes(self, h): pass
 
@@ -242,34 +242,34 @@ class TestMakeError:
             m.assert_called_once_with(noise_level)
         assert error == set(sf3F.EDGES)
 
-    def test_exclude_temporal_boundary_edges_forward(self, rp3_forward: Repetition):
+    def test_exclude_future_boundary_forward(self, rp3_forward: Repetition):
         self._exclude_temproal_boundary_edges_helper(rp3_forward)
 
-    def test_exclude_temporal_boundary_edges_frugal(self, rp3_frugal: Repetition):
+    def test_exclude_future_boundary_frugal(self, rp3_frugal: Repetition):
         self._exclude_temproal_boundary_edges_helper(rp3_frugal)
 
     def _exclude_temproal_boundary_edges_helper(self, repetition: Repetition):
         NOISE_LEVEL = 1
         h = repetition.SCHEME.WINDOW_HEIGHT
-        temporal_boundary_edges = {((j, h-1), (j, h)) for j in range(0, repetition.D-1)}
+        future_boundary_edges = {((j, h-1), (j, h)) for j in range(0, repetition.D-1)}
         with mock.patch(
             "localuf.noise.main._Uniform.make_error",
-            return_value=temporal_boundary_edges,
+            return_value=future_boundary_edges,
         ) as m:
-            error = repetition.make_error(NOISE_LEVEL, exclude_temporal_boundary_edges=True)
+            error = repetition.make_error(NOISE_LEVEL, exclude_future_boundary=True)
             m.assert_called_once_with(NOISE_LEVEL)
         assert error == set()
 
-    def test_exclude_temporal_boundary_edges_surface(self, sfCL_OL: Surface):
+    def test_exclude_future_boundary_surface(self, sfCL_OL: Surface):
         NOISE_LEVEL = 1
         h = sfCL_OL.SCHEME.WINDOW_HEIGHT
-        temporal_boundary_edges = {e for e in sfCL_OL.EDGES if any(
+        future_boundary_edges = {e for e in sfCL_OL.EDGES if any(
             v[sfCL_OL.TIME_AXIS] == h for v in e)}
         with mock.patch(
             "localuf.noise.main.CircuitLevel.make_error",
-            return_value=temporal_boundary_edges,
+            return_value=future_boundary_edges,
         ) as m:
-            error = sfCL_OL.make_error(NOISE_LEVEL, exclude_temporal_boundary_edges=True)
+            error = sfCL_OL.make_error(NOISE_LEVEL, exclude_future_boundary=True)
             m.assert_called_once_with(NOISE_LEVEL)
         assert error == set()
 
