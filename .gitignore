@@ -3,3 +3,9 @@
 /*.egg-info
 __pycache__/
 .vscode/settings.json
+
+# Packaging/build artifacts
+/dist/
+/build/
+*.whl
+*.tar.gz

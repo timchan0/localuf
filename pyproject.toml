@@ -1,22 +1,41 @@
 [project]
 name = "localuf"
-version = "3.4.3"
+version = "3.4.4"
 description = "A Python package to simulate and visualise Union-Find-related decoders for CSS codes."
+readme = "README.md"
+license = {text = "MIT"}
 authors = [{name="Tim Chan", email="timwlc@icloud.com"}]
+keywords = ["union-find", "decoders", "css-codes", "quantum-error-correction"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.10"
 dependencies = [
     "ipykernel",
     "ipywidgets",
     "matplotlib",
     "networkx",
     "pandas",
-    "pytest",
     "scipy",
-    "snakeviz",
     "statsmodels",
     "pymatching",
     "stim"
 ]
-requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/timchan0/localuf"
+Documentation = "https://github.com/timchan0/localuf"
+Repository = "https://github.com/timchan0/localuf.git"
+Issues = "https://github.com/timchan0/localuf/issues"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
