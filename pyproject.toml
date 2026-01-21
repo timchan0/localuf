@@ -1,6 +1,6 @@
 [project]
 name = "localuf"
-version = "3.4.1"
+version = "3.4.2"
 description = "A Python package to simulate and visualise Union-Find-related decoders for CSS codes."
 authors = [{name="Tim Chan", email="timwlc@icloud.com"}]
 dependencies = [
