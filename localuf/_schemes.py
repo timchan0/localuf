@@ -44,7 +44,7 @@ class Scheme(abc.ABC):
     def run(
         self,
         decoder: 'Decoder',
-        p: float,
+        noise_level: float,
         n: int,
         **kwargs,
     ) -> tuple[int, int | float]:
@@ -52,7 +52,7 @@ class Scheme(abc.ABC):
         
         
         :param decoder: The decoder.
-        :param p: The noise level.
+        :param noise_level: The noise level.
         :param n: Depends on the decoding scheme.
             If the scheme is 'batch',
             then ``n`` is decoding cycle count.
@@ -109,9 +109,9 @@ class Batch(Scheme):
     def WINDOW_HEIGHT(self): return self._WINDOW_HEIGHT
 
     @override
-    def run(self, decoder: 'Decoder', p: float, n: int):
+    def run(self, decoder: 'Decoder', noise_level: float, n: int):
         # this assumes logical error count per batch << 1
-        m = sum(self._sim_cycle_given_p(decoder, p) for _ in itertools.repeat(None, n))
+        m = sum(self._sim_cycle_given_p(decoder, noise_level) for _ in itertools.repeat(None, n))
         return (m, n if isinstance(self._CODE.NOISE, CodeCapacity)
             else self.WINDOW_HEIGHT * n / self._CODE.D)
 
@@ -123,16 +123,16 @@ class Batch(Scheme):
             flip_count += (u[self._CODE.LONG_AXIS] == -1)
         return flip_count % 2
 
-    def _sim_cycle_given_p(self, decoder: 'Decoder', p: float) -> int:
-        """Simulate a decoding cycle given ``p``.
+    def _sim_cycle_given_p(self, decoder: 'Decoder', noise_level: float) -> int:
+        """Simulate a decoding cycle at a given noise level.
         
         
         :param decoder: the decoder.
-        :param p: noise level.
+        :param noise_level: noise level.
         
         :return logical_error: ``0`` if success else ``1``.
         """
-        error = self._CODE.make_error(p)
+        error = self._CODE.make_error(noise_level)
         return self._sim_cycle_given_error(decoder, error)
 
     def _sim_cycle_given_error(self, decoder: 'Decoder', error: set[Edge]):
@@ -178,11 +178,11 @@ class Global(Batch):
         self.pairs.reset()
 
     @override
-    def run(self, decoder: 'Decoder', p: float, n: int):
+    def run(self, decoder: 'Decoder', noise_level: float, n: int):
         # `slenderness = n` assumes the following:
         assert self.WINDOW_HEIGHT == self._CODE.D * n
         self.reset()
-        m = self._sim_cycle_given_p(decoder, p)
+        m = self._sim_cycle_given_p(decoder, noise_level)
         return m, n
 
     @override
@@ -297,15 +297,15 @@ class Forward(_Streaming):
     def _make_error(
             self,
             buffer_leftover: set[Edge],
-            p: float,
+            noise_level: float,
             exclude_future_boundary: bool = False,
     ):
         """Lower ``buffer_leftover`` by commit height
-        and sample edges from freshly discovered region with probability ``p``.
+        and sample edges from freshly discovered region with probability ``noise_level``.
         
         
         :param buffer_leftover: the current error in the buffer region.
-        :param p: probability for an edge to bitflip.
+        :param noise_level: probability for an edge to bitflip.
         :param exclude_future_boundary: passed to ``self._CODE.make_error``.
         
         :return error: The set of bitflipped edges.
@@ -315,7 +315,7 @@ class Forward(_Streaming):
         for e in buffer_leftover:
             seen.add(self._CODE.raise_edge(e, -self._COMMIT_HEIGHT))
         # populate freshly discovered region with new errors
-        unseen = self._CODE.make_error(p, exclude_future_boundary=exclude_future_boundary)
+        unseen = self._CODE.make_error(noise_level, exclude_future_boundary=exclude_future_boundary)
         return seen | unseen
 
     def _get_leftover(self, error: set[Edge], correction: set[Edge]):
@@ -363,42 +363,43 @@ class Forward(_Streaming):
         return {self._CODE.raise_node(v, -self._COMMIT_HEIGHT) for v in commit_syndrome
                 if v[self._CODE.TIME_AXIS] == self._COMMIT_HEIGHT}
 
-    def _make_error_in_buffer_region(self, p: float):
+    def _make_error_in_buffer_region(self, noise_level: float):
         """Sample edges from buffer region.
         
         
-        ``p`` characteristic probability if circuit-level noise;
-        else, bitflip probability.
+        :param noise_level: Characteristic probability if circuit-level noise;
+            else, bitflip probability.
         
         
-        :returns: The set of bitflipped edges in the buffer region. Each edge bitflips with probability defined by its multiplicity if circuit-level noise; else, probability ``p``.
-        
-        TODO: test this method.
+        :return error: The set of bitflipped edges in the buffer region.
+            Each edge bitflips with probability defined by its multiplicity
+            if circuit-level noise; else, probability ``noise_level``.
         """
+        # TODO: test this method
         if self._COMMIT_HEIGHT >= self._BUFFER_HEIGHT:
-            error = self._CODE.make_error(p)
+            error = self._CODE.make_error(noise_level)
         else:
             rep_count = math.ceil(self._BUFFER_HEIGHT / self._COMMIT_HEIGHT)
             error: set[Edge] = set()
             for _ in itertools.repeat(None, rep_count):
-                error = self._make_error(error, p)
+                error = self._make_error(error, noise_level)
         return error & set(self._BUFFER_EDGES)
     
     @override
     def run(
             self,
             decoder: 'Decoder',
-            p: float,
+            noise_level: float,
             n: int,
             draw=False,
             log_history=False,
             **kwargs_for_draw_run,
     ):
-        """Simulate ``n`` decoding cycles (in the steady state) given ``p``, for analysing accuracy and throughput.
+        """Simulate ``n`` decoding cycles (in the steady state), for analysing accuracy and throughput.
         
         
         :param decoder: the decoder.
-        :param p: noise level.
+        :param noise_level: The noise level to simulate.
         :param n: is decoding cycle count in the steady state.
         
         :return failure_count: Failure count.
@@ -412,7 +413,7 @@ class Forward(_Streaming):
         if n < 1: raise ValueError("n must be positive integer.")
         m = 0
         commit_leftover: set[Edge] = set()
-        buffer_leftover = self._make_error_in_buffer_region(p)
+        buffer_leftover = self._make_error_in_buffer_region(noise_level)
         # `cleanse_count` additional decoding cycles ensures window is free of defects
         cleanse_count = self.WINDOW_HEIGHT // self._COMMIT_HEIGHT
         # If F is the last freshly discovered region of edges that can flip (that excludes a future boundary),
@@ -420,12 +421,16 @@ class Forward(_Streaming):
         # If F includes the future boundary, then need 1 more than this.
         if log_history:
             self.history = []
-        for prob, time, exclude_future_boundary in itertools.chain(
-            itertools.repeat((p, True, False), n),
-            itertools.repeat((p, False, True), 1),
+        for instantaneous_noise_level, time, exclude_future_boundary in itertools.chain(
+            itertools.repeat((noise_level, True, False), n),
+            itertools.repeat((noise_level, False, True), 1),
             itertools.repeat((0, False, False), cleanse_count),
         ):
-            error = self._make_error(buffer_leftover, prob, exclude_future_boundary=exclude_future_boundary)
+            error = self._make_error(
+                buffer_leftover,
+                instantaneous_noise_level,
+                exclude_future_boundary=exclude_future_boundary,
+            )
             artificial_defects = self._get_artificial_defects(commit_leftover)
             syndrome = self._CODE.get_syndrome(error) ^ artificial_defects
             decoder.reset()
@@ -558,7 +563,7 @@ class Frugal(_Streaming):
     def run(
             self,
             decoder: 'Snowflake',
-            p: float,
+            noise_level: float,
             n: int,
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
@@ -566,11 +571,11 @@ class Frugal(_Streaming):
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
-        """Simulate ``n*d`` decoding cycles (in the steady state) given ``p``.
+        """Simulate ``n*d`` decoding cycles (in the steady state).
         
         
         :param decoder: The decoder; currently, only Snowflake is supported.
-        :param p: The noise level.
+        :param noise_level: The noise level to simulate.
         :param n: The number of decoding cycles in the steady state, divided by the code distance.
             For Snowflake, there is 1 decoding cycle per stabiliser measurement round.
         :param draw: Whether to draw.
@@ -612,22 +617,22 @@ class Frugal(_Streaming):
         # TODO: tighten this bound
         # Note: cleanse_count = math.ceil(self.WINDOW_HEIGHT / self._COMMIT_HEIGHT) does NOT work
         # as the committed correction will be incomplete
-        for prob, advance_count, time, exclude_future_boundary in itertools.chain(
-            ((p, transient_count, False, False),),
-            itertools.repeat((p, d, True, False), n),
-            ((p, d-1, False, False),),
-            ((p, 1, False, True),),
+        for instantaneous_noise_level, advance_count, time, exclude_future_boundary in itertools.chain(
+            ((noise_level, transient_count, False, False),),
+            itertools.repeat((noise_level, d, True, False), n),
+            ((noise_level, d-1, False, False),),
+            ((noise_level, 1, False, True),),
             ((0, cleanse_count, False, False),),
         ):
             step_count = 0
             for _ in itertools.repeat(None, advance_count):
                 step_count += self.advance(
-                    prob,
+                    instantaneous_noise_level,
                     decoder,
                     exclude_future_boundary=exclude_future_boundary,
                     log_history=log_history,
                     confidence_scores=confidence_scores,
-                    noise_level_for_priors=p,
+                    noise_level_for_priors=noise_level,
                     time_only=time_only,
                 )
                 m += self.get_logical_error()
@@ -640,7 +645,7 @@ class Frugal(_Streaming):
     def sample_latency(
             self,
             decoder: 'Snowflake',
-            p: float,
+            noise_level: float,
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
@@ -655,7 +660,7 @@ class Frugal(_Streaming):
         Inputs same as in ``run``.
         
         
-        :returns latency: The number of timesteps
+        :return latency: The number of timesteps
         from receiving the last measurement round to outputting the final correction.
         """
         self.reset()
@@ -666,15 +671,15 @@ class Frugal(_Streaming):
             decoder.init_history()
         latency = 0
         defects_possible = True
-        for prob, include_in_latency in itertools.chain(
-            itertools.repeat((p, False), self.WINDOW_HEIGHT+1),
-            ((p, True),),
+        for instantaneous_noise_level, include_in_latency in itertools.chain(
+            itertools.repeat((noise_level, False), self.WINDOW_HEIGHT+1),
+            ((noise_level, True),),
             itertools.repeat((0, True), self.WINDOW_HEIGHT-1),
         ):
-            if defects_possible and prob==0:
+            if defects_possible and instantaneous_noise_level==0:
                 defects_possible = bool(decoder.syndrome)
             step_count = self.advance(
-                prob,
+                instantaneous_noise_level,
                 decoder,
                 exclude_future_boundary=include_in_latency,
                 log_history=log_history,

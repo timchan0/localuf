@@ -14,18 +14,18 @@ from localuf._schemes import Frugal
 @pytest.mark.parametrize('code_class', (Repetition, Surface))
 def test_frugal(code_class: Type[Code]):
     ds = [1, 2]
-    ps = [0, 1]
+    noise_levels = [0, 1]
     n = 2
-    call_count = len(ds) * len(ps)
+    call_count = len(ds) * len(noise_levels)
 
     def make_step_counts(
             decoder: Snowflake,
-            p: float,
+            noise_level: float,
             n: int,
             **_,
     ):
         frugal: Frugal = decoder.CODE.SCHEME # type: ignore
-        frugal.step_counts = (n-1)*[int(p)]
+        frugal.step_counts = (n-1)*[int(noise_level)]
 
     with patch(
         'localuf._schemes.Frugal.run',
@@ -33,13 +33,13 @@ def test_frugal(code_class: Type[Code]):
     ) as mock_run:
         data = runtime.frugal(
             ds=ds,
-            ps=ps,
+            noise_levels=noise_levels,
             n=n,
             code_class=code_class,
             noise='phenomenological',
         )
         assert mock_run.call_count == call_count
     assert type(data) is DataFrame
-    assert data.shape == (n-1, len(ds) * len(ps))
+    assert data.shape == (n-1, len(ds) * len(noise_levels))
     assert data.columns.names == ['d', 'p']
-    assert (data.columns == MultiIndex.from_product([ds, ps])).all()
+    assert (data.columns == MultiIndex.from_product([ds, noise_levels])).all()

@@ -25,7 +25,7 @@ def assert_all_edge_data_correct(
 ):
     """Assert all edge data are correct according to `noise_level`."""
     edge_weights = code.NOISE.get_edge_weights(noise_level)
-    for (u, v), (p, weight) in edge_weights.items():
+    for (u, v), (flip_probability, weight) in edge_weights.items():
         if u in code.BOUNDARY_NODES:
             edge_data = matching.get_boundary_edge_data(detector_to_int[v])
         elif v in code.BOUNDARY_NODES:
@@ -37,4 +37,4 @@ def assert_all_edge_data_correct(
             )
         assert edge_data['fault_ids'] == ({0} if (u[code.LONG_AXIS] == -1) else set())
         assert edge_data['weight'] == weight
-        assert edge_data['error_probability'] == p
+        assert edge_data['error_probability'] == flip_probability

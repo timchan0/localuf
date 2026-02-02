@@ -198,13 +198,13 @@ def test_make_tree(uf7F: UF, syndrome7F):
 
 
 def test_weigh_correction(uf7F: UF):
-    p = 0.5
+    flip_probability = 0.5
     with mock.patch('localuf.noise.main._Uniform.get_edge_weights') as mock_get_edge_weights:
         mock_get_edge_weights.return_value = {
-            ((0, 0), (0, 1)): (p, 1),
-            ((0, 1), (0, 2)): (p, 2),
-            ((0, 2), (0, 3)): (p, 3),
-            ((0, 3), (0, 4)): (p, 4),
+            ((0, 0), (0, 1)): (flip_probability, 1),
+            ((0, 1), (0, 2)): (flip_probability, 2),
+            ((0, 2), (0, 3)): (flip_probability, 3),
+            ((0, 3), (0, 4)): (flip_probability, 4),
         }
         weight = uf7F._weigh_correction()
         mock_get_edge_weights.assert_called_once_with(None)

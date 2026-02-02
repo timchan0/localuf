@@ -83,7 +83,7 @@ class MWPM(Decoder):
             boundary_node_to_fault_id = self._WEST_LOGICAL
         edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
         matching = Matching()
-        for (u, v), (p, weight) in edge_weights.items():
+        for (u, v), (flip_probability, weight) in edge_weights.items():
             modified_weight = self._edge_weight_modifier[u, v] * weight
             int_u = detector_to_int.get(u, None)
             int_v = detector_to_int.get(v, None)
@@ -95,21 +95,21 @@ class MWPM(Decoder):
                     node=int_v, # type: ignore
                     fault_ids=fault_u, # type: ignore
                     weight=modified_weight,
-                    error_probability=p,
+                    error_probability=flip_probability,
                 )
             elif int_v is None:
                 matching.add_boundary_edge(
                     node=int_u,
                     fault_ids=fault_v, # type: ignore
                     weight=modified_weight,
-                    error_probability=p,
+                    error_probability=flip_probability,
                 )
             else:
                 matching.add_edge(
                     node1=int_u,
                     node2=int_v,
                     weight=modified_weight,
-                    error_probability=p,
+                    error_probability=flip_probability,
                 )
         return matching
 
@@ -132,7 +132,7 @@ class MWPM(Decoder):
         # `boundary_nodes` maps each fault ID to a boundary node index
         boundary_nodes: defaultdict[int | None, int] = defaultdict(
             lambda: self.CODE.DETECTOR_COUNT + len(boundary_nodes))
-        for (u, v), (p, weight) in edge_weights.items():
+        for (u, v), (flip_probability, weight) in edge_weights.items():
             int_u = detector_to_int.get(u, None)
             int_v = detector_to_int.get(v, None)
             fault_u = boundary_node_to_fault_id.get(u, None)
@@ -144,7 +144,7 @@ class MWPM(Decoder):
                     node2=int_v, # type: ignore
                     fault_ids=fault_u, # type: ignore
                     weight=weight,
-                    error_probability=p,
+                    error_probability=flip_probability,
                 )
             elif int_v is None:
                 matching.add_edge(
@@ -152,14 +152,14 @@ class MWPM(Decoder):
                     node2=boundary_nodes[fault_v],
                     fault_ids=fault_v, # type: ignore
                     weight=weight,
-                    error_probability=p,
+                    error_probability=flip_probability,
                 )
             else:
                 matching.add_edge(
                     node1=int_u,
                     node2=int_v,
                     weight=weight,
-                    error_probability=p,
+                    error_probability=flip_probability,
                 )
         matching.set_boundary_nodes(set(boundary_nodes.values()))
         return matching

@@ -115,14 +115,14 @@ def test_DEFAULT_MULTIPLICITIES_unchanged(assert_these_multiplicities_unchanged)
 
 def test_make_error(toy_cl: CircuitLevel, e_westmost: tuple[Edge, Edge]):
     m0, m1 = toy_cl._FRESH_EDGES.keys()
-    for p in (0, 1):
+    for noise_level in (0, 1):
         with mock.patch(
             'localuf.noise.CircuitLevel._get_flip_probabilities',
-            return_value={m0: 1-p, m1: p},
+            return_value={m0: 1-noise_level, m1: noise_level},
         ) as mock_gep:
-            error = toy_cl.make_error(p)
-            mock_gep.assert_called_once_with(p)
-            assert error == {e_westmost[p]}
+            error = toy_cl.make_error(noise_level)
+            mock_gep.assert_called_once_with(noise_level)
+            assert error == {e_westmost[noise_level]}
 
 
 def test_get__flip_probabilities(cl: CircuitLevel):
@@ -139,7 +139,7 @@ def test_get__flip_probabilities(cl: CircuitLevel):
 
 
 def test_get_edge_weights(cl: CircuitLevel):
-    p = 1e-1
+    noise_level = 1e-1
     with mock.patch("localuf.noise.CircuitLevel._get_flip_probabilities") as mock_gfp:
-        cl.get_edge_weights(p)
-        mock_gfp.assert_called_once_with(p)
+        cl.get_edge_weights(noise_level)
+        mock_gfp.assert_called_once_with(noise_level)

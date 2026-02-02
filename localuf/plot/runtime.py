@@ -27,7 +27,7 @@ def mean(
         per_measurement_round: bool = False,
         layers_per_sample: Callable[[int], int] = lambda d: d,
         yerr_shows: Literal['sem', 'std'] = 'sem',
-        noise_levels: Sequence[float] | None = None,
+        plot_noise_levels: Sequence[float] | None = None,
         legend: None | bool = None,
         grid: bool = False,
         xlabel: None | str = None,
@@ -54,7 +54,7 @@ def mean(
     :param yerr_shows: what errorbars show:
         either ``'sem'`` for standard error,
     or ``'std'`` for standard deviation.
-    :param noise_levels: sequence specifying which noise levels to plot, in case want to omit any.
+    :param plot_noise_levels: sequence specifying which noise levels to plot, in case want to omit any.
     :param base_color: a single color for all errorbars and their connecting lines.
         Decreasing noise level is then shown by increasing opacity.
     If ``None``, each noise level is shown by a different, fully opaque color.
@@ -81,8 +81,8 @@ def mean(
         default_ylabel = 'mean runtime per measurement round'
     else:
         default_ylabel = 'mean runtime'
-    ps: Sequence[float] = data.columns.get_level_values('p').unique() \
-        if noise_levels is None else noise_levels # type: ignore
+    noise_levels: Sequence[float] = data.columns.get_level_values('p').unique() \
+        if plot_noise_levels is None else plot_noise_levels # type: ignore
     if base_color is None:
         colors = itertools.repeat(None)
         if legend is None:
@@ -90,10 +90,10 @@ def mean(
     else:
         if legend is None:
             legend = False
-        p_count = len(ps)
+        p_count = len(noise_levels)
         colors = [(base_color, k/p_count) for k in range(p_count, 0, -1)]
-    for p, color in zip(ps, colors):
-        df: DataFrame = data_copy.xs(p, level='p', axis=1) # type: ignore
+    for noise_level, color in zip(noise_levels, colors):
+        df: DataFrame = data_copy.xs(noise_level, level='p', axis=1) # type: ignore
 
         if yerr_shows == 'sem':
             yerr: Series[float] = df.sem()
@@ -106,7 +106,7 @@ def mean(
             container = plt.plot(
                 ds,
                 df.mean(),
-                label=f'{p:.1e}',
+                label=f'{noise_level:.1e}',
                 color=color,
             )
             lo = df.mean() - yerr
@@ -126,7 +126,7 @@ def mean(
                 y=df.mean(),
                 yerr=yerr,
                 capsize=capsize,
-                label=f'{p:.1e}',
+                label=f'{noise_level:.1e}',
                 color=color,
                 **kwargs,
             )
@@ -137,7 +137,7 @@ def mean(
                 color=container[0].get_color(),
                 linestyle=quantile_linestyle,
             )
-        containers[p] = container
+        containers[noise_level] = container
     plt.xticks(ds);
     if legend: plt.legend(title=r'$p =\dots$', reverse=True)
     if grid: plt.grid(which='both')
@@ -151,7 +151,7 @@ def mean(
 
 def distribution(
         data: DataFrame,
-        p: float,
+        noise_level: float,
         bins=80,
         horizontal=True,
         figsize: None | tuple[float, float] = None,
@@ -159,7 +159,7 @@ def distribution(
         grid=False,
         global_range=True,
 ):
-    df: DataFrame = data.xs(p, level='p', axis=1) # type: ignore
+    df: DataFrame = data.xs(noise_level, level='p', axis=1) # type: ignore
     ds = df.columns
     min_runtime = min(df.min())
     max_runtime = max(df.max())
@@ -218,7 +218,7 @@ def distribution(
 
 def distributions(
         data: Sequence[DataFrame],
-        p: float,
+        noise_level: float,
         bins: int | Iterable[int] = 80,
         figsize: None | tuple[float, float] = None,
         log_scale=True,
@@ -236,7 +236,7 @@ def distributions(
     :param data: sequence of DataFrames. In each DataFrame, each
         column a (distance, probability);
     row, a runtime sample.
-    :param p: noise level associated to the runtimes histogrammed.
+    :param noise_level: noise level associated to the runtimes histogrammed.
     :param bins: bin count in each histogram.
         If an int, use same bin count for all entries in ``data``.
     If any bin count is 0, set bin width to 1.
@@ -248,14 +248,14 @@ def distributions(
     """
     if isinstance(bins, int):
         bins = itertools.repeat(bins)
-    ds: Index[int] = next(iter(data)).xs(p, level='p', axis=1).columns # type: ignore
+    ds: Index[int] = next(iter(data)).xs(noise_level, level='p', axis=1).columns # type: ignore
     if figsize is None:
         figsize=(len(ds), 3)
     w, h = figsize
     figsize = (w, h*len(data))
     f = plt.figure(figsize=figsize)
     for i, (dfmi, bin_count, letter) in enumerate(zip(data, bins, ascii_lowercase)):
-        df: DataFrame = dfmi.xs(p, level='p', axis=1) # type: ignore
+        df: DataFrame = dfmi.xs(noise_level, level='p', axis=1) # type: ignore
         min_runtime = min(df.min())
         max_runtime = max(df.max())
         range_ = (min_runtime, max_runtime) if global_range else None
@@ -293,7 +293,7 @@ def distributions(
 
 def violin(
         data: DataFrame,
-        p: float,
+        noise_level: float,
         title='',
         widths=1,
         showextrema=False,
@@ -301,12 +301,12 @@ def violin(
         errorbar_kwargs: None | dict = None,
         **kwargs_for_violinplot,
 ):
-    """Violin plot of runtime distributions for a given ``p``.
+    """Violin plot of runtime distributions for a given noise level.
     
     
     :param capsize: length of error bar caps in points.
     """
-    df: DataFrame = data.xs(p, level='p', axis=1) # type: ignore
+    df: DataFrame = data.xs(noise_level, level='p', axis=1) # type: ignore
     if errorbar_kwargs is None: errorbar_kwargs = {}
     parts = plt.violinplot(
         df,

@@ -56,13 +56,13 @@ def get_failure_data_from_subset_sample(
         data: DataFrame,
         code_class: Type[Code],
         noise: NoiseModel,
-        ps: npt.NDArray[np.float64],
+        noise_levels: npt.NDArray[np.float64],
         alpha: float = STANDARD_ERROR_ALPHA,
         method='normal',
 ):
     """Get failure stats from output of ``sim.accuracy.subset_sample``.
     
-    Output: a DataFrame indexed by (distance, probability),
+    Output: a DataFrame indexed by (distance, noise level),
     with columns:
     * ``f`` logical error probability.
     * ``lo`` lower bound of ``f``.
@@ -81,8 +81,8 @@ def get_failure_data_from_subset_sample(
         df = df.droplevel('d')
         code = code_class(d, noise=noise)
         f, lo, hi = [], [], []
-        for p in ps:
-            subset_probs = code.NOISE.subset_probabilities(p, survival=False)
+        for noise_level in noise_levels:
+            subset_probs = code.NOISE.subset_probabilities(noise_level, survival=False)
             considered = df.join(subset_probs, rsuffix=' current')
             ignored = subset_probs[~subset_probs.index.isin(df.index)]
 
@@ -98,7 +98,7 @@ def get_failure_data_from_subset_sample(
             'f': f,
             'lo': lo,
             'hi': hi,
-        }, index=ps))
+        }, index=noise_levels))
     return pd.concat(
         ls,
         keys=data.index.get_level_values('d').unique(),
@@ -189,7 +189,7 @@ def add_ignored_timesteps(
     
     
     :param data: a DataFrame where each
-        column a (distance, probability);
+        column a (distance, noise level);
     row, a runtime sample.
     :param extra_steps_per_layer: number of ignored timesteps per layer
         in the decoding graph.
@@ -204,6 +204,6 @@ def add_ignored_timesteps(
     If using Snowflake with the 2:1 schedule,
     set ``extra_steps_per_layer=3`` as there is one additional grow timestep.
     """
-    dc = {(d, p): data[d, p] + extra_steps_per_layer*layers_per_sample(int(d))
-        for d, p in data.columns}
+    dc = {(d, noise_level): data[d, noise_level] + extra_steps_per_layer*layers_per_sample(int(d))
+        for d, noise_level in data.columns}
     return DataFrame(dc, columns=data.columns)

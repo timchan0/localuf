@@ -12,7 +12,7 @@ from localuf.decoders.snowflake import Snowflake
 
 def frugal(
         ds: Iterable[int],
-        ps: Iterable[float],
+        noise_levels: Iterable[float],
         n: int,
         code_class: Type[Code],
         noise: StreamingNoiseModel,
@@ -25,7 +25,7 @@ def frugal(
     
     
     :param ds: an iterable of surface code distances.
-    :param ps: an iterable of noise levels.
+    :param noise_levels: an iterable of noise levels.
     :param n: sample count.
     :param code_class: the class of the code.
     :param noise: the noise model.
@@ -65,9 +65,9 @@ def frugal(
         )
         frugal: Frugal = code.SCHEME # type: ignore
         decoder = Snowflake(code, **kwargs_for_Snowflake)
-        for p in ps:
-            dc[d, p] = [frugal.sample_latency(
-                decoder, p, time_only=time_only) for _ in range(n)]
+        for noise_level in noise_levels:
+            dc[d, noise_level] = [frugal.sample_latency(
+                decoder, noise_level, time_only=time_only) for _ in range(n)]
     data = DataFrame(dc).sort_index(axis=1)
     data.columns.set_names(['d', 'p'], inplace=True)
     return data

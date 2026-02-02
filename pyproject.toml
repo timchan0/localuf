@@ -1,6 +1,6 @@
 [project]
 name = "localuf"
-version = "3.4.6-alpha.2"
+version = "3.4.6-alpha.3"
 description = "A Python package to simulate and visualise Union-Find-related decoders for CSS codes."
 readme = "README.md"
 license = {text = "MIT"}

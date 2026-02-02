@@ -29,9 +29,9 @@ def test_make_error(uniform: ConcreteUniform):
 
 
 def test_get_edge_weights(uniform: ConcreteUniform):
-    p = 1e-1
-    weight = uniform.log_odds_of_no_flip(p)
-    assert uniform.get_edge_weights(p) == {e: (p, weight) for e in uniform.FRESH_EDGES}
+    flip_probability = 1e-1
+    weight = uniform.log_odds_of_no_flip(flip_probability)
+    assert uniform.get_edge_weights(flip_probability) == {e: (flip_probability, weight) for e in uniform.FRESH_EDGES}
 
 
 def test_force_error(uniform: ConcreteUniform):

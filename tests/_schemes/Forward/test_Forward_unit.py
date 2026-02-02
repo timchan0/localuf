@@ -152,13 +152,13 @@ def test_get_artificial_defects_circuit_level(sfCL_OL_scheme: Forward):
 
 
 def test_make_error_in_buffer_region(forward_rp: Forward):
-    p = 0.5
+    noise_level = 0.5
     with mock.patch(
         "localuf.noise.Phenomenological.make_error",
         return_value=set(forward_rp._CODE.EDGES),
     ) as mock_me:
-        error_in_buffer_region = forward_rp._make_error_in_buffer_region(p)
-        mock_me.assert_called_once_with(p)
+        error_in_buffer_region = forward_rp._make_error_in_buffer_region(noise_level)
+        mock_me.assert_called_once_with(noise_level)
         assert error_in_buffer_region == set(forward_rp._BUFFER_EDGES)
 
 
@@ -186,7 +186,7 @@ class TestRun:
     @pytest.mark.parametrize("n", range(1, 4), ids=lambda x: f"n{x}")
     def test_commit_equals_buffer(self, forward: Forward, n: int):
         uf = UF(forward._CODE)
-        p = 0.5
+        noise_level = 0.5
         cleanse_count = forward.WINDOW_HEIGHT // forward._COMMIT_HEIGHT
         commit_leftover = set()
         decoding_cycle_count = n+1 + cleanse_count
@@ -209,13 +209,13 @@ class TestRun:
             return_value=1
         ) as mock_gle,
         ):
-            m, slenderness = forward.run(uf, p, n)
+            m, slenderness = forward.run(uf, noise_level, n)
             assert m == decoding_cycle_count
             layer_count = forward._BUFFER_HEIGHT + (n+1)*forward._COMMIT_HEIGHT
             assert slenderness == layer_count / forward._CODE.D
-            mock_meibr.assert_called_once_with(p)
-            assert mock_me.call_args_list == n*[mock.call(set(), p, exclude_future_boundary=False)] \
-                + [mock.call(set(), p, exclude_future_boundary=True)] \
+            mock_meibr.assert_called_once_with(noise_level)
+            assert mock_me.call_args_list == n*[mock.call(set(), noise_level, exclude_future_boundary=False)] \
+                + [mock.call(set(), noise_level, exclude_future_boundary=True)] \
                 + cleanse_count * [mock.call(set(), 0, exclude_future_boundary=False)]
             assert mock_gad.call_args_list == [mock.call(commit_leftover)] * decoding_cycle_count
             assert mock_gs.call_args_list == [mock.call(mock_me.return_value)] * decoding_cycle_count

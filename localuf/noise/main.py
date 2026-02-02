@@ -32,7 +32,7 @@ class Noise(abc.ABC):
         """``ALL_WEIGHTS`` as pandas Index."""
 
     @abc.abstractmethod
-    def make_error(self, p: float) -> set[Edge]:
+    def make_error(self, noise_level: float) -> set[Edge]:
         """See ``Code.make_error``."""
 
     @abc.abstractmethod
@@ -43,21 +43,21 @@ class Noise(abc.ABC):
     def subset_probability(
         self,
         weights: Iterable[int] | tuple[tuple[int, ...], ...],
-        p: float,
+        noise_level: float,
     ) -> Iterable[float]:
         """Return probability of any error of weight ``weight``, for ``weight`` in ``weights``."""
 
-    def subset_probabilities(self, p: float, survival: bool = True):
+    def subset_probabilities(self, noise_level: float, survival: bool = True):
         """Return DataFrame containing probabilities of each subset.
         
         
-        :param p: noise level.
+        :param noise_level: noise level.
         :param survival: whether to compute survival probability column.
         
         
         :returns: DataFrame indexed by subset weight, with columns ``['subset prob', 'survival prob']``.
         """
-        subset_prob = self.subset_probability(self.ALL_WEIGHTS, p)
+        subset_prob = self.subset_probability(self.ALL_WEIGHTS, noise_level)
         df = pd.DataFrame({'subset prob': subset_prob}, index=self.ALL_WEIGHTS_INDEX)
         if survival:
             df.sort_values(by='subset prob', inplace=True)
@@ -84,13 +84,13 @@ class Noise(abc.ABC):
         """
 
     @staticmethod
-    def log_odds_of_no_flip(p: float) -> float:
+    def log_odds_of_no_flip(flip_probability: float) -> float:
         """Convert flip probability to log odds of no flip."""
-        return np.log10((1-p)/p)
+        return np.log10((1 - flip_probability) / flip_probability)
 
 
 class _Uniform(Noise):
-    """Base class for noise model where each edge has flip probability ``p``.
+    """Base class for noise model where each edge has the same flip probability.
     
     Extends ``Noise``.
     """
@@ -111,8 +111,8 @@ class _Uniform(Noise):
         """
         return self._FRESH_EDGES
 
-    def make_error(self, p):
-        return {e for e in self.FRESH_EDGES if random.random() < p}
+    def make_error(self, noise_level):
+        return {e for e in self.FRESH_EDGES if random.random() < noise_level}
     
     def force_error(self, weight: int):
         """Bitlfip exactly ``weight`` edges in G.
@@ -130,11 +130,11 @@ class _Uniform(Noise):
     def ALL_WEIGHTS_INDEX(self):
         return pd.Index(self.ALL_WEIGHTS, name='weight')
     
-    def subset_probability(self, weights: Iterable[int], p: float) -> Iterable[float]:
+    def subset_probability(self, weights: Iterable[int], noise_level: float) -> Iterable[float]:
         probs = binom.pmf(
             k=weights,
             n=len(self.FRESH_EDGES),
-            p=p,
+            p=noise_level,
         )
         return probs
     
@@ -306,8 +306,8 @@ class CircuitLevel(Noise):
                     dc[e] += m
         return dc
     
-    def make_error(self, p):
-        bitflip_probs = self._get_flip_probabilities(p)
+    def make_error(self, noise_level):
+        bitflip_probs = self._get_flip_probabilities(noise_level)
         error: set[Edge] = set()
         for m, pr in bitflip_probs.items():
             error |= {e for e in self._FRESH_EDGES[m] if random.random() < pr}
@@ -324,8 +324,8 @@ class CircuitLevel(Noise):
     def ALL_WEIGHTS_INDEX(self):
         return pd.MultiIndex.from_tuples(self.ALL_WEIGHTS)
     
-    def subset_probability(self, weights: tuple[tuple[int, ...], ...], p: float):
-        pi = self._pi(p)
+    def subset_probability(self, weights: tuple[tuple[int, ...], ...], noise_level: float):
+        pi = self._pi(noise_level)
         return self._FORCER.subset_probability(weights, pi)
     
     @cache
@@ -338,10 +338,10 @@ class CircuitLevel(Noise):
         else:
             flip_probabilities = self._get_flip_probabilities(noise_level)
             for multiplicity_vector, edges in self._ALL_EDGES.items():
-                p = flip_probabilities[multiplicity_vector]
-                weight = self.log_odds_of_no_flip(p)
+                flip_probability = flip_probabilities[multiplicity_vector]
+                weight = self.log_odds_of_no_flip(flip_probability)
                 for e in edges:
-                    edge_weights[e] = (p, weight)
+                    edge_weights[e] = (flip_probability, weight)
         return edge_weights
 
     def _pi(self, noise_level: float) -> FourFloats:

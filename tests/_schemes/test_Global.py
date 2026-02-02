@@ -25,14 +25,14 @@ def test_run(d: int, n: int):
         window_height=d*n,
     ).SCHEME
     decoder = UF(global_scheme._CODE)
-    p = 0.5
+    noise_level = 0.5
     with (
         mock.patch('localuf._schemes.Global.reset') as mock_reset,
         mock.patch('localuf._schemes.Batch._sim_cycle_given_p') as scgp,
     ):
-        assert global_scheme.run(decoder, p, n) == (scgp.return_value, n)
+        assert global_scheme.run(decoder, noise_level, n) == (scgp.return_value, n)
         mock_reset.assert_called_once_with()
-        scgp.assert_called_once_with(decoder, p)
+        scgp.assert_called_once_with(decoder, noise_level)
 
 
 class TestGetLogicalError:

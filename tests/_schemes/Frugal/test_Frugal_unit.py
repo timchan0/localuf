@@ -100,7 +100,7 @@ def test_get_logical_error_surface(sf_frugal: Frugal):
 
 
 def test_advance(frugal3: Frugal):
-    p = 1/2
+    noise_level = 1/2
     with (
         mock.patch("localuf._schemes.Frugal._raise_window") as rw,
         mock.patch(
@@ -116,9 +116,9 @@ def test_advance(frugal3: Frugal):
             return_value=2,
         ) as mock_decode,
     ):
-        assert frugal3.advance(p, Snowflake(frugal3._CODE)) == 2
+        assert frugal3.advance(noise_level, Snowflake(frugal3._CODE)) == 2
         rw.assert_called_once_with()
-        me.assert_called_once_with(p, exclude_future_boundary=False)
+        me.assert_called_once_with(noise_level, exclude_future_boundary=False)
         mock_load.assert_called_once_with(set())
         mock_decode.assert_called_once_with(set())
 
@@ -189,7 +189,7 @@ class TestRun:
     def test_run(self, frugal3: Frugal, n: int):
         d = frugal3._CODE.D
         decoder = Snowflake(frugal3._CODE)
-        p = 1/2
+        noise_level = 1/2
         transient_count = math.ceil(frugal3.WINDOW_HEIGHT / frugal3._COMMIT_HEIGHT)
         steady_state_raise_count = (n+1) * d
         cleanse_count = 2 * frugal3.WINDOW_HEIGHT
@@ -205,28 +205,28 @@ class TestRun:
             mock.patch("localuf.decoders.snowflake.Snowflake.init_history") as ih,
             mock.patch("localuf.decoders.snowflake.Snowflake.draw_decode") as dd,
         ):
-            failure_count, slenderness = frugal3.run(decoder, p, n)
+            failure_count, slenderness = frugal3.run(decoder, noise_level, n)
             assert failure_count == raise_count
             assert slenderness == (transient_count + steady_state_raise_count) / d
             mock_reset.assert_called_once_with()
             snow_reset.assert_called_once_with()
             assert mock_advance.call_args_list == \
                 (transient_count + d*n + d-1) * [mock.call(
-                    p,
+                    noise_level,
                     decoder,
                     exclude_future_boundary=False,
                     log_history=False,
                     confidence_scores=(),
-                    noise_level_for_priors=p,
+                    noise_level_for_priors=noise_level,
                     time_only='merging',
                 )] \
                 + [mock.call(
-                    p,
+                    noise_level,
                     decoder,
                     exclude_future_boundary=True,
                     log_history=False,
                     confidence_scores=(),
-                    noise_level_for_priors=p,
+                    noise_level_for_priors=noise_level,
                     time_only='merging',
                 )] \
                 + cleanse_count * [mock.call(
@@ -235,13 +235,13 @@ class TestRun:
                     exclude_future_boundary=False,
                     log_history=False,
                     confidence_scores=(),
-                    noise_level_for_priors=p,
+                    noise_level_for_priors=noise_level,
                     time_only='merging',
                 )]
             assert gle.call_args_list == raise_count * [mock.call()]
             ih.assert_not_called()
             dd.assert_not_called()
 
-            frugal3.run(decoder, p, n, draw='fine')
+            frugal3.run(decoder, noise_level, n, draw='fine')
             ih.assert_called_once_with()
             dd.assert_called_once_with()

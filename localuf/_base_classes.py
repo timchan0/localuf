@@ -396,11 +396,11 @@ class Code(abc.ABC):
         """Move ``e`` up by ``delta_t``."""
         return tuple(self.raise_node(v, delta_t) for v in e) # type: ignore
 
-    def make_error(self, p: float, exclude_future_boundary: bool = False):
+    def make_error(self, noise_level: float, exclude_future_boundary: bool = False):
         """Sample edges from freshly discovered region.
         
         
-        :param p: characteristic noise level if circuit-level noise;
+        :param noise_level: characteristic noise level if circuit-level noise;
             else, bitflip probability.
             Should be in [0, 1], though no check is done to ensure this.
         :param exclude_future_boundary: whether to exclude future boundary edges
@@ -411,11 +411,11 @@ class Code(abc.ABC):
             (so there is no measurement error).
         
         
-        :returns error: The set of bitflipped edges in the freshly discovered region.
+        :return error: The set of bitflipped edges in the freshly discovered region.
             Each edge bitflips with probability defined by its multiplicity
-            if circuit-level noise; else, probability ``p``.
+            if circuit-level noise; else, with probability ``noise_level``.
         """
-        error = self.NOISE.make_error(p)
+        error = self.NOISE.make_error(noise_level)
         if exclude_future_boundary:
             excluded_edges: set[Edge] = set()
             for e in error:
@@ -447,7 +447,7 @@ class Code(abc.ABC):
         """
         # Note: Implementing `verbose_syndrome` as a set we add to and remove from is
         # empirically faster than as a dictionary w/ a key for each measure-Z qubit
-        # and Booleans as values, which we flip back and forth (for d=29, p=0.11:
+        # and Booleans as values, which we flip back and forth (for d=29, noise_level=0.11:
         # 3.03(4) ms < 3.26(5) ms).
         verbose_syndrome: set[Node] = set()
         for e in error:
@@ -687,11 +687,11 @@ class Decoder(abc.ABC):
         e.g. ``margins=(0.1, 0.1)``.
         """
 
-    def subset_sample(self, p: float, n: int, tol: float = 5e-1):
+    def subset_sample(self, noise_level: float, n: int, tol: float = 5e-1):
         """Simulate decoding cycles for each error subset.
         
         
-        :param p: noise level.
+        :param noise_level: noise level.
         :param n: number of decoding cycles per subset.
         :param tol: how much cutoff error we can tolerate,
             as a fraction of the mean.
@@ -699,7 +699,7 @@ class Decoder(abc.ABC):
         
         :returns: A pandas DataFrame indexed by ``weight`` with columns ``['subset prob', 'survival prob', 'm', 'n']``.
         """
-        subset_probs = self.CODE.NOISE.subset_probabilities(p)
+        subset_probs = self.CODE.NOISE.subset_probabilities(noise_level)
         mean, mn, weights = 0, [], []
         for weight in subset_probs.index:
             weights.append(weight)

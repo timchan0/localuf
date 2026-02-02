@@ -9,9 +9,9 @@ from localuf.sim import runtime
 def test_validate_only():
     stages = ('SV',)
     ds = [1, 2]
-    ps = [0, 1]
+    noise_levels = [0, 1]
     n = 2
-    call_count = len(ds) * len(ps) * n
+    call_count = len(ds) * len(noise_levels) * n
     with (
         patch('localuf.Surface.make_error', return_value=set()) as mock_me,
         patch('localuf.Surface.get_syndrome', return_value=set()) as mock_gs,
@@ -20,28 +20,28 @@ def test_validate_only():
     ):
         data = runtime.batch(
             ds=ds,
-            ps=ps,
+            noise_levels=noise_levels,
             n=n,
             noise='code capacity',
         )
         assert mock_me.call_args_list == len(ds) * [
-            call(p) for p in ps for _ in repeat(None, times=n)
+            call(noise_level) for noise_level in noise_levels for _ in repeat(None, times=n)
         ]
         assert mock_gs.call_args_list == call_count * [call(set())]
         assert mock_validate.call_args_list == call_count * [call(set())]
         assert mock_reset.call_args_list == call_count * [call()]
     assert type(data) is DataFrame
-    assert data.shape == (n, len(ds) * len(ps))
+    assert data.shape == (n, len(ds) * len(noise_levels))
     assert data.columns.names == ['stage', 'd', 'p']
-    assert (data.columns == MultiIndex.from_product([stages, ds, ps])).all()
+    assert (data.columns == MultiIndex.from_product([stages, ds, noise_levels])).all()
 
 
 def test_full():
     stages = ('BP', 'SV')
     ds = [1, 2]
-    ps = [0, 1]
+    noise_levels = [0, 1]
     n = 2
-    call_count = len(ds) * len(ps) * n
+    call_count = len(ds) * len(noise_levels) * n
     with (
         patch('localuf.Surface.make_error', return_value=set()) as mock_me,
         patch('localuf.Surface.get_syndrome', return_value=set()) as mock_gs,
@@ -50,18 +50,18 @@ def test_full():
     ):
         data = runtime.batch(
             ds=ds,
-            ps=ps,
+            noise_levels=noise_levels,
             n=n,
             noise='code capacity',
             validate_only=False,
         )
         assert mock_me.call_args_list == len(ds) * [
-            call(p) for p in ps for _ in repeat(None, times=n)
+            call(noise_level) for noise_level in noise_levels for _ in repeat(None, times=n)
         ]
         assert mock_gs.call_args_list == call_count * [call(set())]
         assert mock_decode.call_args_list == call_count * [call(set())]
         assert mock_reset.call_args_list == call_count * [call()]
     assert type(data) is DataFrame
-    assert data.shape == (n, len(stages) * len(ds) * len(ps))
+    assert data.shape == (n, len(stages) * len(ds) * len(noise_levels))
     assert data.columns.names == ['stage', 'd', 'p']
-    assert (data.columns == MultiIndex.from_product([stages, ds, ps])).all()
+    assert (data.columns == MultiIndex.from_product([stages, ds, noise_levels])).all()

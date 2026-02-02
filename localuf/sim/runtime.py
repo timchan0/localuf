@@ -23,7 +23,7 @@ from localuf.sim._height_calculator import get_heights
 
 def batch(
         ds: Iterable[int],
-        ps: Iterable[float],
+        noise_levels: Iterable[float],
         n: int,
         noise: NoiseModel,
         decoder_class: Type[Macar | Actis] = Macar,
@@ -34,7 +34,7 @@ def batch(
     
     
     :param ds: an iterable of surface code distances.
-    :param ps: an iterable of noise levels.
+    :param noise_levels: an iterable of noise levels.
     :param n: sample count.
     :param noise: noise model.
     :param decoder_class: the class of the decoder.
@@ -58,16 +58,16 @@ def batch(
             **kwargs_for_Surface,
         )
         decoder = decoder_class(code)
-        for p in ps:
+        for noise_level in noise_levels:
             for _ in itertools.repeat(None, times=n):
-                error = code.make_error(p)
+                error = code.make_error(noise_level)
                 syndrome = code.get_syndrome(error)
                 if validate_only:
                     tSV = decoder.validate(syndrome)
                 else:
                     tSV, tBP = decoder.decode(syndrome)
-                    dc['BP', d, p].append(tBP)
-                dc['SV', d, p].append(tSV)
+                    dc['BP', d, noise_level].append(tBP)
+                dc['SV', d, noise_level].append(tSV)
                 decoder.reset()
     data = DataFrame(dc).sort_index(axis=1)
     data.columns.set_names(['stage', 'd', 'p'], inplace=True)
@@ -76,7 +76,7 @@ def batch(
 
 def forward(
         ds: Iterable[int],
-        ps: Iterable[float],
+        noise_levels: Iterable[float],
         n: int,
         noise: StreamingNoiseModel,
         get_commit_height: Callable[[int], int] | None = None,
@@ -92,7 +92,7 @@ def forward(
     
     
         :param ds: same as for ``batch``.
-        :param ps: same as for ``batch``.
+        :param noise_levels: same as for ``batch``.
         :param n: same as for ``batch``.
         :param noise: same as for ``batch``.
         :param kwargs_for_Surface: same as for ``batch``.
@@ -124,12 +124,12 @@ def forward(
             **kwargs_for_Surface,
         )
         decoder = Macar(code)
-        for p in ps:
+        for noise_level in noise_levels:
             forward: Forward = code.SCHEME # type: ignore
-            forward.run(decoder, p, n)
+            forward.run(decoder, noise_level, n)
             step_counts: list[tuple[int, int]] = forward.step_counts # type: ignore
-            dc['SV', d, p] = [sv for sv, _ in step_counts]
-            dc['BP', d, p] = [bp for _, bp in step_counts]
+            dc['SV', d, noise_level] = [sv for sv, _ in step_counts]
+            dc['BP', d, noise_level] = [bp for _, bp in step_counts]
     data = DataFrame(dc).sort_index(axis=1)
     data.columns.set_names(['stage', 'd', 'p'], inplace=True)
     return data
@@ -137,7 +137,7 @@ def forward(
 
 def frugal(
         ds: Iterable[int],
-        ps: Iterable[float],
+        noise_levels: Iterable[float],
         n: int,
         code_class: Type[Code],
         noise: StreamingNoiseModel,
@@ -150,7 +150,7 @@ def frugal(
     
     
     :param ds: an iterable of surface code distances.
-    :param ps: an iterable of noise levels.
+    :param noise_levels: an iterable of noise levels.
     :param n: sample count.
     :param code_class: the class of the code.
     :param noise: the noise model.
@@ -190,9 +190,9 @@ def frugal(
         )
         frugal: Frugal = code.SCHEME # type: ignore
         decoder = Snowflake(code, **kwargs_for_Snowflake)
-        for p in ps:
-            frugal.run(decoder, p, n, time_only=time_only)
-            dc[d, p] = tuple(frugal.step_counts)
+        for noise_level in noise_levels:
+            frugal.run(decoder, noise_level, n, time_only=time_only)
+            dc[d, noise_level] = tuple(frugal.step_counts)
     data = DataFrame(dc).sort_index(axis=1)
     data.columns.set_names(['d', 'p'], inplace=True)
     return data
