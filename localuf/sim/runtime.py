@@ -41,11 +41,11 @@ def batch(
     :param validate_only: whether to time only syndrome validation or the full decoding cycle.
     :param kwargs_for_Surface: passed to ``Surface``.
     
-    Output: ``data`` a DataFrame where each
-    column a (stage, distance, probability);
-    row, a runtime sample.
-    Stage is either ``SV`` or ``BP``
-    which stand for 'syndrome validation' and 'burning & peeling'.
+    :return data: A DataFrame where each
+        column a (stage, distance, probability);
+        row, a runtime sample.
+        Stage is either ``SV`` or ``BP``
+        which stand for 'syndrome validation' and 'burning & peeling'.
     """
     scheme = 'batch'
     dc: defaultdict[tuple[str, int, float], list[int]] = defaultdict(list)

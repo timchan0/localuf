@@ -67,9 +67,10 @@ def mean(
         depending on which is used.
     
     
-    :returns:
-    * ``data_copy`` a copy of ``data`` with runtimes divided by distance if ``per_measurement_round`` else an exact deep copy of ``data``.
-    * ``containers`` a dictionary where each key a noise level; value, the ``ErrorbarContainer`` for that noise level.
+    :return data_copy: A copy of ``data`` with runtimes divided by distance
+        if ``per_measurement_round`` else an exact deep copy of ``data``.
+    :return containers: A dictionary where each key is a noise level;
+        value, the ``ErrorbarContainer`` for that noise level.
     """
     containers: dict[float, ErrorbarContainer | list[Line2D]] = {}
     ds: Index[int] = data.columns.get_level_values('d').unique()

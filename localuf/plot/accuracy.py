@@ -49,9 +49,10 @@ def monte_carlo(
     :param kwargs_for_errorbar: passed to ``pyplot.errorbar``.
     
     
-    :returns:
-    * ``plotted`` transposed ``data`` with additional columns ``f, lo, hi`` storing respectively the mean, lower and upper confidence bounds of failure probability.
-    * ``containers`` a dictionary where each key a distance; value, the ``ErrorbarContainer`` for that distance.
+    :return plotted: Transposed ``data`` with additional columns ``f, lo, hi`` storing
+        respectively the mean, lower and upper confidence bounds of failure probability.
+    :return containers: A dictionary where each key is a distance;
+        value, the ``ErrorbarContainer`` for that distance.
     """
     containers: dict[int, ErrorbarContainer] = {}
     if base_color is None:

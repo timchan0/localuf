@@ -37,29 +37,39 @@ def monte_carlo(
 ):
     """Make threshold data for any decoder.
     
-    
-    :param sample_counts: a dictionary where each
-        key a code distance;
-    value, a list of (noise level, sample count) pairs.
-    If ``scheme`` is 'global batch',
-    sample count must be the same for all noise levels of a given distance.
-    For a more detailed definition of 'sample', see ``_base_classes.Scheme.run``.
-    :param code_class: the class of the code.
-    :param decoder_class: the class of the decoder.
-    :param inputs: with same name as for ``Code.__init__`` serve the same purpose.
+    :param sample_counts: A dictionary mapping code distances to lists of (noise level, sample count) pairs.
+        If ``scheme`` is 'global batch',
+        each sample count must be the same for all noise levels of a given distance.
+        For a more detailed definition of 'sample', see ``_base_classes.Scheme.run``.
+    :param code_class: The class of the code; either ``localuf.Repetition`` or ``localuf.Surface``.
+    :param decoder_class: The class of the decoder;
+        available decoders are listed in ``localuf.decoders``.
+    :param noise: The noise model.
+    :param scheme: The decoding scheme; either 'batch', 'global batch', 'forward' or 'frugal'.
         In global batch scheme, the decoding graph is ``d*n`` layers tall i.e.
-    as tall as the (entire) decoding graph would be in forward scheme with commit height ``d``.
+        as tall as the (entire) decoding graph would be in forward scheme with commit height ``d``.
+    :param get_commit_height: A function with input ``d`` that outputs commit height
+        e.g. ``lambda d: 2*(d//2)``.
+        If ``None``, commit height is ``d`` for forward scheme and ``1`` for frugal scheme.
+        Affects only forward and frugal decoding schemes.
+    :param get_buffer_height: A function with input ``d`` that outputs buffer height.
+        If ``None``, buffer height is ``d`` for forward scheme and ``2*(d//2)`` for frugal scheme.
+        Affects only forward and frugal decoding schemes.
+    :param parametrization: defines relative fault probabilities of
+        1- and 2-qubit gates, and prep/measurement.
+        Affects only circuit-level noise.
+    :param demolition: whether measurement destroys the ancilla qubit state
+        which hence needs to be initialized for next measurement cycle.
+        Affects only circuit-level noise.
+    :param monolingual: whether can prep/measure in only Z basis
+        hence X-basis prep/measurement needs Hadamard gates.
+        Affects only circuit-level noise.
+    :param _merge_redundant_edges: whether to merge redundant boundary edges.
+        Affects only circuit-level noise.
     :param kwargs_for_decoder_class: are for ``decoder_class``.
     
-    The following 2 inputs affect only forward and frugal decoding schemes:
-    * ``get_commit_height`` a function with input ``d`` that outputs commit height
-        e.g. ``lambda d: 2*(d//2)``.
-    If ``None``, commit height is ``d`` for forward scheme and ``1`` for frugal scheme.
-    * ``get_buffer_height`` a function with input ``d`` that outputs buffer height.
-        If ``None``, buffer height is ``d`` for forward scheme and ``2*(d//2)`` for frugal scheme.
-    
-    
-    :returns: ``df`` a DataFrame where each column a (distance, probability); rows 'm', 'n' indicate number of logical errors and samples, respectively.
+    :return df: A DataFrame where each column is a (distance, probability);
+        rows 'm', 'n' indicate number of logical errors and samples, respectively.
     """
     dc: dict[tuple[int, float], tuple[int, int | float]] = {}
     for d, list_ in sample_counts.items():
@@ -121,7 +131,7 @@ def monte_carlo_pymatching(
     :param noise: same as for ``monte_carlo``.
     :param kwargs_for_code_class: for ``code_class``.
     
-    Output same as for ``monte_carlo``.
+    :return df: Output same as for ``monte_carlo``.
     """
     if isinstance(ns, int):
         ns = [ns] * len(ps)

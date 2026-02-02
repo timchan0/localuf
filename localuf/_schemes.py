@@ -51,12 +51,12 @@ class Scheme(abc.ABC):
         n: int,
         **kwargs,
     ) -> tuple[int, int | float]:
-        """Simulate ``n`` (equivalent) decoding cycles given ``p``.
+        """Simulate multiple decoding cycles at a given noise level.
         
         
-        :param decoder: the decoder.
-        :param p: noise level.
-        :param n: depends on the decoding scheme.
+        :param decoder: The decoder.
+        :param p: The noise level.
+        :param n: Depends on the decoding scheme.
             If the scheme is 'batch',
             then ``n`` is decoding cycle count.
             If the scheme is 'global batch',
@@ -68,10 +68,9 @@ class Scheme(abc.ABC):
             then ``n`` is decoding cycle count in the steady state, divided by the code distance.
             For Snowflake, the there is 1 decoding cycle per stabiliser measurement round.
         
-        :returns:
-        * logical error count.
-        * decoding cycle count
-        if noise is code capacity; else, (total layer count / code distance).
+        :return logical_error_count: Logical error count.
+        :return slenderness: Decoding cycle count
+            if noise is code capacity; else, (total layer count / code distance).
         """
 
     @abc.abstractmethod

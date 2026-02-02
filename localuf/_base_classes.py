@@ -14,51 +14,7 @@ from localuf.noise import CircuitLevel, CodeCapacity, Phenomenological
 
 
 class Code(abc.ABC):
-    """The decoding graph G = (V, E) of a CSS code.
-    
-    Attributes (all are constants):
-    * ``D`` code distance.
-    * ``MERGED_EQUIVALENT_BOUNDARY_NODES`` whether
-        all nodes that represent the same boundary are merged.
-    This results in a decoding graph with
-    as many boundary nodes as there are boundaries.
-    * ``SCHEME`` the decoding scheme.
-    * ``N_EDGES`` number of edges in G.
-    * ``EDGES`` a tuple of edges of G.
-    Use tuple instead of generator so can repeatedly iterate through.
-    * ``NODES`` a tuple of nodes of G.
-    * ``NODE_COUNT`` number of nodes in G.
-    * ``NOISE`` noise model.
-    * ``TIME_AXIS`` that which represents time.
-    * ``LONG_AXIS`` that whose index runs from -1 to d-1 inclusive.
-    * ``DIMENSION`` of G.
-    * ``INCIDENT_EDGES`` maps each node to a set of incident edges.
-    * ``DETECTORS`` a tuple of all detectors of G.
-    * ``DETECTOR_COUNT`` number of detectors in G.
-    * ``BOUNDARY_NODES`` a tuple of all boundary nodes of G.
-    * ``GRAPH`` a NetworkX graph of G.
-    
-    G represents: if ``NOISE`` is...
-    
-    ``'code capacity'``: the code, where each
-    * detector represents a measure-Z qubit;
-    * edge, a data qubit i.e. possible bitflip location.
-    
-    ``'phenomenological'``:
-    ``window_height+1`` measurement rounds of the code,
-    where each
-    * detector represents the difference between two consecutive measurements
-        of a measure-Z qubit at a given point in time;
-    * horizontal edge, a possible time at which a data qubit could bitflip;
-    * vertical edge, a possible faulty measurement
-        (i.e. measure-Z qubit recording the wrong parity with some probability ``q``)
-        location.
-        First AND last round assumed to be perfect (hence no future boundary edges).
-    
-    ``'circuit-level'``: same as ``'phenomenological'``
-    but each edge represents a possible pair of defects
-    that could have resulted from one fault.
-    """
+    """The decoding graph G = (V, E) of a CSS code."""
 
     _TIME_AXIS = -1
     _LONG_AXIS: int
@@ -301,57 +257,105 @@ class Code(abc.ABC):
         """
 
     @property
-    def D(self): return self._D
+    def D(self):
+        """The code distance."""
+        return self._D
 
     @property
     def MERGED_EQUIVALENT_BOUNDARY_NODES(self):
+        """Whether all nodes that represent the same boundary are merged.
+        This results in a decoding graph with
+        as many boundary nodes as there are boundaries.
+        """
         return self._MERGED_EQUIVALENT_BOUNDARY_NODES
 
     @property
-    def SCHEME(self): return self._SCHEME
+    def SCHEME(self):
+        """The decoding scheme."""
+        return self._SCHEME
 
     @property
-    def N_EDGES(self): return self._N_EDGES
+    def N_EDGES(self):
+        """Number of edges in G."""
+        return self._N_EDGES
 
     @property
-    def EDGES(self): return self._EDGES
+    def EDGES(self):
+        """A tuple of edges of G."""
+        # Use tuple instead of generator so can repeatedly iterate through
+        return self._EDGES
 
     @property
-    def NODES(self): return self._NODES
+    def NODES(self):
+        """A tuple of nodes of G."""
+        return self._NODES
 
     @cached_property
     def NODE_COUNT(self):
+        """Number of nodes in G."""
         return len(self.NODES)
 
     @property
-    def NOISE(self): return self._NOISE
+    def NOISE(self):
+        """The noise model.
+        
+        If the noise model is:
+        * code capacity,
+            then the decoding graph G represents the code, where each
+            * detector represents a measure-Z qubit;
+            * edge, a data qubit i.e. possible bitflip location.
+        * phenomenological,
+            then G represents w+1 measurement rounds of the code,
+            where w is the decoding window height and each
+            * detector represents the difference between two consecutive measurements
+                of a measure-Z qubit at a given point in time;
+            * horizontal edge, a possible time at which a data qubit could bitflip;
+            * vertical edge, a possible faulty measurement
+                (i.e. measure-Z qubit recording the wrong parity with some probability q)
+                location.
+        * circuit-level,
+            then G represents the same thing as for phenomenological noise,
+            but each edge represents a possible pair of defects
+            that could have resulted from one fault.
+        """
+        return self._NOISE
 
     @property
-    def TIME_AXIS(self): return self._TIME_AXIS
+    def TIME_AXIS(self):
+        """The axis that represents time."""
+        return self._TIME_AXIS
 
     @property
-    def LONG_AXIS(self): return self._LONG_AXIS
+    def LONG_AXIS(self):
+        """The axis whose index runs from -1 to d-1 inclusive."""
+        return self._LONG_AXIS
 
     @cached_property
     def DIMENSION(self):
+        """The number of dimensions that G is embedded in."""
         return self._CODE_DIMENSION + (str(self.NOISE) != 'code capacity')
 
     @property
-    def INCIDENT_EDGES(self): return self._INCIDENT_EDGES
+    def INCIDENT_EDGES(self):
+        """A map from each node to a set of incident edges."""
+        return self._INCIDENT_EDGES
     # Tried construction via manually changing indices by 1
     # so need not iterate through `self.EDGES`,
     # but this is ~twice as slow.
     
     @cached_property
     def DETECTORS(self):
+        """A tuple of all detectors of G."""
         return tuple(v for v in self.NODES if not self.is_boundary(v))
 
     @cached_property
     def DETECTOR_COUNT(self):
+        """Number of detectors in G."""
         return len(self.DETECTORS)
 
     @cached_property
     def BOUNDARY_NODES(self):
+        """A tuple of all boundary nodes of G."""
         return tuple(v for v in self.NODES if self.is_boundary(v))
 
     def is_boundary(self, v: Node):
@@ -475,7 +479,7 @@ class Code(abc.ABC):
 
     @cached_property
     def GRAPH(self):
-        """Return a NetworkX graph of G.
+        """A NetworkX graph of G.
         
         Notes: caching so only need make it once provides noticeable speedup!
         """
@@ -587,10 +591,10 @@ class Code(abc.ABC):
         :param x_offset: the ratio of out-of-screen to along-screen distance.
         :param nodelist: the nodes to draw. Default is ``self.NODES``.
         
-        Output: ``pos`` a dictionary where each key a node index; value, position coordinate.
-        E.g. for surface code w/ perfect measurements,
-        convert each matrix index to position coords via
-        (i, j) -> (x, y) = (j, -i).
+        :returns pos: a dictionary where each key a node index; value, position coordinate.
+            E.g. for the surface code with perfect measurements,
+            convert each matrix index to position coords via
+            (i, j) -> (x, y) = (j, -i).
         """
 
     def get_node_color(
@@ -612,7 +616,7 @@ class Code(abc.ABC):
         :param nodelist: the nodes to draw. Default is all nodes i.e. ``self.NODES``.
         :param show_boundary_defects: whether to boundary nodes can be defects.
         
-        Output: List of colors for each node in ``nodelist``.
+        :returns node_color: A list of colors for each node in ``nodelist``.
         """
         if nodelist is None:
             nodelist = self.NODES
@@ -632,20 +636,18 @@ class Code(abc.ABC):
     
 
 class Decoder(abc.ABC):
-    """Base class for decoders.
-    
-    Instance attributes (1 constant):
-    * ``CODE`` the code to be decoded.
-    * ``correction`` a set of edges comprising the correction.
-    """
+    """Base class for decoders."""
 
     @property
-    def CODE(self): return self._CODE
+    def CODE(self):
+        """The code to be decoded."""
+        return self._CODE
 
     def __init__(self, code: Code):
         """Input: ``code`` the code to be decoded."""
         self._CODE = code
         self.correction: set[Edge]
+        """A set of edges comprising the correction."""
 
     def reset(self):
         """Factory reset."""
@@ -658,7 +660,6 @@ class Decoder(abc.ABC):
             **kwargs,
     ) -> None | int | tuple[int, int]:
         """Decode syndrome.
-        
         
         :param syndrome: the set of defects.
         :param draw: whether to draw.
