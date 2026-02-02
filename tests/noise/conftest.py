@@ -34,9 +34,9 @@ def toy_cl(
     toy_merges: dict[Edge, Edge],
 ):
     return CircuitLevel(
-        edge_dict=toy_edge_dict,
+        fresh_edge_dict=toy_edge_dict,
         parametrization='balanced',
         demolition=False,
         monolingual=False,
-        merges=toy_merges,
+        fresh_merges=toy_merges,
     )

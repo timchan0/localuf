@@ -1,4 +1,5 @@
 from localuf import Repetition, Surface
+from localuf.noise.main import Phenomenological
 
 
 def test_make_error(
@@ -12,9 +13,11 @@ def test_make_error(
     assert sf3T.make_error(0) == set()
     assert sf3T.make_error(1) == set(sf3T.EDGES)
     assert rp3_forward.make_error(0) == set()
-    assert rp3_forward.make_error(1) == set(rp3_forward.NOISE.EDGES) # type: ignore
+    model: Phenomenological = rp3_forward.NOISE # type: ignore
+    assert rp3_forward.make_error(1) == set(model.FRESH_EDGES)
     assert rp3_frugal.make_error(0) == set()
-    assert rp3_frugal.make_error(1) == set(rp3_frugal.NOISE.EDGES) # type: ignore
+    model: Phenomenological = rp3_frugal.NOISE # type: ignore
+    assert rp3_frugal.make_error(1) == set(model.FRESH_EDGES)
 
 
 def test_INCIDENT_EDGES_circuit_level():

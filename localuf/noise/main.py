@@ -79,7 +79,8 @@ class Noise(abc.ABC):
             If not specified, all edges have flip probability 0 and weight 1.
         
         
-        :return edge_weights: A map from edge to the pair (flip probability, weight).
+        :return edge_weights: A map from each edge in the decoding window
+            to the pair (flip probability, weight).
         """
 
     @staticmethod
@@ -94,22 +95,24 @@ class _Uniform(Noise):
     Extends ``Noise``.
     """
 
-    def __init__(self, edges: tuple[Edge, ...]):
+    def __init__(self, fresh_edges: tuple[Edge, ...], all_edges: None | tuple[Edge, ...] = None):
         """
-        :param edges: The edges of the freshly discovered region after a window raise
+        :param fresh_edges: The edges of the freshly discovered region after a window raise
         if scheme is streaming; else, the edges of G.
         """
-        self._EDGES = edges
+        self._FRESH_EDGES = fresh_edges
+        self._ALL_EDGES = fresh_edges if all_edges is None else all_edges
+        """Same as `self._EDGES` but for _all_ edges in the decoding window."""
 
     @property
-    def EDGES(self):
+    def FRESH_EDGES(self):
         """The edges of the freshly discovered region after a window raise
         if scheme is streaming; else, the edges of G.
         """
-        return self._EDGES
+        return self._FRESH_EDGES
 
     def make_error(self, p):
-        return {e for e in self.EDGES if random.random() < p}
+        return {e for e in self.FRESH_EDGES if random.random() < p}
     
     def force_error(self, weight: int):
         """Bitlfip exactly ``weight`` edges in G.
@@ -117,11 +120,11 @@ class _Uniform(Noise):
         :param weight: Between 0 and ``len(self.EDGES)``.
         :return error: The set of bitflipped edges.
         """
-        return set(random.sample(self.EDGES, weight))
+        return set(random.sample(self.FRESH_EDGES, weight))
 
     @property
     def ALL_WEIGHTS(self) -> Iterable[int]:
-        return range(len(self.EDGES)+1)
+        return range(len(self.FRESH_EDGES)+1)
     
     @property
     def ALL_WEIGHTS_INDEX(self):
@@ -130,7 +133,7 @@ class _Uniform(Noise):
     def subset_probability(self, weights: Iterable[int], p: float) -> Iterable[float]:
         probs = binom.pmf(
             k=weights,
-            n=len(self.EDGES),
+            n=len(self.FRESH_EDGES),
             p=p,
         )
         return probs
@@ -143,7 +146,7 @@ class _Uniform(Noise):
         else:
             flip_probability = noise_level
             weight = self.log_odds_of_no_flip(noise_level)
-        return {e: (flip_probability, weight) for e in self.EDGES}
+        return {e: (flip_probability, weight) for e in self._ALL_EDGES}
 
 
 class CodeCapacity(_Uniform):
@@ -197,37 +200,42 @@ class CircuitLevel(Noise):
 
     def __init__(
             self,
-            edge_dict: dict[EdgeType, tuple[Edge, ...]],
+            fresh_edge_dict: dict[EdgeType, tuple[Edge, ...]],
             parametrization: Parametrization,
             demolition: bool,
             monolingual: bool,
-            merges: dict[Edge, Edge] | None = None,
+            fresh_merges: dict[Edge, Edge] | None = None,
             force_by: Literal['pair', 'edge'] = 'pair',
+            all_edge_dict: None | dict[EdgeType, tuple[Edge, ...]] = None,
+            all_merges: None | dict[Edge, Edge] = None,
     ):
         """
-        :param edge_dict: maps from edge type to tuple of edges.
-            The union of all edge tuples in ``edge_dict`` is the freshly discovered region after a window raise
+        :param fresh_edge_dict: maps from edge type to tuple of edges.
+            The union of all edge tuples in ``fresh_edge_dict`` is the freshly discovered region after a window raise
             if scheme is streaming; else, the edges of G.
         :param parametrization: name of parametrization.
         :param demolition: whether ancilla qubit measurement demolishes state.
         :param monolingual: whether measurements are native in only one basis.
-        :param merges: maps from each redundant edge to its substitute.
+        :param fresh_merges: maps from each redundant edge to its substitute.
         :param force_by: whether ``force_error()`` makes an error based on the weight of each pair or edge type.
             See ``noise.forcers`` for more details.
         """
-        self._EDGES = self._make_edges(edge_dict, demolition, monolingual, merges)
+        self._FRESH_EDGES = self._make_edges(fresh_edge_dict, demolition, monolingual, fresh_merges)
         """A map from multiplicity vector (as a tuple) to tuple of edges
         e.g. ``{(4, 2, 1, 0): (e1, ...), ...}``.
         Order matters as used by ``ForceByEdge.force_error``.
-        The union of all edge tuples in ``_EDGES`` is the freshly discovered region after a window raise
+        The union of all edge tuples in ``_FRESH_EDGES`` is the freshly discovered region after a window raise
         if scheme is streaming; else, the edges of G.
         """
         self._COEFFICIENTS = self._ALL_COEFFICIENTS[parametrization]
         """A 4-vector c such that pi = c*p."""
-        self._FORCER = ForceByEdge(self._EDGES) if force_by == 'edge' \
-            else ForceByPairBalanced(self._EDGES) if parametrization == 'balanced' \
-            else ForceByPair(self._EDGES)
+        self._FORCER = ForceByEdge(self._FRESH_EDGES) if force_by == 'edge' \
+            else ForceByPairBalanced(self._FRESH_EDGES) if parametrization == 'balanced' \
+            else ForceByPair(self._FRESH_EDGES)
         """Method for forcing error."""
+        self._ALL_EDGES = self._FRESH_EDGES if all_edge_dict is None else \
+            self._make_edges(all_edge_dict, demolition, monolingual, all_merges)
+        """Same as `self._FRESH_EDGES` but for _all_ edges in the decoding window."""
 
     @classmethod
     def _make_edges(
@@ -302,7 +310,7 @@ class CircuitLevel(Noise):
         bitflip_probs = self._get_flip_probabilities(p)
         error: set[Edge] = set()
         for m, pr in bitflip_probs.items():
-            error |= {e for e in self._EDGES[m] if random.random() < pr}
+            error |= {e for e in self._FRESH_EDGES[m] if random.random() < pr}
         return error
     
     def force_error(self, weight: tuple[int, ...]):
@@ -324,12 +332,12 @@ class CircuitLevel(Noise):
     def get_edge_weights(self, noise_level: None | float):
         edge_weights: dict[Edge, tuple[float, float]] = {}
         if noise_level is None:
-            for multiplicity_vector, edges in self._EDGES.items():
+            for multiplicity_vector, edges in self._ALL_EDGES.items():
                 for e in edges:
                     edge_weights[e] = (0, 1)
         else:
             flip_probabilities = self._get_flip_probabilities(noise_level)
-            for multiplicity_vector, edges in self._EDGES.items():
+            for multiplicity_vector, edges in self._ALL_EDGES.items():
                 p = flip_probabilities[multiplicity_vector]
                 weight = self.log_odds_of_no_flip(p)
                 for e in edges:
@@ -351,4 +359,4 @@ class CircuitLevel(Noise):
         :return flip_probabilities: map from multiplicity to a flip probability.
         """
         pi = self._pi(noise_level)
-        return {m: MultisetHandler.pr(m, pi) for m in self._EDGES.keys()}
+        return {m: MultisetHandler.pr(m, pi) for m in self._FRESH_EDGES.keys()}

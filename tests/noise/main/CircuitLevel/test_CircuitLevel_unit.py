@@ -14,7 +14,7 @@ from localuf.type_aliases import EdgeType, Edge, MultiplicityVector
 ])
 def _cl(request):
     return CircuitLevel(
-        edge_dict={'S': (((0, 0, 0), (1, 0, 0)),)},
+        fresh_edge_dict={'S': (((0, 0, 0), (1, 0, 0)),)},
         parametrization=request.param,
         demolition=False,
         monolingual=False,
@@ -42,7 +42,7 @@ def test_init(parametrization):
         return_value=CircuitLevel._make_multiplicities(demolition=False, monolingual=False),
     ) as mock_gm:
         cl = CircuitLevel(
-            edge_dict=edge_dict,
+            fresh_edge_dict=edge_dict,
             parametrization=parametrization,
             demolition=False,
             monolingual=False,
@@ -114,7 +114,7 @@ def test_DEFAULT_MULTIPLICITIES_unchanged(assert_these_multiplicities_unchanged)
 
 
 def test_make_error(toy_cl: CircuitLevel, e_westmost: tuple[Edge, Edge]):
-    m0, m1 = toy_cl._EDGES.keys()
+    m0, m1 = toy_cl._FRESH_EDGES.keys()
     for p in (0, 1):
         with mock.patch(
             'localuf.noise.CircuitLevel._get_flip_probabilities',
@@ -131,10 +131,10 @@ def test_get__flip_probabilities(cl: CircuitLevel):
         cl._get_flip_probabilities(1)
         assert mock_pr.call_args_list == [
             mock.call(m, (0, 0, 0, 0))
-            for m in cl._EDGES.keys()
+            for m in cl._FRESH_EDGES.keys()
         ] + [
             mock.call(m, cl._COEFFICIENTS)
-            for m in cl._EDGES.keys()
+            for m in cl._FRESH_EDGES.keys()
         ]
 
 

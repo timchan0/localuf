@@ -99,25 +99,29 @@ class BaseUF(Decoder):
 
     @cache
     def _total_edge_weight(self, noise_level: None | float = None) -> float:
-        """Compute the sum of all edge weights in the decoding graph."""
+        """Compute the sum of all edge weights in the decoding window."""
         edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
-        return sum(weight for _, weight in edge_weights.values())
+        return sum(edge_weights[edge][1] for edge in self.growth.keys())
     
     def unclustered_edge_fraction(self, noise_level: None | float = None):
         """Compute the Unclustered Edge Fraction DCS from ``self.growth``.
         
         
-        :param noise_level: a probability representing the noise strength.
+        :param noise_level: A probability representing the noise strength.
             This is needed to define nonuniform edge weights of the decoding graph
-        in the circuit-level noise model.
-        If ``None``, all edges are assumed to have weight 1.
+            in the circuit-level noise model.
+            If not specified, all edges are assumed to have weight 1.
         
         
-        :returns: ``fraction`` the fraction of edges in the decoding graph that are not in a cluster, weighted by their weights.
+        :returns fraction: The fraction of edges in the decoding window
+            that are not in a cluster, weighted by their weights.
         """
         edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
-        return 1 - sum(weight*self.growth[e].as_float for e, (_, weight) in edge_weights.items()) \
-            / self._total_edge_weight(noise_level=noise_level)
+        numerator = sum(
+            edge_weights[edge][1] * growth_value.as_float
+            for edge, growth_value in self.growth.items()
+        )
+        return 1 - numerator / self._total_edge_weight(noise_level=noise_level)
     
     def draw_growth(
         self,
@@ -298,7 +302,9 @@ class BaseUF(Decoder):
         # TODO: use `networkx.quotient_graph`
         graph, _, _ = self._cached_swim_graph
         for e, (_, weight) in self.CODE.NOISE.get_edge_weights(noise_level).items():
-            if self.growth[e] is Growth.UNGROWN:
+            if e not in self.growth or self.growth[e] is Growth.UNGROWN:
+                # this can happen when the decoder omits some edges in W
+                # e.g. Snowflake omitting the future boundary
                 graph.edges[e]['weight'] = weight
             elif self.growth[e] is Growth.HALF:
                 graph.edges[e]['weight'] = weight / 2
@@ -348,7 +354,7 @@ class BaseUF(Decoder):
         :param max_edge_width: The maximum width of edges.
         :param kwargs_for_networkx_draw: Passed to ``networkx.draw()``.
         """
-        graph, _, _ = self._cached_swim_graph
+        graph, *_, = self._cached_swim_graph
         max_weight: float = max(weight for _, _, weight in graph.edges.data('weight')) # type: ignore
         width_multiplier = (max_edge_width - weightless_edge_width) / max_weight
         nx.draw_networkx_nodes(

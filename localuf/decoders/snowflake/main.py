@@ -1,5 +1,6 @@
 import abc
 from collections.abc import Iterable, Sequence
+from collections import defaultdict
 from functools import cache
 from typing import Literal, override
 
@@ -116,6 +117,8 @@ class Snowflake(BaseUF):
         the correction output from the bottom layer at each drop.
         The order of the bits is given by ``self._LOWEST_EDGES``.
         """
+        self.confidence_score_history: defaultdict[str, list[float]] = defaultdict(list)
+        """A map from DCS to a list of DCS values after each growth stage."""
     
     def __repr__(self) -> str:
         return f'decoders.Snowflake({self.CODE})'
@@ -200,6 +203,7 @@ class Snowflake(BaseUF):
         except AttributeError: pass
         try: del self.floor_history
         except AttributeError: pass
+        self.confidence_score_history = defaultdict(list)
     
     @override
     def decode(
@@ -207,6 +211,8 @@ class Snowflake(BaseUF):
             syndrome: set[Node],
             log_history: Literal[False, 'fine', 'coarse'] = False,
             log_floor_history: bool = False,
+            confidence_scores: Iterable[str] = (),
+            noise_level_for_priors: None | float = None,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             defects_possible: bool = True,
         ):
@@ -217,9 +223,11 @@ class Snowflake(BaseUF):
             i.e. all defects in ``syndrome`` have the time coordinate ``self.CODE.SCHEME.WINDOW_HEIGHT-1``.
         :param log_history: Whether to populate ``history`` attribute;
             'fine' logs each timestep;
-        'coarse', only the final timestep of the growth round.
-        :param log_floor_history: whether to populate ``floor_history`` attribute.
-        :param time_only: whether runtime includes a timestep
+            'coarse', only the final timestep of the growth round.
+        :param log_floor_history: Whether to populate ``floor_history`` attribute.
+        :param confidence_scores: An iterable of DCS names to record after the decoding cycle.
+        :param noise_level_for_priors: Noise level to use when computing some DCSs.
+        :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
             each merging step only ('merging');
             or each unrooting step only ('unrooting').
@@ -240,12 +248,24 @@ class Snowflake(BaseUF):
         self.drop(syndrome)
         if log_history == 'fine': self.append_history()
         if defects_possible:
-            return self._SCHEDULE.finish_decode(
+            t = self._SCHEDULE.finish_decode(
                 log_history=log_history,
                 time_only=time_only,
             )
         else:
-            return 1 if time_only == 'all' else 0
+            t = 1 if time_only == 'all' else 0
+        for confidence_score in confidence_scores:
+            if confidence_score == 'runtime':
+                self.confidence_score_history['runtime'].append(t)
+            elif confidence_score == 'swim_distance':
+                swim_distance = self.swim_distance(noise_level=noise_level_for_priors)
+                self.confidence_score_history['swim_distance'].append(swim_distance)
+            elif confidence_score == 'unclustered_edge_fraction':
+                fraction = self.unclustered_edge_fraction(noise_level=noise_level_for_priors)
+                self.confidence_score_history['unclustered_edge_fraction'].append(fraction)
+            else:
+                raise ValueError(f'Unknown confidence score: {confidence_score}')
+        return t
     
     def drop(self, syndrome: set[Node]):
         """Make all nodes perform a ``drop`` i.e. raise window by a layer."""

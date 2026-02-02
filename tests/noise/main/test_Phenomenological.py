@@ -3,13 +3,15 @@ import pytest
 
 from localuf import Surface, Repetition
 from localuf._schemes import _Streaming
+from localuf.noise.main import Phenomenological
 
 
 class TestEdges:
 
 
     def test_batch(self, sf3T: Surface):
-        assert sf3T.NOISE.EDGES == sf3T.EDGES # type: ignore
+        model: Phenomenological = sf3T.NOISE  # type: ignore
+        assert model.FRESH_EDGES == sf3T.EDGES
 
 
     @pytest.mark.parametrize("rp", ["rp3_forward", "rp3_frugal"])
@@ -22,4 +24,5 @@ class TestEdges:
             True,
             t_start=buffer_height,
         )
-        assert rp.NOISE.EDGES == fresh_edges # type: ignore
+        model: Phenomenological = rp.NOISE  # type: ignore
+        assert model.FRESH_EDGES == fresh_edges

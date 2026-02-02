@@ -98,11 +98,11 @@ class Code(abc.ABC):
                         merge_equivalent_boundary_nodes=merge_equivalent_boundary_nodes,
                     )
                     self._NOISE = CircuitLevel(
-                        edge_dict=edge_dict,
+                        fresh_edge_dict=edge_dict,
                         parametrization=parametrization,
                         demolition=demolition,
                         monolingual=monolingual,
-                        merges=merges,
+                        fresh_merges=merges,
                     )
             self._SCHEME = Batch(self, h) if scheme == 'batch' else Global(self, h)
         else:
@@ -126,9 +126,9 @@ class Code(abc.ABC):
                 self._N_EDGES, self._EDGES = self._phenomenological_edges(h, True)
                 _, commit_edges = self._phenomenological_edges(commit_height, True)
                 _,  fresh_edges = self._phenomenological_edges(commit_height, True, t_start=buffer_height)
-                self._NOISE = Phenomenological(fresh_edges)
+                self._NOISE = Phenomenological(fresh_edges, all_edges=self._EDGES)
             else:  # noise == 'circuit-level'
-                self._N_EDGES, self._EDGES, *_ = self._circuit_level_edges(
+                self._N_EDGES, self._EDGES, all_edge_dict, all_merges = self._circuit_level_edges(
                     h=h,
                     future_boundary=True,
                     _merge_redundant_edges=_merge_redundant_edges,
@@ -145,11 +145,13 @@ class Code(abc.ABC):
                     t_start=buffer_height,
                 )
                 self._NOISE = CircuitLevel(
-                    edge_dict=fresh_edge_dict,
+                    fresh_edge_dict=fresh_edge_dict,
                     parametrization=parametrization,
                     demolition=demolition,
                     monolingual=monolingual,
-                    merges=fresh_merges,
+                    fresh_merges=fresh_merges,
+                    all_edge_dict=all_edge_dict,
+                    all_merges=all_merges,
                 )
             
             self._SCHEME = scheme_class(
@@ -207,9 +209,8 @@ class Code(abc.ABC):
             all nodes that represent the same boundary.
         
         
-        :returns:
-        * number of edges in the graph.
-        * a tuple of edges of the graph.
+        :return edge_count: Number of edges in the graph.
+        :return edges: Tuple of edges of the graph.
         """
 
     @abc.abstractmethod
@@ -228,23 +229,27 @@ class Code(abc.ABC):
     ]:
         """Return inputs for ``noise.CircuitLevel``.
         
-        Additional inputs over ``_phenomenological_edges``:
-        * ``_merge_redundant_edges`` whether to merge redundant boundary edges.
+        :param h: window height.
+        :param future_boundary: whether top of graph has future boundary.
+            True for W, False for G.
+        :param t_start: the time index of the bottom layer.
+        :param merge_equivalent_boundary_nodes: whether to merge
+            all nodes that represent the same boundary.
+        :param _merge_redundant_edges: Whether to merge redundant boundary edges.
             Automatically ``True`` if ``merge_equivalent_boundary_nodes`` is ``True``.
         
         
-        :returns:
-        * ``n_edges`` number of edges in the graph.
-        * ``edges`` a tuple of edges of the graph which excludes the redundant edges if ``_merge_redundant_edges`` is ``True``.
-        * ``edge_dict`` maps from edge type (i.e. orientation and location) to tuple of all edges of that type. Always includes redundant edges. Inter-key order matters as used by ``noise.forcers.ForceByEdge.force_error``.
-        * ``merges`` maps each redundant edge to its substitute.
+        :return edge_count: Number of edges in the graph.
+        :return edges: Tuple of edges of the graph which excludes the redundant edges if ``_merge_redundant_edges`` is ``True``.
+        :return edge_dict: A map from edge type (i.e. orientation and location) to tuple of all edges of that type. Always includes redundant edges. Inter-key order matters as used by ``noise.forcers.ForceByEdge.force_error``.
+        :return merges: A map each redundant edge to its substitute.
         """
 
     @abc.abstractmethod
     def _future_boundary_nodes(self, h: int) -> list[Node]:
         """Return list of boundary nodes at top of viewing window.
         
-        Input: ``h`` window height.
+        :param h: window height.
         """
 
     @abc.abstractmethod
@@ -253,7 +258,7 @@ class Code(abc.ABC):
         
         Used only by circuit-level noise.
         
-        Input: ``h`` window height.
+        :param h: window height.
         """
 
     @property

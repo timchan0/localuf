@@ -211,9 +211,33 @@ class TestRun:
             mock_reset.assert_called_once_with()
             snow_reset.assert_called_once_with()
             assert mock_advance.call_args_list == \
-                (transient_count + d*n + d-1) * [mock.call(p, decoder, exclude_future_boundary=False, log_history=False, time_only='merging')] \
-                + [mock.call(p, decoder, exclude_future_boundary=True, log_history=False, time_only='merging')] \
-                + cleanse_count * [mock.call(0, decoder, exclude_future_boundary=False, log_history=False, time_only='merging')]
+                (transient_count + d*n + d-1) * [mock.call(
+                    p,
+                    decoder,
+                    exclude_future_boundary=False,
+                    log_history=False,
+                    confidence_scores=(),
+                    noise_level_for_priors=p,
+                    time_only='merging',
+                )] \
+                + [mock.call(
+                    p,
+                    decoder,
+                    exclude_future_boundary=True,
+                    log_history=False,
+                    confidence_scores=(),
+                    noise_level_for_priors=p,
+                    time_only='merging',
+                )] \
+                + cleanse_count * [mock.call(
+                    0,
+                    decoder,
+                    exclude_future_boundary=False,
+                    log_history=False,
+                    confidence_scores=(),
+                    noise_level_for_priors=p,
+                    time_only='merging',
+                )]
             assert gle.call_args_list == raise_count * [mock.call()]
             ih.assert_not_called()
             dd.assert_not_called()

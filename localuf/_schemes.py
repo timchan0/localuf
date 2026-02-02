@@ -1,5 +1,6 @@
 import abc
 from abc import abstractmethod
+from collections.abc import Iterable
 import itertools
 import math
 from typing import Literal, TYPE_CHECKING, override
@@ -561,6 +562,7 @@ class Frugal(_Streaming):
             n: int,
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
+            confidence_scores: Iterable[str] = (),
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
@@ -573,6 +575,7 @@ class Frugal(_Streaming):
             For Snowflake, there is 1 decoding cycle per stabiliser measurement round.
         :param draw: Whether to draw.
         :param log_history: Whether to populate ``history`` attribute.
+        :param confidence_scores: An iterable of DCSs to compute and record after each decoding cycle.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
             each merging step only ('merging');
@@ -623,6 +626,8 @@ class Frugal(_Streaming):
                     decoder,
                     exclude_future_boundary=exclude_future_boundary,
                     log_history=log_history,
+                    confidence_scores=confidence_scores,
+                    noise_level_for_priors=p,
                     time_only=time_only,
                 )
                 m += self.get_logical_error()
