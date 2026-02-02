@@ -32,8 +32,8 @@ def monte_carlo(
     
     
     :param data: a DataFrame where each
-        column a (distance, probability);
-    rows m, n indicate number of logical errors and samples, respectively.
+        column is a (distance, probability);
+        rows m, n indicate number of logical errors and samples, respectively.
     :param title: plot title.
     :param xlabel: x-axis label.
     :param ylabel: y-axis label.
@@ -44,7 +44,7 @@ def monte_carlo(
     see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
     :param base_color: a single color for all errorbars and their connecting lines.
         Increasing distance is then shown by increasing opacity.
-    If ``None``, each distance is shown by a different, fully opaque color.
+        If ``None``, each distance is shown by a different, fully opaque color.
     :param capsize: length of error bar caps in points.
     :param kwargs_for_errorbar: passed to ``pyplot.errorbar``.
     

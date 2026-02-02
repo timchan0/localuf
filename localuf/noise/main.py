@@ -74,12 +74,12 @@ class Noise(abc.ABC):
         
         
         :param noise_level: a probability that represents the noise strength.
-            This is needed to define nonuniform edge weights of the decoding graph
-        in the circuit-level noise model.
-        If ``None``, all edges have flip probability 0 and weight 1.
+            This defines the nonuniform edge weights of the decoding graph
+            in the circuit-level noise model.
+            If not specified, all edges have flip probability 0 and weight 1.
         
         
-        :returns: map from edge to the pair (flip probability, weight).
+        :return edge_weights: A map from edge to the pair (flip probability, weight).
         """
 
     @staticmethod
@@ -92,23 +92,21 @@ class _Uniform(Noise):
     """Base class for noise model where each edge has flip probability ``p``.
     
     Extends ``Noise``.
-    
-    Attributes:
-    * ``EDGES`` the edges of the freshly discovered region after a window raise
-        if scheme is streaming; else,
-    the edges of G.
     """
 
     def __init__(self, edges: tuple[Edge, ...]):
         """
-        ``edges`` the edges of the freshly discovered region after a window raise
-        if scheme is streaming; else,
-        the edges of G.
+        :param edges: The edges of the freshly discovered region after a window raise
+        if scheme is streaming; else, the edges of G.
         """
         self._EDGES = edges
 
     @property
-    def EDGES(self): return self._EDGES
+    def EDGES(self):
+        """The edges of the freshly discovered region after a window raise
+        if scheme is streaming; else, the edges of G.
+        """
+        return self._EDGES
 
     def make_error(self, p):
         return {e for e in self.EDGES if random.random() < p}
@@ -116,8 +114,8 @@ class _Uniform(Noise):
     def force_error(self, weight: int):
         """Bitlfip exactly ``weight`` edges in G.
         
-        Input: ``weight`` between 0 and ``len(self.EDGES)``.
-        Output: The set of bitflipped edges.
+        :param weight: Between 0 and ``len(self.EDGES)``.
+        :return error: The set of bitflipped edges.
         """
         return set(random.sample(self.EDGES, weight))
 
@@ -169,23 +167,7 @@ class Phenomenological(_Uniform):
 
 
 class CircuitLevel(Noise):
-    """Circuit-level depolarizing noise model.
-    
-    Class attributes:
-    * ``_DEFAULT_MULTIPLICITIES`` maps from edge type to multiplicity vector
-        e.g. ``{'S': (4, 2, 1, 0), ...}``.
-    * ``_ALL_COEFFICIENTS`` maps from parametrization name
-        to 4-vector c such that pi = c*p.
-    
-    Private attributes:
-    * ``_EDGES`` maps from multiplicity vector (as a tuple) to tuple of edges
-        e.g. ``{(4, 2, 1, 0): (e1, ...), ...}``.
-    Order matters as used by ``ForceByEdge.force_error``.
-    The union of all edge tuples in ``_EDGES`` is the freshly discovered region after a window raise
-    if scheme is streaming; else, the edges of G.
-    * ``_COEFFICIENTS`` a 4-vector c such that pi = c*p.
-    * ``_FORCER`` method for forcing error.
-    """
+    """Circuit-level depolarizing noise model."""
 
     _DEFAULT_MULTIPLICITIES: dict[EdgeType, FourInts] = {
         'S':               (4, 2, 1, 0),
@@ -201,12 +183,14 @@ class CircuitLevel(Noise):
         'EU centre':       (4, 0, 0, 0),
         'SEU':             (2, 0, 0, 0),
     }
+    """A map from edge type to multiplicity vector e.g. ``{'S': (4, 2, 1, 0), ...}``."""
 
     _ALL_COEFFICIENTS: dict[Parametrization, FourFloats] = {
         'standard': (4/15, 8/15, 2/3, 1),
         'balanced': (4/15, 8/15, 8/15, 8/15),
         'ion trap': (4/15, 8/15, (2e-3)/3, 1e-2),
     }
+    """A map from parametrization name to 4-vector c such that pi = c*p."""
 
     def __str__(self) -> str:
         return 'circuit-level'
@@ -223,7 +207,7 @@ class CircuitLevel(Noise):
         """
         :param edge_dict: maps from edge type to tuple of edges.
             The union of all edge tuples in ``edge_dict`` is the freshly discovered region after a window raise
-        if scheme is streaming; else, the edges of G.
+            if scheme is streaming; else, the edges of G.
         :param parametrization: name of parametrization.
         :param demolition: whether ancilla qubit measurement demolishes state.
         :param monolingual: whether measurements are native in only one basis.
@@ -232,10 +216,18 @@ class CircuitLevel(Noise):
             See ``noise.forcers`` for more details.
         """
         self._EDGES = self._make_edges(edge_dict, demolition, monolingual, merges)
+        """A map from multiplicity vector (as a tuple) to tuple of edges
+        e.g. ``{(4, 2, 1, 0): (e1, ...), ...}``.
+        Order matters as used by ``ForceByEdge.force_error``.
+        The union of all edge tuples in ``_EDGES`` is the freshly discovered region after a window raise
+        if scheme is streaming; else, the edges of G.
+        """
         self._COEFFICIENTS = self._ALL_COEFFICIENTS[parametrization]
+        """A 4-vector c such that pi = c*p."""
         self._FORCER = ForceByEdge(self._EDGES) if force_by == 'edge' \
             else ForceByPairBalanced(self._EDGES) if parametrization == 'balanced' \
             else ForceByPair(self._EDGES)
+        """Method for forcing error."""
 
     @classmethod
     def _make_edges(
@@ -249,14 +241,14 @@ class CircuitLevel(Noise):
         multiplicities = cls._make_multiplicities(demolition, monolingual)
         edges: defaultdict[FourInts, list[Edge]] = defaultdict(list)
         if merges is None:
-            for edge_type, es in edge_dict.items():
-                m: FourInts = tuple(multiplicities[edge_type]) # type: ignore
-                edges[m] += list(es)
+            for edge_type, edges_of_that_type in edge_dict.items():
+                multiplicity: FourInts = tuple(multiplicities[edge_type]) # type: ignore
+                edges[multiplicity] += list(edges_of_that_type)
         else:
             dc = cls._get_dc(edge_dict, multiplicities, merges)
-            for e, mv in dc.items():
-                m: FourInts = tuple(mv) # type: ignore
-                edges[m].append(e)
+            for edge, multiplicity_vector in dc.items():
+                multiplicity: FourInts = tuple(multiplicity_vector) # type: ignore
+                edges[multiplicity].append(edge)
         return dict(edges)
 
     @classmethod
@@ -330,19 +322,19 @@ class CircuitLevel(Noise):
     
     @cache
     def get_edge_weights(self, noise_level: None | float):
-        result: dict[Edge, tuple[float, float]] = {}
+        edge_weights: dict[Edge, tuple[float, float]] = {}
         if noise_level is None:
-            for m, edges in self._EDGES.items():
+            for multiplicity_vector, edges in self._EDGES.items():
                 for e in edges:
-                    result[e] = (0, 1)
+                    edge_weights[e] = (0, 1)
         else:
             flip_probabilities = self._get_flip_probabilities(noise_level)
-            for m, edges in self._EDGES.items():
-                p = flip_probabilities[m]
+            for multiplicity_vector, edges in self._EDGES.items():
+                p = flip_probabilities[multiplicity_vector]
                 weight = self.log_odds_of_no_flip(p)
                 for e in edges:
-                    result[e] = (p, weight)
-        return result
+                    edge_weights[e] = (p, weight)
+        return edge_weights
 
     def _pi(self, noise_level: float) -> FourFloats:
         """Return 4-vector probability ``pi = c*noise_level``."""
@@ -353,10 +345,10 @@ class CircuitLevel(Noise):
         """Return map from multiplicity to flip probability.
         
         
-        :param noise_level: a probability that represents the noise strength.
+        :param noise_level: A probability that represents the noise strength.
         
         
-        :returns: map from multiplicity to a flip probability.
+        :return flip_probabilities: map from multiplicity to a flip probability.
         """
         pi = self._pi(noise_level)
         return {m: MultisetHandler.pr(m, pi) for m in self._EDGES.keys()}

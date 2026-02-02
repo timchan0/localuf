@@ -406,7 +406,9 @@ class Code(abc.ABC):
             (so there is no measurement error).
         
         
-        :returns: The set of bitflipped edges in the freshly discovered region. Each edge bitflips with probability defined by its multiplicity if circuit-level noise; else, probability ``p``.
+        :returns error: The set of bitflipped edges in the freshly discovered region.
+            Each edge bitflips with probability defined by its multiplicity
+            if circuit-level noise; else, probability ``p``.
         """
         error = self.NOISE.make_error(p)
         if exclude_future_boundary:
@@ -422,10 +424,10 @@ class Code(abc.ABC):
         """Get syndrome from error configuration.
         
         
-        ``error`` a set of bitflipped edges.
+        :param error: a set of bitflipped edges.
         
         
-        :returns: ``syndrome`` a set of defects.
+        :returns syndrome: a set of defects.
         """
         return self.get_verbose_syndrome(error).difference(self.BOUNDARY_NODES)
 
@@ -433,10 +435,10 @@ class Code(abc.ABC):
         """Get syndrome, treating boundary nodes as detectors too.
         
         
-        ``error`` a set of bitflipped edges.
+        :param error: a set of bitflipped edges.
         
         
-        :returns: ``verbose_syndrome`` a set of defects.
+        :returns verbose_syndrome: a set of defects.
         """
         # Note: Implementing `verbose_syndrome` as a set we add to and remove from is
         # empirically faster than as a dictionary w/ a key for each measure-Z qubit
@@ -452,10 +454,11 @@ class Code(abc.ABC):
         """Sequentially compose any number of errors.
         
         :param errors: a tuple (error1, error2, ...) where each
-        error a set of bitflipped edges.
+            error is a set of bitflipped edges.
         
         
-        :returns: A set of edges representing the sequential composition of all errors in ``errors``.
+        :returns composition: A set of edges representing
+            the sequential composition of all errors in ``errors``.
         """
         composition: set[Edge] = set()
         for error in errors:
@@ -469,7 +472,10 @@ class Code(abc.ABC):
         :param leftover: a set of bitflipped edges.
         
         
-        :returns: logical error count parity if scheme is batch else logical error count if scheme is scheme is global batch else logical error count in commit region if scheme is forward.
+        :returns logical_error: logical error count parity
+            if scheme is batch else logical error count
+            if scheme is scheme is global batch else logical error count in commit region
+            if scheme is forward.
         """
         return self.SCHEME.get_logical_error(leftover)
     

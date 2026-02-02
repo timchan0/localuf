@@ -173,13 +173,13 @@ class UF(BaseUF):
         """Weigh ``self.correction``.
         
         
-        :param noise_level: a probability representing the noise strength.
+        :param noise_level: A probability representing the noise strength.
             This is needed to define nonuniform edge weights of the decoding graph
-        in the circuit-level noise model.
-        If ``None``, all edges are assumed to have weight 1.
+            in the circuit-level noise model.
+            If not specified, all edges are assumed to have weight 1.
         
         
-        :returns: The sum of the weights of the edges in ``self.correction``.
+        :return weight: The sum of the weights of the edges in ``self.correction``.
         """
         edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
         return sum(edge_weights[e][1] for e in self.correction)
@@ -188,7 +188,7 @@ class UF(BaseUF):
         """Compute the Unclustered Node Fraction DCS.
         
         
-        :returns: ``fraction`` the fraction of nodes that are not in a cluster.
+        :return fraction: The fraction of nodes that are not in a cluster.
         """
         clustered_node_count = sum(cluster.size
             for cluster in self.clusters.values() if cluster.size > 1)

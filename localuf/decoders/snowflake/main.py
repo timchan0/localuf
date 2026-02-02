@@ -1,7 +1,7 @@
 import abc
 from collections.abc import Iterable, Sequence
 from functools import cache
-from typing import Literal
+from typing import Literal, override
 
 import networkx as nx
 
@@ -23,42 +23,13 @@ class Snowflake(BaseUF):
     Incompatible with code capacity noise model.
     Compatible only with frugal scheme.
     
-    Class constants:
-    ``BW_DEFAULT_NODE_SIZE`` the default node size for black-and-white drawing.
-    
-    Additional instance attributes:
-    * ``NODES`` a dictionary of nodes.
-    * ``EDGES`` ditto for edges.
-    * ``_pointer_digraph`` a NetworkX digraph representing the fully grown edges used by pointers,
-        the set of its edges as directed edges,
-    the set of its edges as undirected edges.
-    * ``_stage`` the current stage of the decoder.
-        Only used for ``draw_growth`` when ``show_global = True``.
-    * ``_LOWEST_EDGES`` a tuple of the edges in the bottom layer of the viewing window.
-        For repetition code, the edges are ordered
-    first by type (up, east)
-    then by y-coordinate (west to east).
-    For surface code, the edges are ordered
-    first by type (up, south_down, east_up, south_east_up, south, east),
-    then by x-coordinate (north to south), then by y-coordinate (west to east).
-    If ``__init__`` was called with ``_include_timelike_lowest_edges = False``,
-    the purely timelike (i.e. 'up') edges are excluded.
-    * ``floor_history`` a list of bitstrings representing
-        the correction output from the bottom layer at each drop.
-    The order of the bits is given by ``self._LOWEST_EDGES``.
-    
-    Overriden methods:
-    * ``reset``.
-    * ``decode``.
-    * ``draw_growth``.
-    * ``draw_decode``.
-    
-    Uses not:
+    Does not use:
     * ``_growth`` attribute.
     * ``erasure`` attribute.
     """
 
     BW_DEFAULT_NODE_SIZE = 360
+    """The default node size for black-and-white drawing."""
 
     def __init__(
             self,
@@ -122,20 +93,42 @@ class Snowflake(BaseUF):
         }
         self._DECODE_DRAWER = DecodeDrawer(self._FIG_WIDTH, fig_height=self._FIG_HEIGHT)
         self._stage = Stage.DROP
+        """The current stage of the decoder.
+        Only used for ``draw_growth`` when ``show_global = True``.
+        """
         self._BITSTRING_CONVERTER = (_Repetition if type(code) is Repetition else _Surface)(code.D, window_height)
         self._LOWEST_EDGES = tuple(self.EDGES[e] for e in self._BITSTRING_CONVERTER.lowest_edges(
             str(code.NOISE),
             _include_timelike_lowest_edges=_include_timelike_lowest_edges,
         ))
+        """A tuple of the edges in the bottom layer of the viewing window.
+        For repetition code, the edges are ordered
+        first by type (up, east)
+        then by y-coordinate (west to east).
+        For surface code, the edges are ordered
+        first by type (up, south_down, east_up, south_east_up, south, east),
+        then by x-coordinate (north to south), then by y-coordinate (west to east).
+        If ``__init__`` was called with ``_include_timelike_lowest_edges = False``,
+        the purely timelike (i.e. 'up') edges are excluded.
+        """
+        self.floor_history: list[str]
+        """A list of bitstrings representing
+        the correction output from the bottom layer at each drop.
+        The order of the bits is given by ``self._LOWEST_EDGES``.
+        """
     
     def __repr__(self) -> str:
         return f'decoders.Snowflake({self.CODE})'
 
     @property
-    def NODES(self): return self._NODES
+    def NODES(self):
+        """A map from node coordinates to node objects."""
+        return self._NODES
 
     @property
-    def EDGES(self): return self._EDGES
+    def EDGES(self):
+        """A map from coordinate pairs to edge objects."""
+        return self._EDGES
 
     @property
     def syndrome(self):
@@ -195,6 +188,7 @@ class Snowflake(BaseUF):
             delta = 2*d if id_<2*d*h else d*(d-1)
         return id_ + delta
         
+    @override
     def reset(self):
         super().reset()
         for node in self.NODES.values():
@@ -207,6 +201,7 @@ class Snowflake(BaseUF):
         try: del self.floor_history
         except AttributeError: pass
     
+    @override
     def decode(
             self,
             syndrome: set[Node],
@@ -218,24 +213,25 @@ class Snowflake(BaseUF):
         """Perform a decoding cycle i.e. a growth round.
         
         
-        :param syndrome: the syndrome in the new region discovered by the window raise
+        :param syndrome: The syndrome in the new region discovered by the window raise
             i.e. all defects in ``syndrome`` have the time coordinate ``self.CODE.SCHEME.WINDOW_HEIGHT-1``.
-        :param log_history: whether to populate ``history`` attribute --
+        :param log_history: Whether to populate ``history`` attribute;
             'fine' logs each timestep;
         'coarse', only the final timestep of the growth round.
         :param log_floor_history: whether to populate ``floor_history`` attribute.
         :param time_only: whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
-        each merging step only ('merging');
-        or each unrooting step only ('unrooting').
-        :param defects_possible: whether to expect there may be defects in the viewing window
+            each merging step only ('merging');
+            or each unrooting step only ('unrooting').
+        :param defects_possible: Whether to expect there may be defects in the viewing window
             in the current or any future timestep.
-        If ``False``, the decoder will perform only 'drop',
-        and will skip 'grow' and 'merge' stages.
-        This is useful at the end of the memory experiment after the final syndrome data has come in.
+            If ``False``, the decoder will perform only 'drop',
+            and will skip 'grow' and 'merge' stages.
+            This is useful at the end of the memory experiment after the final syndrome data has come in.
         
         
-        :returns: ``t`` number of timesteps to complete decoding cycle. Equals the increase in ``len(self.history)`` if ``log_history`` is 'fine' and ``time_only`` is ``'all'``.
+        :return t: Number of timesteps to complete decoding cycle.
+            Equals the increase in ``len(self.history)`` if ``log_history == 'fine'`` and ``time_only == 'all'``.
         """
         self._stage = Stage.DROP
         if log_floor_history:
@@ -334,6 +330,7 @@ class Snowflake(BaseUF):
             result[top_left] = str(self._stage) + result[top_left]
         return result
 
+    @override
     def draw_growth(
         self,
         highlighted_edges: set[Edge] | None = None,
@@ -568,13 +565,14 @@ class Snowflake(BaseUF):
 
     @property
     def _pointer_digraph(self):
-        """Return a NetworkX digraph representing the fully grown edges used by pointers,
-        the set of its edges as directed edges,
-        the set of its edges as undirected edges.
-        TODO: this is a temporary fix of ``_DigraphMaker.pointer_digraph``.
-        i.e. ``self.__init__`` used to have the line
-        ``self._DIGRAPH_MAKER = DigraphMaker(self.NODES, self.growth)``.
         """
+        :return dig: A NetworkX digraph representing the fully grown edges used by pointers.
+        :return dig_diedges: The set of the digraph's edges as directed edges.
+        :return dig_edges: The set of the digraph's edges as undirected edges.
+        """
+        # TODO: this is a temporary fix of ``_DigraphMaker.pointer_digraph``.
+        # i.e. ``self.__init__`` used to have the line
+        # ``self._DIGRAPH_MAKER = DigraphMaker(self.NODES, self.growth)``.
         dig = nx.DiGraph()
         dig.add_nodes_from(self.NODES.keys())
         dig_diedges: list[Edge] = []
@@ -591,6 +589,7 @@ class Snowflake(BaseUF):
                 except KeyError: pass  # node in bottom sheet points down
         return dig, dig_diedges, dig_edges
     
+    @override
     def draw_decode(self, **kwargs_for_networkx_draw):
         self._DECODE_DRAWER.draw(self.history, **kwargs_for_networkx_draw)
 
@@ -1220,11 +1219,11 @@ class _Schedule(abc.ABC):
         """Perform the rest of the decoding cycle after drop.
         
         
-        :param log_history: as in ``decode`` inputs.
-        :param time_only: as in ``decode`` inputs.
+        :param log_history: As in ``decode`` inputs.
+        :param time_only: As in ``decode`` inputs.
         
         
-        :returns: ``t`` number of timesteps to complete decoding cycle.
+        :return t: Number of timesteps to complete decoding cycle.
         """
 
     @abc.abstractmethod

@@ -34,35 +34,28 @@ class BaseUF(Decoder):
     """The abstract class representing the UF decoder (Union--Find).
     
     Extends ``BaseDecoder``.
-    
-    Class attributes:
-    * ``_ACTIVE_GROWTH_VALUES`` the set of growth values for which an edge is active i.e. can grow.
-    * ``_INACTIVE_GROWTH_VALUES`` the set of growth values for which an edge is inactive.
-    
-    Additional instance attributes:
-    * ``growth`` maps each edge in the decoding graph to an integer representing its growth value.
-    * ``syndrome`` the set of defects.
-    * ``erasure`` the set of fully grown edges.
-        Only computed if ``erasure`` not yet an attribute.
-    * ``history`` a list of past self snapshots @ each growth round
-        (all w/ same ``history`` attribute to prevent infinite loop).
-    * ``_cached_swim_graph`` a NetworkX graph representing
-        the search graph for the swim distance DCS.
-    The only time it is retrieved is in the property ``_swim_graph``,
-    which always updates the edge weights before returning the graph.
     """
 
     _ACTIVE_GROWTH_VALUES = {Growth.UNGROWN, Growth.HALF}
+    """The set of growth values for which an edge is active i.e. can grow."""
     _INACTIVE_GROWTH_VALUES = {Growth.BURNT, Growth.FULL}
+    """The set of growth values for which an edge is inactive."""
 
     def __init__(self, code: Code):
         """Input: ``code`` the code to be decoded."""
         super().__init__(code)
-        self._growth = {e: Growth.UNGROWN for e in self.CODE.EDGES}
+        self._growth: dict[Edge, Growth] = {e: Growth.UNGROWN for e in self.CODE.EDGES}
         self.syndrome: set[Node]
+        """The set of defects."""
+        self.history: list[BaseUF]
+        """A list of past self snapshots at each growth round
+        (all with the same ``history`` attribute to prevent infinite loop).
+        """
 
     @property
-    def growth(self): return self._growth
+    def growth(self):
+        """A map from each edge in the decoding graph to an integer representing its growth value."""
+        return self._growth
 
     @property
     @abstractmethod
@@ -76,7 +69,9 @@ class BaseUF(Decoder):
 
     @cached_property
     def erasure(self):
-        """Compute erasure from growth."""
+        """The set of fully grown edges, computed from ``self.growth``.
+        Only computed if ``erasure`` not yet an attribute.
+        """
         return {e for e, growth in self.growth.items() if growth is Growth.FULL}
 
     def reset(self):
@@ -94,7 +89,7 @@ class BaseUF(Decoder):
 
     def init_history(self):
         """Initialize ``history`` attribute."""
-        self.history: list[BaseUF] = []
+        self.history = []
 
     def append_history(self):
         """Append a snapshot of the current ``self`` to ``self.history``."""
@@ -145,16 +140,16 @@ class BaseUF(Decoder):
         """Draw growth of edges using matplotlib.
         
         
-        :param growth: a dictionary where each key an edge index; value, its growth value.
-        :param syndrome: the set of defects.
-        :param highlighted_edges: the set of edges to be highlighted in drawing.
-        :param x_offset: the ratio of out-of-screen to along-screen distance.
-        :param with_labels: whether to show node labels.
-        :param labels: a dictionary where each key a node index; value, its label as a string.
-        :param width: line width of edges.
-        :param arrows: whether to draw arrows on edges used by pointers.
+        :param growth: A dictionary where each key an edge index; value, its growth value.
+        :param syndrome: The set of defects.
+        :param highlighted_edges: The set of edges to be highlighted in drawing.
+        :param x_offset: The ratio of out-of-screen to along-screen distance.
+        :param with_labels: Whether to show node labels.
+        :param labels: A dictionary where each key a node index; value, its label as a string.
+        :param width: Line width of edges.
+        :param arrows: Whether to draw arrows on edges used by pointers.
             For ``Macar, Actis, Snowflake`` decoders only.
-        :param kwargs_for_networkx_draw: passed to ``networkx.draw()``.
+        :param kwargs_for_networkx_draw: Passed to ``networkx.draw()``.
             E.g. ``linewidths`` line width of node symbol border.
         """
         g = self.CODE.GRAPH
@@ -232,12 +227,15 @@ class BaseUF(Decoder):
             outline_color: str = 'k',
             **kwargs_for_get_node_color,
     ):
-        """Return ``node_color``, ``edgecolors`` kwargs for ``networkx.draw()``.
+        """Return node color and node edge color kwargs for ``networkx.draw()``.
         
         
-        :param outlined_nodes: the set of nodes to be outlined.
-        :param nodelist: the list of nodes (needed to specify the node order in the outputs).
-        :param kwargs_for_get_node_color: passed to ``self.CODE.get_node_color()``.
+        :param outlined_nodes: Set of nodes to be outlined.
+        :param nodelist: List of nodes (needed to specify the node order in the outputs).
+        :param kwargs_for_get_node_color: Passed to ``self.CODE.get_node_color()``.
+
+        :return node_color: List of node colors.
+        :return edgecolors: List of node edge colors.
         """
         node_color = self.CODE.get_node_color(
             self.syndrome,
@@ -266,15 +264,15 @@ class BaseUF(Decoder):
         but works slightly faster in the latter case.
         
         
-        :param noise_level: a probability representing the noise strength.
-            This is needed to define nonuniform edge weights of the decoding graph
-        in the circuit-level noise model.
-        If ``None``, all edges are assumed to have weight 1.
-        :param draw: whether to draw the search graph and the shortest path.
-        :param kwargs_for_draw_swim_graph: passed to ``self._draw_swim_graph()``.
+        :param noise_level: An optional probability representing the noise strength.
+            This defines nonuniform edge weights of the decoding graph
+            in the circuit-level noise model.
+            If not specified, all edges are assumed to have weight 1.
+        :param draw: Whether to draw the search graph and the shortest path.
+        :param kwargs_for_draw_swim_graph: Passed to ``self._draw_swim_graph()``.
         
         
-        :returns: ``length`` the swim distance.
+        :return length: The swim distance.
         """
         graph, west, east = self._swim_graph(noise_level=noise_level)
         length, path = nx.bidirectional_dijkstra(graph, west, east)
@@ -282,17 +280,17 @@ class BaseUF(Decoder):
             self._draw_swim_graph(path, **kwargs_for_draw_swim_graph)
         return length
     
-    def _swim_graph(self, noise_level: None | float = None) -> tuple[nx.Graph, Node, Node]:
+    def _swim_graph(self, noise_level: None | float = None):
         """Return the search graph and endpoints for the swim distance.
         
         
-        :param noise_level: as described in ``swim_distance()``.
+        :param noise_level: As described in ``swim_distance()``.
         
         
-        :returns:
-        * ``graph`` the search graph.
-        * ``west`` the node representing the west boundary.
-        * ``east`` the node representing the east boundary.
+        :return graph: A NetworkX graph representing
+            the search graph for the swim distance DCS.
+        :return west: The node representing the west boundary.
+        :return east: The node representing the east boundary.
         
         The edges not in ``self.growth`` have weight 0 ALWAYS.
         The weight of the other edges is set according to ``self.growth``.
@@ -312,11 +310,12 @@ class BaseUF(Decoder):
     def _cached_swim_graph(self):
         """Return the search graph and endpoints for the swim distance.
         
-        
-        :returns:
-        * ``graph`` the search graph.
-        * ``west`` the node representing the west boundary.
-        * ``east`` the node representing the east boundary.
+        :return graph: A NetworkX graph representing
+            the search graph for the swim distance DCS.
+            The only time it is retrieved is in the property ``_swim_graph``,
+            which always updates the edge weights before returning the graph.
+        :return west: The node representing the west boundary.
+        :return east: The node representing the east boundary.
         
         The edges not in ``self.growth`` have weight 0 ALWAYS.
         There is no guarantee about the weight of the other edges.
@@ -344,10 +343,10 @@ class BaseUF(Decoder):
         """Draw the search graph for the swim distance.
         
         
-        :param path: the shortest west--east path.
-        :param weightless_edge_width: the width of zero-weight edges.
-        :param max_edge_width: the maximum width of edges.
-        :param kwargs_for_networkx_draw: passed to ``networkx.draw()``.
+        :param path: The shortest west--east path.
+        :param weightless_edge_width: The width of zero-weight edges.
+        :param max_edge_width: The maximum width of edges.
+        :param kwargs_for_networkx_draw: Passed to ``networkx.draw()``.
         """
         graph, _, _ = self._cached_swim_graph
         max_weight: float = max(weight for _, _, weight in graph.edges.data('weight')) # type: ignore
