@@ -137,7 +137,7 @@ def monte_carlo_pymatching(
         ns = [ns] * len(ps)
     elif len(ns) != len(ps):
         raise ValueError('Sequence `ns` must have same length as `ps`')
-    mi = MultiIndex.from_product([ds, ps], names=['d', 'p'])
+    mi = MultiIndex.from_product([list(ds), list(ps)], names=['d', 'p'])
     df = DataFrame(columns=mi)
     for d in ds:
         code = code_class(
@@ -180,7 +180,7 @@ def monte_carlo_special(
         ns = [ns] * len(ps)
     elif len(ns) != len(ps):
         raise ValueError('Sequence `ns` must have same length as `ps`')
-    mi = MultiIndex.from_product([ds, ps], names=['d', 'p'])
+    mi = MultiIndex.from_product([list(ds), list(ps)], names=['d', 'p'])
     df = DataFrame(columns=mi)
     for d in ds:
         code = code_class(
@@ -212,7 +212,11 @@ def subset_sample(
     """Make threshold data for any decoder using subset sampling.
     
     
-    :returns: ``df`` a DataFrame indexed by (distance, error weight), with columns: * 'subset prob' probability of error of that weight, given distance. * 'survival prob' complement of cumulative sum of 'subset prob'. * 'm' failure count. * 'n' shot count.
+    :return df: A DataFrame indexed by (distance, error weight), with columns:
+        1. 'subset prob' probability of error of that weight, given distance.
+        2. 'survival prob' complement of cumulative sum of 'subset prob'.
+        3. 'm' failure count.
+        4. 'n' shot count.
     """
     ls = []
     for d in ds:
