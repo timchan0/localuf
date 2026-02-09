@@ -267,7 +267,6 @@ class BaseUF(Decoder):
         ``merge_equivalent_boundary_nodes=False`` or ``True``
         but works slightly faster in the latter case.
         
-        
         :param noise_level: An optional probability representing the noise strength.
             This defines nonuniform edge weights of the decoding graph
             in the circuit-level noise model.
@@ -275,11 +274,10 @@ class BaseUF(Decoder):
         :param draw: Whether to draw the search graph and the shortest path.
         :param kwargs_for_draw_swim_graph: Passed to ``self._draw_swim_graph()``.
         
-        
         :return length: The swim distance.
         """
-        graph, west, east = self._swim_graph(noise_level=noise_level)
-        length, path = nx.bidirectional_dijkstra(graph, west, east)
+        graph = self._swim_graph(noise_level=noise_level)
+        length, path = nx.bidirectional_dijkstra(graph, *self._META_BOUNDARIES)
         if draw:
             self._draw_swim_graph(path, **kwargs_for_draw_swim_graph)
         return length
@@ -287,20 +285,15 @@ class BaseUF(Decoder):
     def _swim_graph(self, noise_level: None | float = None):
         """Return the search graph and endpoints for the swim distance.
         
-        
         :param noise_level: As described in ``swim_distance()``.
-        
         
         :return graph: A NetworkX graph representing
             the search graph for the swim distance DCS.
-        :return west: The node representing the west boundary.
-        :return east: The node representing the east boundary.
-        
-        The edges not in ``self.growth`` have weight 0 ALWAYS.
-        The weight of the other edges is set according to ``self.growth``.
+            The edges not in ``self.growth`` have weight 0 ALWAYS.
+            The weight of the other edges is set according to ``self.growth``.
         """
         # TODO: use `networkx.quotient_graph`
-        graph, _, _ = self._cached_swim_graph
+        graph = self._cached_swim_graph
         for e, (_, weight) in self.CODE.NOISE.get_edge_weights(noise_level).items():
             if e not in self.growth or self.growth[e] is Growth.UNGROWN:
                 # this can happen when the decoder omits some edges in W
@@ -313,6 +306,21 @@ class BaseUF(Decoder):
         return self._cached_swim_graph
     
     @cached_property
+    def _META_BOUNDARIES(self) -> tuple[Node, Node]:
+        """The two extra nodes connecting the west and east boundary nodes.
+        
+        :return west: The node connected to the west boundary nodes.
+        :return east: The node connected to the east boundary nodes.
+        """
+        d = self.CODE.D
+        a = self.CODE.LONG_AXIS
+        n = self.CODE.DIMENSION
+        return (
+            tuple(chain(repeat(d//2, a), (-2,), repeat(d//2, n-a-1))),
+            tuple(chain(repeat(d//2, a), ( d,), repeat(d//2, n-a-1))),
+        )
+    
+    @cached_property
     def _cached_swim_graph(self):
         """Return the search graph and endpoints for the swim distance.
         
@@ -320,21 +328,16 @@ class BaseUF(Decoder):
             the search graph for the swim distance DCS.
             The only time it is retrieved is in the property ``_swim_graph``,
             which always updates the edge weights before returning the graph.
-        :return west: The node representing the west boundary.
-        :return east: The node representing the east boundary.
-        
-        The edges not in ``self.growth`` have weight 0 ALWAYS.
-        There is no guarantee about the weight of the other edges.
+            The edges not in ``self.growth`` have weight 0 ALWAYS.
+            There is no guarantee about the weight of the other edges.
         """
         graph = self.CODE.GRAPH.copy()
         d = self.CODE.D
         a = self.CODE.LONG_AXIS
-        n = self.CODE.DIMENSION
-        west = tuple(chain(repeat(d//2, a), (-2,), repeat(d//2, n-a-1)))
-        east = tuple(chain(repeat(d//2, a), (d,), repeat(d//2, n-a-1)))
+        west, east = self._META_BOUNDARIES
         graph.add_edges_from(((west, v) for v in self.CODE.NODES if v[a]==-1), weight=0)
         graph.add_edges_from(((v, east) for v in self.CODE.NODES if v[a]==d-1), weight=0)
-        return graph, west, east
+        return graph
 
     def _draw_swim_graph(
             self,
@@ -348,13 +351,12 @@ class BaseUF(Decoder):
     ):
         """Draw the search graph for the swim distance.
         
-        
         :param path: The shortest west--east path.
         :param weightless_edge_width: The width of zero-weight edges.
         :param max_edge_width: The maximum width of edges.
         :param kwargs_for_networkx_draw: Passed to ``networkx.draw()``.
         """
-        graph, *_, = self._cached_swim_graph
+        graph = self._cached_swim_graph
         max_weight: float = max(weight for _, _, weight in graph.edges.data('weight')) # type: ignore
         width_multiplier = (max_edge_width - weightless_edge_width) / max_weight
         nx.draw_networkx_nodes(
@@ -370,7 +372,8 @@ class BaseUF(Decoder):
             node_size=node_size,
             width=[width_multiplier * weight + weightless_edge_width
                    for _, _, weight in graph.edges.data('weight')], # type: ignore
-            edge_color=[constants.RED if set(edge)<=set(path) else 'k' for edge in graph.edges], # type: ignore
+            edge_color=[constants.RED if set(edge)<=set(path)
+                        else 'k' for edge in graph.edges], # type: ignore
             alpha=edge_alpha,
             **kwargs_for_networkx_draw,
         )
