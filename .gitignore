@@ -9,3 +9,10 @@ __pycache__/
 /build/
 *.whl
 *.tar.gz
+
+# Sphinx documentation build
+/docs/_build/
+/docs/generated/
+
+# Developer helper scripts (not part of the package)
+/scripts/
