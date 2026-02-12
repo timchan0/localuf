@@ -28,7 +28,8 @@ dependencies = [
     "scipy",
     "statsmodels",
     "pymatching",
-    "stim"
+    "stim",
+    "typing_extensions; python_version < '3.12'",
 ]
 
 [project.optional-dependencies]

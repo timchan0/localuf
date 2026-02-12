@@ -2,7 +2,12 @@ import abc
 from collections.abc import Iterable, Sequence
 from collections import defaultdict
 from functools import cache
-from typing import Literal, override
+from typing import Literal
+
+try:
+    from typing import override  # py>=3.12
+except ImportError:  # pragma: no cover
+    from typing_extensions import override
 
 import networkx as nx
 

@@ -3,7 +3,12 @@ from abc import abstractmethod
 from collections.abc import Iterable
 import itertools
 import math
-from typing import Literal, TYPE_CHECKING, override
+from typing import Literal, TYPE_CHECKING
+
+try:
+    from typing import override  # py>=3.12
+except ImportError:  # pragma: no cover
+    from typing_extensions import override
 
 from localuf import constants
 from localuf.noise import CodeCapacity
