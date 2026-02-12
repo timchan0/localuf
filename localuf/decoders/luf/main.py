@@ -22,25 +22,28 @@ class LUF(BaseUF):
     Extends ``_BaseUF``.
     
     Class attributes:
+    
     * ``DEFAULT_X_OFFSET`` default ``x_offset``.
         Slightly larger than ``constants.DEFAULT_X_OFFSET``
-    as the drawer for this class shows more information at each node.
+        as the drawer for this class shows more information at each node.
     
     Instance attributes (1--5 constant):
+    
     * ``CONTROLLER`` a global controller object.
     * ``NODES`` a Nodes object.
     * ``VISIBLE`` whether controller has direct connection w/ each node or only node w/ ID 0
         i.e. strictly local iff ``VISIBLE`` is ``False``.
-    Only computed if ``syndrome`` not yet an attribute.
+        Only computed if ``syndrome`` not yet an attribute.
     * ``_DIGRAPH_MAKER`` maker of NetworkX digraph.
     * ``_DECODE_DRAWER`` provides ``draw_decode``.
     * ``_FIG_WIDTH`` figure width used by drawer.
     * ``correction`` only exists after calling ``decode()``.
     * ``_pointer_digraph`` a NetworkX digraph representing the fully grown edges used by pointers,
         the set of its edges as directed edges,
-    the set of its edges as undirected edges.
+        the set of its edges as undirected edges.
     
     In drawings of this graph:
+    
     * active nodes are square-shaped
     * inactive nodes are circular
     * CID is shown as a label
@@ -85,15 +88,15 @@ class LUF(BaseUF):
             **kwargs_for_draw_decode,
     ):
         """Additional inputs over those of ``Decoder.decode()``:
+        
         * ``log_history`` whether to populate ``history`` attribute.
         * ``kwargs_for_draw_decode`` passed to ``self.draw_decode()``.
         
         
-        :returns:
-        * ``tSV`` # timesteps to validate syndrome.
-        * ``tBP`` # timesteps to burn and peel.
+        :returns tSV: Number of timesteps to validate syndrome.
+        :returns tBP: Number of timesteps to burn and peel.
         
-        If ``log_history`` is ``True`` then ``tSV + tBP = len(self.history)``.
+                If ``log_history`` is ``True`` then ``tSV + tBP = len(self.history)``.
         """
         log_history |= draw
         tSV = self.validate(
@@ -331,6 +334,7 @@ class Controller:
     """Global controller for LUF.
     
     Instance attributes (1 constant):
+    
     * ``LUF`` the LUF object which has this controller.
     * ``stage`` the global stage.
     """
@@ -378,10 +382,11 @@ class Nodes(abc.ABC):
     """Collection of all LUF nodes.
     
     Instance attributes (1--2 constant):
+    
     * ``LUF`` the LUF object which has these nodes.
     * ``dc`` a dictionary where each
         key an index tuple;
-    value, the node object at that index.
+        value, the node object at that index.
     * ``syndrome`` the set of defects.
     * ``busy`` is ``False`` iff we are sure all nodes are ready for next stage.
     * ``valid`` is ``True`` iff we are sure no node is active after presyncing stage
@@ -487,6 +492,7 @@ class ActisNodes(Nodes):
     Extends ``Nodes``.
     
     Additional instance attributes (1--2 constant):
+    
     * ``SPAN`` distance from controller to furthest node (boundary node w/ highest ID).
     * ``WAITER`` object which decides how long controller must wait until
         it is sure no more info is being relayed (towards it).
@@ -585,6 +591,7 @@ class Waiter(abc.ABC):
     """Base class for ``WAITER`` attribute of ``ActisNodes`` instance.
     
     Instance attributes:
+    
     * ``NODES`` the ``ActisNodes`` object the waiter belongs to.
     * ``RECEIVING_START`` the value the waiter sets countdown to
         if it receives a busy signal during the receiving window.
@@ -607,17 +614,18 @@ class Waiter(abc.ABC):
         """Advance 1 timestep.
         
         Countdown start for controller stage:
+        
         * GROWING or PRESYNCING is ``span`` as it takes ``span`` timesteps
             (``span-1`` .. -1 .. 0)
-        for information to go from controller to furthest node.
+            for information to go from controller to furthest node.
         * MERGING is ``span+1`` as it takes ``span`` timesteps
             (``span`` .. -1 .. 1)
-        for information to go from furthest node to controller
-        [and furthest node (which is a boundary) can be busy].
+            for information to go from furthest node to controller
+            [and furthest node (which is a boundary) can be busy].
         * SYNCING is ``span`` as it takes ``span-1`` timesteps
             (``span-1`` .. -1 .. 1)
-        for information to go from furthest detector to controller
-        (furthest boundary node never busy nor active).
+            for information to go from furthest detector to controller
+            (furthest boundary node never busy nor active).
         """
         self.NODES.busy = True
         if self.NODES.countdown == 0:  # stage complete
@@ -641,6 +649,7 @@ class OptimalWaiter(Waiter):
     Extends ``Waiter``.
     
     Additional class constants:
+    
     * ``RECEIVING_WINDOW`` the countdown values
         during which the waiter considers busy signals.
     """
@@ -674,36 +683,38 @@ class _Node(abc.ABC):
     """Node for LUF.
     
     Class attributes:
+    
     * ``OPPOSITE`` a dictionary where each
         key a possible ``pointer`` value;
-    value, the value in the opposite direction.
+        value, the value in the opposite direction.
     
     Instance attributes (1--4 constant,
     5 constant within a decoding cycle,
     6--14 variable within a decoding cycle):
+    
     * ``NODES`` the Nodes object the node belongs to.
     * ``INDEX`` the index of the node.
     * ``ID`` the unique ID of the node.
         ``ID`` bijects ``INDEX``.
     * ``NEIGHBORS`` a dictionary where each
         key a pointer string;
-    value, a tuple of the form (edge, index of edge which is neighbor).
+        value, a tuple of the form (edge, index of edge which is neighbor).
     * ``_IS_BOUNDARY`` whether node is a boundary node.
     * ``defect`` whether the node is a defect.
     * ``active`` whether the cluster the node is in is active.
     * ``cid`` the ID of the cluster the node belongs to.
     * ``next_cid`` the provisional ``cid`` for the next timestep.
         It depends on the ``cid`` of the nodes around it.
-    At the end of the timestep, each node sets ``cid = next_cid``.
-    This ensures causality i.e. info travels at 1 edge per timestep.
+        At the end of the timestep, each node sets ``cid = next_cid``.
+        This ensures causality i.e. info travels at 1 edge per timestep.
     * ``anyon`` whether the node has an anyon.
     * ``next_anyon`` the provisional ``anyon`` for the next timestep.
     * ``pointer`` the direction the node sends anyons along.
     * ``busy`` whether the node changes any of its attributes in the current timestep.
     * ``access`` refers to neighbors along fully grown edges.
         In the form of a dictionary of where each
-    key a pointer string;
-    value, the ``_Node`` object in the direction of that pointer.
+        key a pointer string;
+        value, the ``_Node`` object in the direction of that pointer.
     """
 
     OPPOSITE: dict[direction, direction] = {
@@ -937,6 +948,7 @@ class ActisNode(_Node):
     Extends ``_Node``.
     
     Additional instance attributes (1--2 constant):
+    
     * ``SPAN`` the countdown start of the node.
     * ``FRIENDSHIP`` the type of connection the node has for communicating
         ``stage`` and signal information.
@@ -945,10 +957,10 @@ class ActisNode(_Node):
     * ``stage`` node stage.
     * ``busy_signal`` if in the current timestep the node either
         is busy
-    or receives a busy signal from another node.
+        or receives a busy signal from another node.
     * ``active_signal`` if in the current timestep the node either
         has ``stage`` as ``presyncing`` and becomes active,
-    or receives an active signal from another node.
+        or receives an active signal from another node.
     * ``next_{stage, {busy, active}_signal}`` the provisional ``{stage, {busy, active}_signal}`` for the next timestep.
     * ``stage, {busy, active}_signal`` have string representations via ``[attribute]_symbol`` property.
     """
@@ -1011,7 +1023,7 @@ class ActisNode(_Node):
                 self.advance_indefinite('syncing')
 
     def advance_definite(self, stage: str):
-        """Advance when ``stage`` in `{'growing', 'presyncing'}."""
+        """Advance when ``stage`` in ``{'growing', 'presyncing'}``."""
         if self.countdown == 0:
             getattr(self, stage)()
             self.next_stage += Stage.INCREMENT
@@ -1019,7 +1031,7 @@ class ActisNode(_Node):
             self.countdown -= 1
 
     def advance_indefinite(self, stage: str):
-        """Advance when ``stage`` in `{'merging', 'syncing'}."""
+        """Advance when ``stage`` in ``{'merging', 'syncing'}``."""
         changed = self.FRIENDSHIP.update_stage()
         if changed:
             self.countdown = self.SPAN
@@ -1060,6 +1072,7 @@ class Friendship(abc.ABC):
     """The type of connection for communicating ``stage, {busy, active}_signal`` information.
     
     Instance attributes (1 constant):
+    
     * ``NODE`` the node which has this friendship.
     """
 
@@ -1117,6 +1130,7 @@ class NodeFriendship(Friendship):
     Extends ``Friendship``.
     
     Additional instance attributes (1 constant):
+    
     * ``RELAYEE`` the neighboring node that ``busy_signal`` is sent to.
         Equals the neighbor in the direction toward node of ID 0.
     """

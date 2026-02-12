@@ -40,7 +40,7 @@ class Code(abc.ABC):
         :param scheme: the decoding scheme.
         :param window_height: total layer count in the time direction.
             Affects only batch and global batch decoding schemes.
-        Default value is ``d``.
+            Default value is ``d``.
         :param commit_height: the layer count in the time direction
             that is committed.
             Affects only forward and frugal decoding schemes.
@@ -186,8 +186,8 @@ class Code(abc.ABC):
         
         
         :returns:
-        * number of edges in G.
-        * tuple of edges of G.
+            * number of edges in G.
+            * tuple of edges of G.
         """
 
     @abc.abstractmethod
@@ -305,6 +305,7 @@ class Code(abc.ABC):
         """The noise model.
         
         If the noise model is:
+        
         * code capacity,
             then the decoding graph G represents the code, where each
             * detector represents a measure-Z qubit;

@@ -661,7 +661,7 @@ class Frugal(_Streaming):
         
         
         :return latency: The number of timesteps
-        from receiving the last measurement round to outputting the final correction.
+            from receiving the last measurement round to outputting the final correction.
         """
         self.reset()
         decoder.reset()

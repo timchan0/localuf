@@ -29,17 +29,17 @@ def get_failure_data(
     :param alpha: significance level of confidence intervals.
     :param method: method to compute confidence intervals.
         For details on confidence intervals,
-    see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
+        see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
     
     
-    :returns:
-    * ``dT`` a DataFrame where each row a (distance, probability); columns are:
-    * ``f`` logical failure rate
-    * ``lo`` lower confidence bound of ``f``
-    * ``hi`` upper confidence bound of ``f``
-    * ``x`` log10(``p``)
-    * ``y`` log10(``f``)
-    * ``yerr`` half the confidence interval of ``y``.
+    :return dT: a DataFrame where each row a (distance, probability); columns are:
+    
+    :return f: logical failure rate
+    :return lo: lower confidence bound of ``f``
+    :return hi: upper confidence bound of ``f``
+    :return x: log10(``p``)
+    :return y: log10(``f``)
+    :return yerr: half the confidence interval of ``y``.
     """
     dT: DataFrame = data.loc[:, (slice(None), p_slice)].T # type: ignore
     dT['f'] = dT.m / dT.n
@@ -64,6 +64,7 @@ def get_failure_data_from_subset_sample(
     
     Output: a DataFrame indexed by (distance, noise level),
     with columns:
+    
     * ``f`` logical error probability.
     * ``lo`` lower bound of ``f``.
     * ``hi`` upper bound of ``f``.
@@ -136,6 +137,7 @@ def get_stats(log_data: DataFrame, missing='drop', **kwargs_for_WLS):
     Output: ``stats`` a DataFrame where each row an x-value
     (probability OR distance);
     columns are:
+    
     * ``intercept``
     * ``se_intercept``
     * ``gradient``
@@ -190,7 +192,7 @@ def add_ignored_timesteps(
     
     :param data: a DataFrame where each
         column a (distance, noise level);
-    row, a runtime sample.
+        row, a runtime sample.
     :param extra_steps_per_layer: number of ignored timesteps per layer
         in the decoding graph.
     :param layers_per_sample: a function with input ``d`` that outputs

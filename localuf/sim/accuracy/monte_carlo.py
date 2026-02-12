@@ -1,6 +1,7 @@
 """Emulate logical success/failure to deduce accuracy thresholds.
 
 Available functions:
+
 * monte_carlo
 * monte_carlo_pymatching
 * monte_carlo_special

@@ -1,5 +1,7 @@
 # localuf (Local Union-Find)
 
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://timchan0.github.io/localuf/)
+
 A Python package to simulate and visualise
 Union-Find-related decoders for the surface and repetition codes.
 Used in the papers on [Snowflake](https://arxiv.org/abs/2406.01701)
@@ -14,6 +16,16 @@ See the [`demo_notebooks/intro.ipynb`](https://github.com/timchan0/localuf/blob/
 notebook.
 The first section is a demo of the Macar and Actis decoders.
 The second section is a demo of the Snowflake decoder.
+
+## Documentation
+If you just want to read the documentation,
+click the blue **Documentation** badge at the top of this README.
+
+Optionally, you can build the HTML docs locally.
+First ensure you are in a Python environment (conda env, venv, etc.) where Sphinx is installed:
+
+- One-liner: `sphinx-build -b html docs docs/_build/html`
+- Or via Makefile: `make -C docs html`
 
 ## Code Structure
 All UML class diagrams can be found in [`uml_class_diagrams.md`](https://github.com/timchan0/localuf/blob/main/uml_class_diagrams.md).

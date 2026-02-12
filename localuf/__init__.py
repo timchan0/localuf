@@ -1,19 +1,22 @@
 """
 localuf (Local Union--Find)
-========
+============================
 
 A Python package to simulate and visualise decoders for CSS codes.
 
 Available code classes:
+
 * Surface
 * Repetition
 
 Available modules:
+
 * decoders
 * plot
 * sim
 
 Available functions:
+
 * get_failure_data
 * get_log_runtime_data
 * get_stats

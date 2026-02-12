@@ -22,6 +22,7 @@ class _BaseForcer(abc.ABC):
     """Abstract base class for all forcers.
     
     Instance attributes:
+    
     * ``_EDGES`` maps each multiplicity 4-vector
         to the corresponding subset as a list of edges.
     """
@@ -56,6 +57,7 @@ class _BaseForcer(abc.ABC):
         :returns: ``probs`` an iterable of probabilities where each corresponds to a ``weight`` in ``weights``.
         
         Example for ``ForceByPairBalanced``:
+        
         * ``weights = ((0, 0), (0, 1), (1, 0), (1, 1))``
         * ``B_k = B(n=len(self.PAIR_POPULATIONS[k]), p=pi[k])``
         * ``probs`` = (

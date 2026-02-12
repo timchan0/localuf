@@ -195,6 +195,7 @@ class MWPM(Decoder):
         :param kwargs: passed to ``self.get_matching()``.
         
         Side effects:
+        
         * Update ``self.correction_vector`` and ``self.correction_weight``.
         """
         syndrome_vector = self.get_binary_vector(syndrome)
@@ -228,7 +229,7 @@ class MWPM(Decoder):
             is the parity of number of edges in the minimum-weight correction
             that connect to the west (east) boundary node.
         :return gap: The complementary gap.
-
+        
         :raises ValueError: if ``self.CODE.MERGED_EQUIVALENT_BOUNDARY_NODES`` is ``False``.
         """
         if not self.CODE.MERGED_EQUIVALENT_BOUNDARY_NODES:

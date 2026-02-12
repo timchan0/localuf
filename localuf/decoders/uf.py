@@ -20,13 +20,15 @@ class UF(BaseUF):
     Incompatible with the frugal decoding scheme.
     
     Additional instance constants:
+    
     * ``_FORESTER`` decides whether to maintain a static or dynamic forest.
     * ``_INCLINATION`` a class that decides which boundary the root should be on
         when there is a percolating cluster
-    i.e. one that spans opposite boundaries.
-    Has the ``update_boundary`` method.
+        i.e. one that spans opposite boundaries.
+        Has the ``update_boundary`` method.
     
     Additional instance attributes:
+    
     * ``parents`` maps each node in the decoding graph to its parent node.
     * ``clusters`` maps each root node to the cluster of that root node.
         Initially, EVERY node its own cluster; then, only grow active clusters.
@@ -47,20 +49,20 @@ class UF(BaseUF):
         :param code: the code to be decoded.
         :param dynamic: whether the forest is dynamic or static.
             Static forest is when the spanning forest of the erasure
-        is grown only after syndrome validation;
-        this implementation grows the spanning tree using depth-first search (DFS).
-        Dynamic forest is when the spanning forest of the erasure
-        is maintained throughout syndrome validation;
-        this is equivalent to multi-source breadth-first search (BFS) where each defect is a source.
-        Dynamic forests are further explained in https://doi.org/10.13140/RG.2.2.13495.96162, section 5.3.2.
-        This ``dynamic`` parameter has a big effect on the complementary gap:
-        the gap of dynamic UF closely follows the log odds of success;
-        the gap of static UF can be much larger.
-        This is because for dynamic UF only, the spanning tree of each cluster
-        connects any two defects in a low-weight path.
+            is grown only after syndrome validation;
+            this implementation grows the spanning tree using depth-first search (DFS).
+            Dynamic forest is when the spanning forest of the erasure
+            is maintained throughout syndrome validation;
+            this is equivalent to multi-source breadth-first search (BFS) where each defect is a source.
+            Dynamic forests are further explained in https://doi.org/10.13140/RG.2.2.13495.96162, section 5.3.2.
+            This ``dynamic`` parameter has a big effect on the complementary gap:
+            the gap of dynamic UF closely follows the log odds of success;
+            the gap of static UF can be much larger.
+            This is because for dynamic UF only, the spanning tree of each cluster
+            connects any two defects in a low-weight path.
         :param inclination: decides which boundary the root should be on when there is a percolating cluster.
             'default' means prefer neither east nor west, essentially random.
-        'west' defines the root of a percolating cluster always at the west boundary.
+            'west' defines the root of a percolating cluster always at the west boundary.
         """
         if isinstance(code.SCHEME, Frugal):
             raise ValueError('UF incompatible with frugal scheme.')
@@ -109,6 +111,7 @@ class UF(BaseUF):
             fig_width: float | None = None,
     ):
         """Additional inputs over ``Decoder.decode()``:
+        
         * ``fig_width`` figure width.
         """
         self.validate(syndrome, log_history=draw)
@@ -133,8 +136,8 @@ class UF(BaseUF):
         
         :param noise_level: a probability representing the noise strength.
             This is needed to define nonuniform edge weights of the decoding graph
-        in the circuit-level noise model.
-        If ``None``, all edges are assumed to have weight 1.
+            in the circuit-level noise model.
+            If ``None``, all edges are assumed to have weight 1.
         :param draw: whether to draw the original and complementary corrections.
         :param fig_width: figure width.
         :param fig_height: figure height.
@@ -144,6 +147,7 @@ class UF(BaseUF):
         :returns: ``weight_2 - weight_1`` the complementary gap.
         
         Side effects:
+        
         * ``self`` ends up in the final state after computing the complementary correction.
         * All clusters are blind to boundary nodes
             so will stop growing only once they have an odd defect count.
@@ -483,12 +487,13 @@ class BaseCluster(abc.ABC):
     Mathematically, a cluster is a connected subgraph of the decoding graph.
     
     Attributes:
+    
     * ``root`` the representative of the cluster.
     * ``size`` the number of nodes in the cluster.
     * ``odd`` a Boolean to say if the number of defects in the cluster is odd.
     * ``boundary`` the node in the cluster that is the surface boundary if it exists; else, None.
         If ``cluster.boundary`` not None, cluster will never be active in future.
-    If syndrome validation not dynamic, boundary may not be unique!
+        If syndrome validation not dynamic, boundary may not be unique!
     """
 
     def __init__(self, uf: UF, root: Node, no_boundaries=False):
@@ -507,6 +512,7 @@ class _Cluster(BaseCluster):
     Extends ``BaseCluster``.
     
     Additional attributes:
+    
     * ``vision`` a set of active edges incident to the cluster
         i.e. edges to be grown by the cluster in next growth round.
     """

@@ -1,6 +1,7 @@
 """Module for emulating runtime for Macar, Actis, Snowflake.
 
 Available functions:
+
 * batch
 * frugal
 """
@@ -91,18 +92,18 @@ def forward(
     resembles that of a batch decoding window.
     
     
-        :param ds: same as for ``batch``.
-        :param noise_levels: same as for ``batch``.
-        :param n: same as for ``batch``.
-        :param noise: same as for ``batch``.
-        :param kwargs_for_Surface: same as for ``batch``.
+    :param ds: same as for ``batch``.
+    :param noise_levels: same as for ``batch``.
+    :param n: same as for ``batch``.
+    :param noise: same as for ``batch``.
+    :param kwargs_for_Surface: same as for ``batch``.
     :param get_commit_height: a function with input ``d`` that outputs commit height
         e.g. ``lambda d: 2*(d//2)``.
-    If ``None``, commit height is ``d``.
+        If ``None``, commit height is ``d``.
     :param get_buffer_height: a function with input ``d`` that outputs buffer height.
         If ``None``, buffer height is ``d``.
     
-    Output same as for ``batch`` where ``validate_only=True``.
+    :return: Same as for ``batch`` where ``validate_only=True``.
     """
     scheme = 'forward'
     dc: dict[tuple[str, int, float], list[int]] = {}
@@ -156,15 +157,15 @@ def frugal(
     :param noise: the noise model.
     :param time_only: whether runtime includes a timestep
         for each drop, each grow, and each merging step ('all');
-    each merging step only ('merging');
-    or each unrooting step only ('unrooting').
+        each merging step only ('merging');
+        or each unrooting step only ('unrooting').
     :param get_commit_height: a function with input ``d`` that outputs commit height.
         If ``None``, commit height is ``1``.
     :param get_buffer_height: a function with input ``d`` that outputs buffer height.
         If ``None``, buffer height is ``2*(d//2)``.
     :param kwargs_for_Snowflake: passed to Snowflake
         e.g. ``merger`` decides whether Snowflake's nodes
-    flood before syncing (fast) or vice versa (slow) in a merging step.
+        flood before syncing (fast) or vice versa (slow) in a merging step.
     
     Output: ``data`` a DataFrame where each
     column a (distance, probability);

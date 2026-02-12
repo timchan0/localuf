@@ -7,9 +7,11 @@ class NodeUF(uf.UF):
     
     Extends ``UF`` class.
     Overriden attributes:
+    
     * ``clusters`` and ``active_clusters`` now use ``_NodeCluster`` rather than ``_Cluster``.
     
     Overriden methods:
+    
     * ``reset``.
     * ``_growth_round``.
     * ``_grow``.
@@ -84,6 +86,7 @@ class _NodeCluster(uf.BaseCluster):
     Extends ``BaseCluster``.
     
     Additional attributes:
+    
     * ``frontier`` the detectors in the cluster that are incident to >=1 active edge.
     """
 

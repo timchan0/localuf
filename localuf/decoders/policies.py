@@ -25,6 +25,7 @@ class DigraphMaker(_PolicyMixin):
     """Maker of NetworkX digraph.
     
     Instance attributes:
+    
     * ``_NODES`` dictionary of nodes.
     * ``_growth`` dictionary of growths.
     """

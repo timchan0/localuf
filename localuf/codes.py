@@ -1,6 +1,7 @@
 """Module for CSS codes.
 
 Available codes:
+
 * Repetition
 * Surface
 """
@@ -100,6 +101,7 @@ class Surface(Code):
     Extends ``Code`` class.
     
     Additional instance properties:
+    
     * ``DATA_QUBIT_COUNT`` number of data qubits.
     """
 

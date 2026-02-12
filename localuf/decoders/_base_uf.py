@@ -237,7 +237,7 @@ class BaseUF(Decoder):
         :param outlined_nodes: Set of nodes to be outlined.
         :param nodelist: List of nodes (needed to specify the node order in the outputs).
         :param kwargs_for_get_node_color: Passed to ``self.CODE.get_node_color()``.
-
+        
         :return node_color: List of node colors.
         :return edgecolors: List of node edge colors.
         """

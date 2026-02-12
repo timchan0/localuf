@@ -1,6 +1,7 @@
 """Module for decoders.
 
 Available decoders:
+
 * Actis
 * BUF
 * Macar
@@ -11,6 +12,7 @@ Available decoders:
 * UF
 
 In drawings of UF-type decoders:
+
 * ungrown edges are invisible
 * half-grown edges are dotted
 * fully grown edges are solid

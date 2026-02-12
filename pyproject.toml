@@ -31,9 +31,14 @@ dependencies = [
     "stim"
 ]
 
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7",
+]
+
 [project.urls]
 Homepage = "https://github.com/timchan0/localuf"
-Documentation = "https://github.com/timchan0/localuf"
+Documentation = "https://timchan0.github.io/localuf/"
 Repository = "https://github.com/timchan0/localuf.git"
 Issues = "https://github.com/timchan0/localuf/issues"
 

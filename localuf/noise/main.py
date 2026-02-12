@@ -98,7 +98,7 @@ class _Uniform(Noise):
     def __init__(self, fresh_edges: tuple[Edge, ...], all_edges: None | tuple[Edge, ...] = None):
         """
         :param fresh_edges: The edges of the freshly discovered region after a window raise
-        if scheme is streaming; else, the edges of G.
+            if scheme is streaming; else, the edges of G.
         """
         self._FRESH_EDGES = fresh_edges
         self._ALL_EDGES = fresh_edges if all_edges is None else all_edges

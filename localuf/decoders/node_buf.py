@@ -8,11 +8,13 @@ class NodeBUF(NodeUF):
     Extends ``decoders.NodeUF``.
     
     Overriden attributes:
+    
     * ``buckets`` replaces ``active_clusters``
         and is a dictionary where each key a cluster size;
-    value, a set of all active clusters of that size.
+        value, a set of all active clusters of that size.
     
     Overriden methods:
+    
     * ``reset``.
     * ``load``.
     * ``validate_syndrome``.

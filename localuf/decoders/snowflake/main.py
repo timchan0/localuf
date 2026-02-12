@@ -25,6 +25,7 @@ class Snowflake(BaseUF):
     Compatible only with frugal scheme.
     
     Does not use:
+    
     * ``_growth`` attribute.
     * ``erasure`` attribute.
     """
@@ -48,21 +49,21 @@ class Snowflake(BaseUF):
         :param schedule: the cluster growth schedule.
         :param unrooter: the type of unrooting process to use.
             If ``'full'``, each node in the amputated cluster resets its CID and pointer
-        so that the pointer tree structure can be rebuilt from scratch,
-        via further merging timesteps.
-        If ``'simple'``, the node at breaking point only
-        establishes the shortest path to a boundary.
+            so that the pointer tree structure can be rebuilt from scratch,
+            via further merging timesteps.
+            If ``'simple'``, the node at breaking point only
+            establishes the shortest path to a boundary.
         :param _neighbor_order: optionally customizes the order in which each node checks its neighbors.
             For the repetition code, this should be an iterable of the four directions
-        ('W', 'E', 'D', 'U') in some order.
-        For the surface code, this should be an iterable of the twelve directions
-        ('NWD', 'N', 'NU', 'WD', 'W', 'D', 'U', 'E', 'EU', 'SD', 'S', 'SEU') in some order.
-        Technically you can exclude the ones which are not part of the decoding the graph
-        e.g. the diagonal directions (comprising >=2 characters) for phenomenological noise,
-        but if you accidentally exclude a relevant direction
-        then no node will ever check that direction for growing, flooding, nor syncing.
-        So it is safest to include all twelve directions even if some are not used.
-        If ``_neighbor_order`` is not specified, the orders listed above are used.
+            ('W', 'E', 'D', 'U') in some order.
+            For the surface code, this should be an iterable of the twelve directions
+            ('NWD', 'N', 'NU', 'WD', 'W', 'D', 'U', 'E', 'EU', 'SD', 'S', 'SEU') in some order.
+            Technically you can exclude the ones which are not part of the decoding the graph
+            e.g. the diagonal directions (comprising >=2 characters) for phenomenological noise,
+            but if you accidentally exclude a relevant direction
+            then no node will ever check that direction for growing, flooding, nor syncing.
+            So it is safest to include all twelve directions even if some are not used.
+            If ``_neighbor_order`` is not specified, the orders listed above are used.
         :param _include_timelike_lowest_edges: whether to include
             the purely timelike (i.e. 'up') edges in ``self._LOWEST_EDGES``.
         """
@@ -649,6 +650,7 @@ class Snowflake(BaseUF):
 
             - repetition code: west to east.
             - surface code: west to east along each row, then from south to north.
+
         :param output_to_csv_file: the CSV file path to save the data in e.g. 'snowflake_data.csv'.
             Defaults to ``None``, meaning no CSV file is saved.
         :param draw: whether to skip drawing the decoding process,
@@ -662,6 +664,7 @@ class Snowflake(BaseUF):
         :returns: The output of Snowflake. This is a list of strings, each representing the edges in the bottom layer that are flipped just before each drop. The ordering of the edges is given by ``self._LOWEST_EDGES``. INCONSISTENCY: for the repetition code, the purely timelike edges in the last layer are excluded from ``self._LOWEST_EDGES``; the spacelike edges are ordered from west to east.
         
         Side effects:
+        
         * If ``output_to_csv_file`` is not None, the input and output of Snowflake
             are saved in a CSV file at path ``output_to_csv_file``.
         * If ``draw`` is True, the decoding process is drawn.
@@ -859,6 +862,7 @@ class NodeEdgeMixin(abc.ABC):
     """Mixin class for ``_Node`` and ``_Edge``.
     
     Instance attributes:
+    
     * ``SNOWFLAKE`` the decoder the node or edge belongs to.
     """
 
@@ -874,12 +878,13 @@ class _Node(NodeEdgeMixin):
     Extends ``NodeEdgeMixin``.
     
     Additional instance attributes:
+    
     * ``INDEX`` index of node.
     * ``ID`` the unique ID of node.
     * ``FRIENDSHIP`` the type of connection the node has for communicating.
     * ``NEIGHBORS`` a dictionary where each
         key a pointer string;
-    value, a tuple of the form (edge, index of edge which is neighbor).
+        value, a tuple of the form (edge, index of edge which is neighbor).
     * ``_IS_BOUNDARY`` whether node is a boundary node.
     * ``_MERGER`` the provider for the ``merging`` method.
     * ``UNROOTER`` the type of unrooting process used.
@@ -889,8 +894,8 @@ class _Node(NodeEdgeMixin):
         each have ``next_`` versions for next timestep.
     * ``access`` refers to neighbors along fully grown edges.
         In the form of a dictionary of where each
-    key a pointer string;
-    value, the ``_Node`` object in the direction of that pointer.
+        key a pointer string;
+        value, the ``_Node`` object in the direction of that pointer.
     """
 
     def __init__(
@@ -1118,6 +1123,7 @@ class Friendship(abc.ABC):
     ``defect, active, cid, pointer`` information.
     
     Instance attributes (1 constant):
+    
     * ``NODE`` the node which has this friendship.
     """
 
@@ -1144,6 +1150,7 @@ class NodeFriendship(Friendship):
     Extends ``Friendship``.
     
     Instance attributes (1 constant):
+    
     * ``DROPEE`` the node immediately below.
     """
 
@@ -1310,6 +1317,7 @@ class _Unrooter(abc.ABC):
     """Abstract base class for the type of unrooting process to use.
     
     Instance constants:
+    
     * ``_NODE`` the node which has this unrooter.
     """
 
@@ -1384,6 +1392,7 @@ class _SimpleUnrooter(_Unrooter):
     Extends ``_Unrooter``.
     
     Additional instance constants:
+    
     * ``_CLOSEST_BOUNDARY_DIRECTION`` the direction toward the closest boundary.
     """
 
@@ -1423,6 +1432,7 @@ class _Edge(NodeEdgeMixin):
     Extends ``NodeEdgeMixin``.
     
     Additional instance attributes:
+    
     * ``INDEX`` index of edge.
     * ``CONTACT`` the type of connection the edge has for communicating.
         Analogous to ``FRIENDSHIP`` for nodes.
@@ -1478,6 +1488,7 @@ class _Contact(abc.ABC):
     ``growth, correction`` information.
     
     Instance attributes (1 constant):
+    
     * ``EDGE`` the edge which has this contact.
     """
 
@@ -1498,6 +1509,7 @@ class EdgeContact(_Contact):
     Extends ``_Contact``.
     
     Instance attributes (1 constant):
+    
     * ``DROPEE`` the edge immediately below.
     """
 

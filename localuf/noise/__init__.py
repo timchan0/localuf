@@ -1,6 +1,7 @@
 """Module for noise models.
 
 Available models:
+
 * CodeCapacity
 * Phenomenological
 * CircuitLevel

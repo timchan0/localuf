@@ -5,6 +5,7 @@ class Determinant:
     """Base class for determining whether a node is a boundary.
     
     Instance attributes:
+    
     * ``D`` code distance.
     * ``LONG_AXIS`` that whose index runs from -1 to d-1 inclusive.
     """
@@ -38,10 +39,12 @@ class SpaceTimeDeterminant(Determinant):
     Extends ``Determinant``.
     
     Additional instance attributes:
+    
     * ``TIME_AXIS`` that which represents time.
     * ``WINDOW_HEIGHT`` total height of sliding window.
     
     Overriden methods:
+    
     * ``__init__``
     * ``is_boundary``
     """

@@ -1,6 +1,7 @@
 """Plot failure probability to deduce accuracy thresholds.
 
 Available functions:
+
 * monte_carlo
 * subset_sample
 """
@@ -41,7 +42,7 @@ def monte_carlo(
     :param alpha: significance level of confidence intervals.
     :param method: method to compute confidence intervals.
         For details on confidence intervals,
-    see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
+        see https://www.statsmodels.org/dev/generated/statsmodels.stats.proportion.proportion_confint.html.
     :param base_color: a single color for all errorbars and their connecting lines.
         Increasing distance is then shown by increasing opacity.
         If ``None``, each distance is shown by a different, fully opaque color.
