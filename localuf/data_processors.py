@@ -34,12 +34,12 @@ def get_failure_data(
     
     :return dT: a DataFrame where each row a (distance, probability); columns are:
     
-    :return f: logical failure rate
-    :return lo: lower confidence bound of ``f``
-    :return hi: upper confidence bound of ``f``
-    :return x: log10(``p``)
-    :return y: log10(``f``)
-    :return yerr: half the confidence interval of ``y``.
+        * ``f`` logical failure rate
+        * ``lo`` lower confidence bound of ``f``
+        * ``hi`` upper confidence bound of ``f``
+        * ``x`` log10(``p``)
+        * ``y`` log10(``f``)
+        * ``yerr`` half the confidence interval of ``y``.
     """
     dT: DataFrame = data.loc[:, (slice(None), p_slice)].T # type: ignore
     dT['f'] = dT.m / dT.n
@@ -62,12 +62,11 @@ def get_failure_data_from_subset_sample(
 ):
     """Get failure stats from output of ``sim.accuracy.subset_sample``.
     
-    Output: a DataFrame indexed by (distance, noise level),
-    with columns:
+    :return: A DataFrame indexed by (distance, noise level), with columns:
     
-    * ``f`` logical error probability.
-    * ``lo`` lower bound of ``f``.
-    * ``hi`` upper bound of ``f``.
+        * ``f`` logical error probability.
+        * ``lo`` lower bound of ``f``.
+        * ``hi`` upper bound of ``f``.
     
     Side effects: adds columns ``f``, ``SE_lo``, ``SE_hi`` to ``data``.
     """
@@ -114,7 +113,8 @@ def get_log_runtime_data(data: DataFrame):
     ``data`` output from ``sim.runtime.batch``.
     
     
-    :returns: ``log_data`` a DataFrame where each column a stat: ``x``, ``y``, or ``yerr``; row, a (probability, distance).
+    :returns log_data: A DataFrame where each column a stat:
+        ``x``, ``y``, or ``yerr``; row, a (probability, distance).
     """
     df: DataFrame = np.log10(data) # type: ignore
     log_data = DataFrame({
@@ -134,15 +134,15 @@ def get_stats(log_data: DataFrame, missing='drop', **kwargs_for_WLS):
     :param missing: passed to ``statsmodels.regression.linear_model.WLS``.
     :param kwargs_for_WLS: passed to ``statsmodels.regression.linear_model.WLS``.
     
-    Output: ``stats`` a DataFrame where each row an x-value
-    (probability OR distance);
-    columns are:
-    
-    * ``intercept``
-    * ``se_intercept``
-    * ``gradient``
-    * ``se_gradient``
-    * ``r_squared``
+    :return stats: A DataFrame where each row an x-value
+        (probability OR distance);
+        columns are:
+        
+        * ``intercept``
+        * ``se_intercept``
+        * ``gradient``
+        * ``se_gradient``
+        * ``r_squared``
     """
     records: list[tuple[
         int | float,
