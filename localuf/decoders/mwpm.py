@@ -4,7 +4,7 @@ import numpy as np
 from pymatching import Matching
 
 from localuf._base_classes import Code, Decoder
-from localuf._schemes import Batch
+from localuf._schemes import Batch, Forward
 from localuf.type_aliases import Node, Edge
 
 
@@ -12,7 +12,7 @@ class MWPM(Decoder):
     """Minimum weight perfect matching decoder using PyMatching implementation.
     
     Extends ``Decoder``.
-    Compatible so far only with the batch decoding scheme.
+    Compatible so far only with the batch and forward decoding schemes.
     """
 
     correction_vector: np.ndarray[tuple[int], np.dtype[np.uint8]]
@@ -28,11 +28,17 @@ class MWPM(Decoder):
             Designed for implementing non-uniform weights for phenomenological noise model.
             If not specified, no scaling is done i.e. all edges have modifier 1.
         """
-        if not isinstance(code.SCHEME, Batch):
+        if type(code.SCHEME) is Batch:
+            self._MERGE_STRATEGY = 'disallow'
+        elif type(code.SCHEME) is Forward:
+            self._MERGE_STRATEGY = 'independent'
+        else:
             raise NotImplementedError
         super().__init__(code)
         self._DETECTOR_TO_INT = {v: k for k, v in enumerate(code.DETECTORS)}
         """Map from each detector node index to a unique integer in 0..detector_count."""
+        self._INT_TO_DETECTOR = {k: v for k, v in enumerate(code.DETECTORS)}
+        """Map from each unique integer in 0..detector_count to the corresponding detector node index."""
         self._WEST_LOGICAL: dict[Node, int | None] = {
             v: 0 if (v[code.LONG_AXIS] == -1) else None
             for v in code.BOUNDARY_NODES
@@ -59,14 +65,13 @@ class MWPM(Decoder):
     ):
         """Return a PyMatching matching graph.
         
-        
-        :param noise_level: a probability that represents the noise strength.
+        :param noise_level: A probability that represents the noise strength.
             This is passed to ``self.CODE.NOISE.get_edge_weights()``.
             If ``None``, all edges in ``matching`` have error probability 0 and weight 1
             (before being scaled by ``self._edge_weight_modifier``).
-        :param detector_to_int: maps each detector node index to a unique integer.
+        :param detector_to_int: A map from each detector node index to a unique integer.
             If ``None``, use the default map from each index to a unique integer in 0..detector_count.
-        :param boundary_node_to_fault_id: maps each boundary node index to its fault ID.
+        :param boundary_node_to_fault_id: A map from each boundary node index to its fault ID.
             If ``None``, use the default map from the west (east) boundary node index to fault ID 0 (None).
         
         :return matching: a PyMatching matching graph whose...
@@ -94,6 +99,7 @@ class MWPM(Decoder):
                     fault_ids=fault_u, # type: ignore
                     weight=modified_weight,
                     error_probability=flip_probability,
+                    merge_strategy=self._MERGE_STRATEGY,
                 )
             elif int_v is None:
                 matching.add_boundary_edge(
@@ -101,6 +107,7 @@ class MWPM(Decoder):
                     fault_ids=fault_v, # type: ignore
                     weight=modified_weight,
                     error_probability=flip_probability,
+                    merge_strategy=self._MERGE_STRATEGY,
                 )
             else:
                 matching.add_edge(
@@ -162,13 +169,11 @@ class MWPM(Decoder):
         
         Does not require ``self.decode()`` to be called first.
         
-        
         :param syndrome: the set of defects.
         :param noise_level: a probability representing the noise strength.
             This is needed to define nonuniform edge weights of the decoding graph
             in the circuit-level noise model.
             If ``None``, all edges are assumed to have weight 1.
-        
         
         :return [correction_west, correction_east]: A 2-vector whose first (second) element
             is the parity of number of edges in the minimum-weight correction
@@ -190,11 +195,9 @@ class MWPM(Decoder):
     def _get_complementary_gap_matchings(self, noise_level: None | float = None):
         """Return two PyMatching matching graphs for complementary gap calculation.
         
-        
         :param noise_level: A probability that represents the noise strength.
             This is passed to ``self.NOISE.get_edge_weights()``.
             If ``None``, all edges have error probability 0 and weight 1.
-        
         
         :return matching_1: A PyMatching matching graph with 2 virtual boundary nodes:
             all edges connected to the west (east) virtual boundary node have fault ID 0 (1).

@@ -42,7 +42,7 @@ class BaseUF(Decoder):
     """The set of growth values for which an edge is inactive."""
 
     def __init__(self, code: Code):
-        """Input: ``code`` the code to be decoded."""
+        """:param code: the code to be decoded."""
         super().__init__(code)
         self._growth: dict[Edge, Growth] = {e: Growth.UNGROWN for e in self.CODE.EDGES}
         self.syndrome: set[Node]
@@ -106,12 +106,10 @@ class BaseUF(Decoder):
     def unclustered_edge_fraction(self, noise_level: None | float = None):
         """Compute the Unclustered Edge Fraction DCS from ``self.growth``.
         
-        
         :param noise_level: A probability representing the noise strength.
             This is needed to define nonuniform edge weights of the decoding graph
             in the circuit-level noise model.
             If not specified, all edges are assumed to have weight 1.
-        
         
         :returns fraction: The fraction of edges in the decoding window
             that are not in a cluster, weighted by their weights.
@@ -142,7 +140,6 @@ class BaseUF(Decoder):
         **kwargs_for_networkx_draw,
     ):
         """Draw growth of edges using matplotlib.
-        
         
         :param growth: A dictionary where each key an edge index; value, its growth value.
         :param syndrome: The set of defects.

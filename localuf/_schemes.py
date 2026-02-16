@@ -342,8 +342,7 @@ class Forward(_Streaming):
     def get_logical_error(self, commit_leftover: set[Edge]):
         """Count logical errors completed in current commit.
         
-        Additional input over ``_Streaming.get_logical_error``:
-        ``commit_leftover`` the leftover in the commit region.
+        :param commit_leftover: the leftover in the commit region.
         """
         for e in commit_leftover:
             self.pairs.load(e)

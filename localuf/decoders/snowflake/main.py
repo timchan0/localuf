@@ -644,18 +644,15 @@ class Snowflake(BaseUF):
     ):
         """Generate output in the form of bitstrings.
         
-        
         :param syndromes: the input of Snowflake.
             This can either be a list of sets of coordinates (each set representing a syndrome;
             each coordinate specifying a defect), or a list of syndrome vectors (strings of '0's
             and '1's). The vertical (i.e. time) coordinate of each defect must be
             ``self.CODE.SCHEME.WINDOW_HEIGHT-1``.
-
+            
             For syndrome vectors, the ordering of the nodes is:
-
             - repetition code: west to east.
             - surface code: west to east along each row, then from south to north.
-
         :param output_to_csv_file: the CSV file path to save the data in e.g. 'snowflake_data.csv'.
             Defaults to ``None``, meaning no CSV file is saved.
         :param draw: whether to skip drawing the decoding process,
@@ -665,8 +662,11 @@ class Snowflake(BaseUF):
             Can be 'interactive', 'horizontal', or 'vertical'.
         :param kwargs_for_draw_decode: additional keyword arguments for ``decoder.draw_decode()``.
         
-        
-        :returns: The output of Snowflake. This is a list of strings, each representing the edges in the bottom layer that are flipped just before each drop. The ordering of the edges is given by ``self._LOWEST_EDGES``. INCONSISTENCY: for the repetition code, the purely timelike edges in the last layer are excluded from ``self._LOWEST_EDGES``; the spacelike edges are ordered from west to east.
+        :returns: The output of Snowflake. This is a list of strings, each representing
+            the edges in the bottom layer that are flipped just before each drop.
+            The ordering of the edges is given by ``self._LOWEST_EDGES``. INCONSISTENCY:
+            for the repetition code, the purely timelike edges in the last layer
+            are excluded from ``self._LOWEST_EDGES``; the spacelike edges are ordered from west to east.
         
         Side effects:
         
