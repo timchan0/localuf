@@ -45,12 +45,12 @@ class Code(abc.ABC):
             that is committed.
             Affects only forward and frugal decoding schemes.
             Default value is ``d`` for forward scheme
-            and ``1`` (``2*(d//2)``) for frugal scheme.
+            and ``1`` for frugal scheme.
         :param buffer_height: the layer count in the time direction
             that is not committed.
             Affects only forward and frugal decoding schemes.
             Default value is ``d`` for forward scheme
-            and ``1`` (``2*(d//2)``) for frugal scheme.
+            and ``2*(d//2)`` for frugal scheme.
         :param merge_equivalent_boundary_nodes: whether to merge
             all nodes that represent the same boundary.
             This results in a decoding graph with
@@ -61,7 +61,7 @@ class Code(abc.ABC):
         :param demolition: whether measurement destroys the ancilla qubit state
             which hence needs to be initialized for next measurement cycle.
             Affects only circuit-level noise.
-        :param monolingual: whether can prep/measure in only Z basis
+        :param monolingual: whether can prepare/measure in only Z basis
             hence X-basis prep/measurement needs Hadamard gates.
             Affects only circuit-level noise.
         :param _merge_redundant_edges: whether to merge redundant boundary edges.
@@ -542,7 +542,7 @@ class Code(abc.ABC):
         * bitflipped edges thick red; else, thin black
         * boundary nodes blue; defects red; else, green.
         
-        Output: The NetworkX graph of G.
+        :return g: The NetworkX graph of G.
         """
         import networkx as nx
         # get error and syndrome
@@ -684,8 +684,8 @@ class Decoder(abc.ABC):
     def draw_decode(self, **kwargs_for_networkx_draw):
         """Draw all stages of decoding.
         
-        Input: ``kwargs_for_networkx_draw`` passed to ``NetworkX.draw``
-        e.g. ``margins=(0.1, 0.1)``.
+        :param kwargs_for_networkx_draw: keyword arguments passed to ``NetworkX.draw``
+            e.g. ``margins=(0.1, 0.1)``.
         """
 
     def subset_sample(self, noise_level: float, n: int, tol: float = 5e-1):

@@ -99,10 +99,6 @@ class Surface(Code):
     """The decoding graph of an unrotated surface code with boundaries.
     
     Extends ``Code`` class.
-    
-    Additional instance properties:
-    
-    * ``DATA_QUBIT_COUNT`` number of data qubits.
     """
 
     _LONG_AXIS = 1
@@ -110,6 +106,7 @@ class Surface(Code):
 
     @property
     def DATA_QUBIT_COUNT(self) -> int:
+        """Number of data qubits."""
         d = self.D
         return d**2 + (d-1)**2
 
