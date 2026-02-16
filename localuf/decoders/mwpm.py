@@ -1,8 +1,6 @@
 from collections.abc import Mapping
-from collections import defaultdict
 
 import numpy as np
-import numpy.typing as npt
 from pymatching import Matching
 
 from localuf._base_classes import Code, Decoder
@@ -17,7 +15,7 @@ class MWPM(Decoder):
     Compatible so far only with the batch decoding scheme.
     """
 
-    correction_vector: npt.NDArray[np.bool_]
+    correction_vector: np.ndarray[tuple[int], np.dtype[np.uint8]]
     """The stored correction as a binary vector whose length is the number of fault IDs."""
     correction_weight: float = 0
     """The weight of the stored correction."""
@@ -34,21 +32,21 @@ class MWPM(Decoder):
             raise NotImplementedError
         super().__init__(code)
         self._DETECTOR_TO_INT = {v: k for k, v in enumerate(code.DETECTORS)}
-        """Maps each detector node index to a unique integer in 0..detector_count."""
+        """Map from each detector node index to a unique integer in 0..detector_count."""
         self._WEST_LOGICAL: dict[Node, int | None] = {
             v: 0 if (v[code.LONG_AXIS] == -1) else None
             for v in code.BOUNDARY_NODES
         }
-        """Maps the west (east) boundary node index to fault ID 0 (None)."""
+        """Map from each west (east) boundary node index to fault ID 0 (None)."""
         self._WEST_EAST_LOGICALS: dict[Node, int] = {
             v: 0 if (v[code.LONG_AXIS] == -1) else 1
             for v in code.BOUNDARY_NODES
         }
-        """Maps the west (east) boundary node index to fault ID 0 (1)."""
+        """Map from each west (east) boundary node index to fault ID 0 (1)."""
         self._edge_weight_modifier: dict[Edge, float] = {
             e: 1.0 for e in code.EDGES
         } if _edge_weight_modifier is None else _edge_weight_modifier
-        """Maps each edge to a multiplicative factor
+        """Map from each edge to a multiplicative factor
         that scales the weight of that particular edge.
         Designed for implementing non-uniform weights for phenomenological noise model.
         """
@@ -112,69 +110,17 @@ class MWPM(Decoder):
                     error_probability=flip_probability,
                 )
         return matching
-
-    # unused
-    def _get_matching_with_real_boundaries(
-            self,
-            noise_level: None | float = None,
-            detector_to_int: None | dict[Node, int] = None,
-            boundary_node_to_fault_id: None | Mapping[Node, int | None] = None,
-    ):
-        """Same as ``get_matching`` but the boundary nodes of the output are real
-        and are numbered consecutively starting from ``detector_count``.
-        """
-        if detector_to_int is None:
-            detector_to_int = self._DETECTOR_TO_INT
-        if boundary_node_to_fault_id is None:
-            boundary_node_to_fault_id = self._WEST_LOGICAL
-        edge_weights = self.CODE.NOISE.get_edge_weights(noise_level)
-        matching = Matching()
-        # `boundary_nodes` maps each fault ID to a boundary node index
-        boundary_nodes: defaultdict[int | None, int] = defaultdict(
-            lambda: self.CODE.DETECTOR_COUNT + len(boundary_nodes))
-        for (u, v), (flip_probability, weight) in edge_weights.items():
-            int_u = detector_to_int.get(u, None)
-            int_v = detector_to_int.get(v, None)
-            fault_u = boundary_node_to_fault_id.get(u, None)
-            fault_v = boundary_node_to_fault_id.get(v, None)
-            if int_u is None:
-                # type(int_v) is int
-                matching.add_edge(
-                    node1=boundary_nodes[fault_u],
-                    node2=int_v, # type: ignore
-                    fault_ids=fault_u, # type: ignore
-                    weight=weight,
-                    error_probability=flip_probability,
-                )
-            elif int_v is None:
-                matching.add_edge(
-                    node1=int_u,
-                    node2=boundary_nodes[fault_v],
-                    fault_ids=fault_v, # type: ignore
-                    weight=weight,
-                    error_probability=flip_probability,
-                )
-            else:
-                matching.add_edge(
-                    node1=int_u,
-                    node2=int_v,
-                    weight=weight,
-                    error_probability=flip_probability,
-                )
-        matching.set_boundary_nodes(set(boundary_nodes.values()))
-        return matching
     
     def reset(self):
-        self.correction_vector = np.zeros(self.CODE.DETECTOR_COUNT, dtype=bool)
+        self.correction_vector = np.zeros(self.CODE.DETECTOR_COUNT, dtype=np.uint8)
         self.correction_weight = 0
 
     def get_binary_vector(self, syndrome: set[Node], detector_to_int: None | dict[Node, int] = None):
-        """Convert ``syndrome`` to a binary vector.
+        """Convert a set of defect coordinates to a binary vector.
         
-        
-        :param syndrome: the set of defects.
-        :param detector_to_int: maps each detector node index to a unique integer in 0..detector_count.
-        
+        :param syndrome: The set of defect coordinates.
+        :param detector_to_int: An optional map from each detector node index
+            to a unique integer in 0..detector_count.
         
         :return binary_vector: A binary vector of length equal to detector count
             whose ordering is given by ``detector_to_int``.
@@ -182,7 +128,7 @@ class MWPM(Decoder):
         """
         if detector_to_int is None:
             detector_to_int = self._DETECTOR_TO_INT
-        binary_vector: npt.NDArray[np.bool_] = np.zeros(self.CODE.DETECTOR_COUNT, dtype=bool)
+        binary_vector = np.zeros(self.CODE.DETECTOR_COUNT, dtype=np.uint8)
         for v in syndrome:
             binary_vector[detector_to_int[v]] = 1
         return binary_vector
@@ -195,7 +141,6 @@ class MWPM(Decoder):
         :param kwargs: passed to ``self.get_matching()``.
         
         Side effects:
-        
         * Update ``self.correction_vector`` and ``self.correction_weight``.
         """
         syndrome_vector = self.get_binary_vector(syndrome)
@@ -212,7 +157,7 @@ class MWPM(Decoder):
             self,
             syndrome: set[Node],
             noise_level: None | float = None,
-    ) -> tuple[npt.NDArray[np.bool_], float]:
+    ) -> tuple[np.ndarray[tuple[int], np.dtype[np.uint8]], float]:
         """Decode ``syndrome`` and calculate the complementary gap.
         
         Does not require ``self.decode()`` to be called first.
@@ -237,7 +182,8 @@ class MWPM(Decoder):
         syndrome_vector = self.get_binary_vector(syndrome)
         matching_1, matching_2 = self._get_complementary_gap_matchings(noise_level=noise_level)
         correction_1, weight_1 = matching_1.decode(syndrome_vector, return_weight=True)
-        complementary_syndrome_vector = np.concatenate((syndrome_vector, correction_1 ^ True))
+        correction_1: np.ndarray[tuple[int], np.dtype[np.uint8]]
+        complementary_syndrome_vector = np.concatenate((syndrome_vector, correction_1 ^ 1))
         _, weight_2 = matching_2.decode(complementary_syndrome_vector, return_weight=True)
         return correction_1, weight_2 - weight_1
 
