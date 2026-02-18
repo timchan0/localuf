@@ -14,7 +14,7 @@ import networkx as nx
 from localuf import constants, Repetition
 from localuf.decoders.snowflake.constants import RESET, Stage
 from localuf.noise import CodeCapacity
-from localuf.type_aliases import Edge, Node, Coord
+from localuf.type_aliases import ConfidenceScoreName, Edge, Node, Coord
 from localuf.constants import Growth
 from localuf.decoders.policies import DecodeDrawer
 from localuf._base_classes import Code
@@ -217,7 +217,7 @@ class Snowflake(BaseUF):
             syndrome: set[Node],
             log_history: Literal[False, 'fine', 'coarse'] = False,
             log_floor_history: bool = False,
-            confidence_scores: Iterable[str] = (),
+            confidence_scores: Iterable[ConfidenceScoreName] = (),
             noise_level_for_priors: None | float = None,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             defects_possible: bool = True,
@@ -232,6 +232,7 @@ class Snowflake(BaseUF):
             'coarse', only the final timestep of the growth round.
         :param log_floor_history: Whether to populate ``floor_history`` attribute.
         :param confidence_scores: An iterable of DCS names to record after the decoding cycle.
+            Supported values are 'runtime', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
         :param noise_level_for_priors: Noise level to use when computing some DCSs.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
@@ -266,12 +267,22 @@ class Snowflake(BaseUF):
             elif confidence_score == 'swim_distance':
                 swim_distance = self.swim_distance(noise_level=noise_level_for_priors)
                 self.confidence_score_history['swim_distance'].append(swim_distance)
+            elif confidence_score == 'min_defect_height':
+                min_defect_height = self.min_defect_height()
+                self.confidence_score_history['min_defect_height'].append(min_defect_height)
             elif confidence_score == 'unclustered_edge_fraction':
                 fraction = self.unclustered_edge_fraction(noise_level=noise_level_for_priors)
                 self.confidence_score_history['unclustered_edge_fraction'].append(fraction)
             else:
                 raise ValueError(f'Unknown confidence score: {confidence_score}')
         return t
+    
+    def min_defect_height(self):
+        """Calculate the minimum defect height DCS in the current decoding window."""
+        return min(
+            (coordinate[self.CODE.TIME_AXIS] for coordinate in self.syndrome),
+            default=self.CODE.SCHEME.WINDOW_HEIGHT,
+        )
     
     def drop(self, syndrome: set[Node]):
         """Make all nodes perform a ``drop`` i.e. raise window by a layer."""

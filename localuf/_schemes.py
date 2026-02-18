@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover
 
 from localuf import constants
 from localuf.noise import CodeCapacity
-from localuf.type_aliases import Edge, Node
+from localuf.type_aliases import Edge, Node, ConfidenceScoreName
 from localuf._pairs import LogicalCounter, Pairs
 from localuf._determinants import Determinant, SpaceDeterminant, SpaceTimeDeterminant
 
@@ -571,7 +571,7 @@ class Frugal(_Streaming):
             n: int,
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
-            confidence_scores: Iterable[str] = (),
+            confidence_scores: Iterable[ConfidenceScoreName] = (),
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
@@ -585,6 +585,7 @@ class Frugal(_Streaming):
         :param draw: Whether to draw.
         :param log_history: Whether to populate ``history`` attribute.
         :param confidence_scores: An iterable of DCSs to compute and record after each decoding cycle.
+            Supported values are 'runtime', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
             each merging step only ('merging');
