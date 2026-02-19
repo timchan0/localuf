@@ -7,20 +7,20 @@ from localuf.decoders import MWPM
 from localuf.type_aliases import Node
 
 
-@pytest.mark.parametrize("noise_level", [None, 1e-1, 1e-2])
-def test_get_matching(sfCL: Surface, noise_level: float):
+@pytest.mark.parametrize("noise_level", (None, 1e-1, 1e-2))
+def test_get_matching(sfCL: Surface, noise_level: None | float):
     decoder = MWPM(sfCL)
-    matching = decoder.get_matching(noise_level=noise_level)
+    matching = decoder._get_matching(noise_level=noise_level)
     assert matching.num_edges == sfCL.N_EDGES
     assert matching.num_detectors == sfCL.D * (sfCL.D-1) * sfCL.SCHEME.WINDOW_HEIGHT
     assert matching.num_fault_ids == 1
-    assert_all_edge_data_correct(sfCL, matching, noise_level, decoder._DETECTOR_TO_INT)
+    assert_all_edge_data_correct(sfCL, matching, noise_level, decoder.DETECTOR_TO_INT)
 
 
 def assert_all_edge_data_correct(
         code: Code,
         matching: Matching,
-        noise_level: float,
+        noise_level: float | None,
         detector_to_int: dict[Node, int],
 ):
     """Assert all edge data are correct according to `noise_level`."""

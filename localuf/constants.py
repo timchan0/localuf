@@ -1,6 +1,6 @@
 """Module for constants."""
 
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 
 from scipy.stats import norm
 
@@ -29,3 +29,11 @@ class Growth(IntEnum):
         if self is Growth.BURNT:
             return 1
         return self.value/2
+
+
+class Boundary(StrEnum):
+    """The string segments indicating which boundary nodes a detector connects to."""
+
+    FUTURE = 'F'
+    WEST = 'W'
+    EAST = 'E'
