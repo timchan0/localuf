@@ -224,7 +224,6 @@ class Snowflake(BaseUF):
         ):
         """Perform a decoding cycle i.e. a growth round.
         
-        
         :param syndrome: The syndrome in the new region discovered by the window raise
             i.e. all defects in ``syndrome`` have the time coordinate ``self.CODE.SCHEME.WINDOW_HEIGHT-1``.
         :param log_history: Whether to populate ``history`` attribute;
@@ -232,7 +231,7 @@ class Snowflake(BaseUF):
             'coarse', only the final timestep of the growth round.
         :param log_floor_history: Whether to populate ``floor_history`` attribute.
         :param confidence_scores: An iterable of DCS names to record after the decoding cycle.
-            Supported values are 'runtime', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
+            Supported values are 'throughput', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
         :param noise_level_for_priors: Noise level to use when computing some DCSs.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
@@ -244,8 +243,7 @@ class Snowflake(BaseUF):
             and will skip 'grow' and 'merge' stages.
             This is useful at the end of the memory experiment after the final syndrome data has come in.
         
-        
-        :return t: Number of timesteps to complete decoding cycle.
+        :return runtime: Number of timesteps to complete decoding cycle.
             Equals the increase in ``len(self.history)`` if ``log_history == 'fine'`` and ``time_only == 'all'``.
         """
         self._stage = Stage.DROP
@@ -255,15 +253,15 @@ class Snowflake(BaseUF):
         self.drop(syndrome)
         if log_history == 'fine': self.append_history()
         if defects_possible:
-            t = self._SCHEDULE.finish_decode(
+            runtime = self._SCHEDULE.finish_decode(
                 log_history=log_history,
                 time_only=time_only,
             )
         else:
-            t = 1 if time_only == 'all' else 0
+            runtime = 1 if time_only == 'all' else 0
         for confidence_score in confidence_scores:
-            if confidence_score == 'runtime':
-                self.confidence_score_history['runtime'].append(t)
+            if confidence_score == 'throughput':
+                self.confidence_score_history['throughput'].append(1/runtime)
             elif confidence_score == 'swim_distance':
                 swim_distance = self.swim_distance(noise_level=noise_level_for_priors)
                 self.confidence_score_history['swim_distance'].append(swim_distance)
@@ -275,7 +273,7 @@ class Snowflake(BaseUF):
                 self.confidence_score_history['unclustered_edge_fraction'].append(fraction)
             else:
                 raise ValueError(f'Unknown confidence score: {confidence_score}')
-        return t
+        return runtime
     
     def min_defect_height(self):
         """Calculate the minimum defect height DCS in the current decoding window."""
@@ -320,27 +318,26 @@ class Snowflake(BaseUF):
         
         Emergent effect: merge touching clusters, push defects to roots.
         
-        
         :param whole: whether to perform ``MERGING_WHOLE`` or ``MERGING_HALF`` stage.
         :param log_history: as in ``decode`` inputs.
         :param time_only: as in ``decode`` inputs.
         
-        Output: ``t`` number of timesteps to complete growth round.
+        :return runtime: Number of timesteps to complete growth round.
         """
-        t = -1 if time_only == 'merging' else 1 if time_only == 'all' else 0
+        runtime = -1 if time_only == 'merging' else 1 if time_only == 'all' else 0
 
         while True:
             for node in self.NODES.values():
                 node.merging(whole)
             for node in self.NODES.values():
                 node.update_after_merging()
-            t += (time_only!='unrooting') or any(node.cid==RESET for node in self.NODES.values())
+            runtime += (time_only!='unrooting') or any(node.cid==RESET for node in self.NODES.values())
             if not any(node.busy for node in self.NODES.values()):
                 break
             if log_history == 'fine': self.append_history()
 
         if log_history == 'coarse': self.append_history()
-        return t
+        return runtime
 
     # DRAWERS
 
@@ -351,13 +348,12 @@ class Snowflake(BaseUF):
     ):
         """Return the labels dictionary for the drawer.
         
-        
         :param show_global: whether to prepend the global label to the top-left node label.
         :param show_2_1_schedule_variables: whether to show
             node variables specific to the 2:1 cluster growth schedule.
         
-        
-        :returns: ``result`` a dictionary where each key a node index as a tuple; value, the label for the node at that index.
+        :returns result: A map from node index (as a tuple)
+            to the label for the node at that index.
         """
         result = {v: node.label(show_2_1_schedule_variables)
                   for v, node in self.NODES.items()}
@@ -1261,12 +1257,10 @@ class _Schedule(abc.ABC):
     ) -> int:
         """Perform the rest of the decoding cycle after drop.
         
-        
         :param log_history: As in ``decode`` inputs.
         :param time_only: As in ``decode`` inputs.
         
-        
-        :return t: Number of timesteps to complete decoding cycle.
+        :return runtime: Number of timesteps to complete decoding cycle.
         """
 
     @abc.abstractmethod
@@ -1305,18 +1299,18 @@ class _TwoOne(_Schedule):
     """
 
     def finish_decode(self, log_history, time_only):
-        t = 0
+        runtime = 0
         for whole in (True, False):
             self._SNOWFLAKE._stage += Stage.INCREMENT
             self.grow(whole)
             if log_history == 'fine': self._SNOWFLAKE.append_history()
             self._SNOWFLAKE._stage += Stage.INCREMENT
-            t += self._SNOWFLAKE.merge(
+            runtime += self._SNOWFLAKE.merge(
                 whole,
                 log_history,
                 time_only=time_only,
             )
-        return t
+        return runtime
     
     def grow(self, whole: bool):
         if whole:

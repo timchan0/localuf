@@ -585,7 +585,7 @@ class Frugal(_Streaming):
         :param draw: Whether to draw.
         :param log_history: Whether to populate ``history`` attribute.
         :param confidence_scores: An iterable of DCSs to compute and record after each decoding cycle.
-            Supported values are 'runtime', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
+            Supported values are 'throughput', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
             each merging step only ('merging');
@@ -663,7 +663,6 @@ class Frugal(_Streaming):
         Assumes commit height is 1.
         
         Inputs same as in ``run``.
-        
         
         :return latency: The number of timesteps
             from receiving the last measurement round to outputting the final correction.
