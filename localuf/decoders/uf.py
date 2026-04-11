@@ -18,25 +18,6 @@ class UF(BaseUF):
     
     Extends ``BaseUF``.
     Incompatible with the frugal decoding scheme.
-    
-    Additional instance constants:
-    
-    * ``_FORESTER`` decides whether to maintain a static or dynamic forest.
-    * ``_INCLINATION`` a class that decides which boundary the root should be on
-        when there is a percolating cluster
-        i.e. one that spans opposite boundaries.
-        Has the ``update_boundary`` method.
-    
-    Additional instance attributes:
-    
-    * ``parents`` maps each node in the decoding graph to its parent node.
-    * ``clusters`` maps each root node to the cluster of that root node.
-        Initially, EVERY node its own cluster; then, only grow active clusters.
-    * ``active_clusters`` the set of clusters
-        with odd defect count and no boundary node.
-    * ``forest`` the spanning forest after syndrome validation as a list of pairs (edge, node)
-        where node is the further endpoint from the root of the tree in the forest.
-    * ``digraph`` a NetworkX digraph of ``forest``.
     """
 
     def __init__(
@@ -68,11 +49,29 @@ class UF(BaseUF):
             raise ValueError('UF incompatible with frugal scheme.')
         self.history: list[UF]
         self.correction = set()
-        self._FORESTER = _DynamicForester(self) if dynamic else _StaticForester(self)
-        inclination_class = _DefaultInclination if inclination == 'default' else _WestInclination
-        self._INCLINATION = inclination_class(code.LONG_AXIS)
+        self._FORESTER = (_DynamicForester if dynamic else _StaticForester)(self)
+        """Decides whether to maintain a static or dynamic forest."""
+        self._INCLINATION = (_DefaultInclination if inclination == 'default'
+            else _WestInclination)(code.LONG_AXIS)
+        """A class that decides which boundary the root should be on
+        when there is a percolating cluster
+        i.e. one that spans opposite boundaries.
+        Has the ``update_boundary`` method.
+        """
         super().__init__(code)
         self.reset()
+        self.parents: dict[Node, Node]
+        """Maps each node in the decoding graph to its parent node."""
+        self.clusters: dict[Node, _Cluster]
+        """Maps each root node to the cluster of that root node.
+        Initially, EVERY node its own cluster; then, only grow active clusters.
+        """
+        self.active_clusters: set[_Cluster]
+        """The set of clusters with odd defect count and no boundary node."""
+        self.forest: list[tuple[Edge, Node]]
+        """The spanning forest after syndrome validation as a list of pairs (edge, node)
+        where node is the further endpoint from the root of the tree in the forest.
+        """
 
     def __repr__(self):
         return f'UF(code={self.CODE}, syndrome={self.syndrome})'
@@ -88,7 +87,7 @@ class UF(BaseUF):
         # note: following line is faster than dict(zip(nodes, nodes))
         self.parents = {v: v for v in self.CODE.NODES}
         self.clusters = {v: _Cluster(self, v, no_boundaries=no_boundaries) for v in self.CODE.NODES}
-        self.active_clusters: set[_Cluster] = set()
+        self.active_clusters = set()
         try: del self.changed_edges
         except AttributeError: pass
         try: del self.forest
@@ -112,7 +111,7 @@ class UF(BaseUF):
     ):
         """Additional inputs over ``Decoder.decode()``:
         
-        * ``fig_width`` figure width.
+        :param fig_width: figure width.
         """
         self.validate(syndrome, log_history=draw)
         self.peel()
@@ -133,7 +132,6 @@ class UF(BaseUF):
         If ``self.CODE.MERGED_EQUIVALENT_BOUNDARY_NODES`` is ``False``,
         raises a ``ValueError``.
         
-        
         :param noise_level: a probability representing the noise strength.
             This is needed to define nonuniform edge weights of the decoding graph
             in the circuit-level noise model.
@@ -143,8 +141,7 @@ class UF(BaseUF):
         :param fig_height: figure height.
         :param kwargs_for_networkx_draw: passed to ``networkx.draw()``.
         
-        
-        :returns: ``weight_2 - weight_1`` the complementary gap.
+        :returns gap: The complementary gap.
         
         Side effects:
         
@@ -353,7 +350,7 @@ class UF(BaseUF):
 
     @cached_property
     def digraph(self):
-        """Return a NetworkX digraph representing the spanning forest after syndrome validation.
+        """A NetworkX digraph representing the spanning forest after syndrome validation.
         
         Note: Requires calling ``peel()`` first.
         """

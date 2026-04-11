@@ -474,9 +474,7 @@ class Code(abc.ABC):
     def get_logical_error(self, leftover: set[Edge]):
         """Whether leftover implements logical X.
         
-        
         :param leftover: a set of bitflipped edges.
-        
         
         :returns logical_error: logical error count parity
             if scheme is batch else logical error count

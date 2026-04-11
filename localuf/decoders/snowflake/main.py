@@ -89,15 +89,13 @@ class Snowflake(BaseUF):
             else:  # Surface
                 _neighbor_order = ('NWD', 'N', 'NU', 'WD', 'W', 'D', 'U', 'E', 'EU', 'SD', 'S', 'SEU')
         self._NEIGHBOR_ORDER: Iterable[direction] = _neighbor_order
-        self._NODES = {
-            v: _Node(
-                self,
-                v,
-                merger=merger,
-                unrooter=unrooter,
-            ) for v in self.CODE.NODES
-            if v[self.CODE.TIME_AXIS] < window_height
-        }
+        self._NODES = {v: _Node(
+            self,
+            v,
+            merger=merger,
+            unrooter=unrooter,
+        ) for v in self.CODE.NODES
+        if v[self.CODE.TIME_AXIS] < window_height}
         self._DECODE_DRAWER = DecodeDrawer(self._FIG_WIDTH, fig_height=self._FIG_HEIGHT)
         self._stage = Stage.DROP
         """The current stage of the decoder.
@@ -123,8 +121,9 @@ class Snowflake(BaseUF):
         the correction output from the bottom layer at each drop.
         The order of the bits is given by ``self._LOWEST_EDGES``.
         """
-        self.confidence_score_history: defaultdict[str, list[float]] = defaultdict(list)
-        """A map from DCS to a list of DCS values after each growth stage."""
+        self.confidence_score_history: defaultdict[
+            ConfidenceScoreName, list[float]] = defaultdict(list)
+        """A map from DCS name to a list of DCS values after each growth stage."""
     
     def __repr__(self) -> str:
         return f'decoders.Snowflake({self.CODE})'
@@ -261,18 +260,16 @@ class Snowflake(BaseUF):
             runtime = 1 if time_only == 'all' else 0
         for confidence_score in confidence_scores:
             if confidence_score == 'throughput':
-                self.confidence_score_history['throughput'].append(1/runtime)
+                dcs_value = 1/runtime
             elif confidence_score == 'swim_distance':
-                swim_distance = self.swim_distance(noise_level=noise_level_for_priors)
-                self.confidence_score_history['swim_distance'].append(swim_distance)
+                dcs_value = self.swim_distance(noise_level=noise_level_for_priors)
             elif confidence_score == 'min_defect_height':
-                min_defect_height = self.min_defect_height()
-                self.confidence_score_history['min_defect_height'].append(min_defect_height)
+                dcs_value = self.min_defect_height()
             elif confidence_score == 'unclustered_edge_fraction':
-                fraction = self.unclustered_edge_fraction(noise_level=noise_level_for_priors)
-                self.confidence_score_history['unclustered_edge_fraction'].append(fraction)
+                dcs_value = self.unclustered_edge_fraction(noise_level_for_priors)
             else:
                 raise ValueError(f'Unknown confidence score: {confidence_score}')
+            self.confidence_score_history[confidence_score].append(dcs_value)
         return runtime
     
     def min_defect_height(self):

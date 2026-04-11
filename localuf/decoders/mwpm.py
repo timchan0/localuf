@@ -219,7 +219,7 @@ class MWPM(Decoder):
         raise NotImplementedError
     
     def complementary_gap(self, syndrome: set[Node]) -> tuple[np.uint8, float]:
-        """Decode ``syndrome`` and calculate the complementary gap.
+        """Decode and calculate the complementary gap.
         
         Does not require ``self.decode()`` to be called first.
         
