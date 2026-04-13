@@ -1,6 +1,6 @@
 import abc
 from collections.abc import Iterable, Sequence
-from collections import defaultdict
+from collections import defaultdict, Counter
 from functools import cache
 from typing import Literal
 
@@ -14,7 +14,7 @@ import networkx as nx
 from localuf import constants, Repetition
 from localuf.decoders.snowflake.constants import RESET, Stage
 from localuf.noise import CodeCapacity
-from localuf.type_aliases import ConfidenceScoreName, Edge, Node, Coord
+from localuf.type_aliases import ConfidenceScoreName, Edge, Node, Coord, MetricName
 from localuf.constants import Growth
 from localuf.decoders.policies import DecodeDrawer
 from localuf._base_classes import Code
@@ -123,7 +123,9 @@ class Snowflake(BaseUF):
         """
         self.confidence_score_history: defaultdict[
             ConfidenceScoreName, list[float]] = defaultdict(list)
-        """A map from DCS name to a list of DCS values after each growth stage."""
+        """A map from DCS name to a list of values after each decoding cycle."""
+        self.min_active_layers: Counter[int] = Counter()
+        """A counter of the minimum active layer after each decoding cycle."""
     
     def __repr__(self) -> str:
         return f'decoders.Snowflake({self.CODE})'
@@ -209,6 +211,7 @@ class Snowflake(BaseUF):
         try: del self.floor_history
         except AttributeError: pass
         self.confidence_score_history = defaultdict(list)
+        self.min_active_layers = Counter()
     
     @override
     def decode(
@@ -216,7 +219,7 @@ class Snowflake(BaseUF):
             syndrome: set[Node],
             log_history: Literal[False, 'fine', 'coarse'] = False,
             log_floor_history: bool = False,
-            confidence_scores: Iterable[ConfidenceScoreName] = (),
+            metrics: Iterable[MetricName] = (),
             noise_level_for_priors: None | float = None,
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             defects_possible: bool = True,
@@ -229,8 +232,9 @@ class Snowflake(BaseUF):
             'fine' logs each timestep;
             'coarse', only the final timestep of the growth round.
         :param log_floor_history: Whether to populate ``floor_history`` attribute.
-        :param confidence_scores: An iterable of DCS names to record after the decoding cycle.
-            Supported values are 'throughput', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
+        :param metrics: An iterable of metric names to record after the decoding cycle.
+            Supported values are 'throughput', 'swim_distance',
+            'unclustered_edge_fraction', 'min_defect_height', 'min_active_layer'.
         :param noise_level_for_priors: Noise level to use when computing some DCSs.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
@@ -258,24 +262,36 @@ class Snowflake(BaseUF):
             )
         else:
             runtime = 1 if time_only == 'all' else 0
-        for confidence_score in confidence_scores:
-            if confidence_score == 'throughput':
-                dcs_value = 1/runtime
-            elif confidence_score == 'swim_distance':
-                dcs_value = self.swim_distance(noise_level=noise_level_for_priors)
-            elif confidence_score == 'min_defect_height':
-                dcs_value = self.min_defect_height()
-            elif confidence_score == 'unclustered_edge_fraction':
-                dcs_value = self.unclustered_edge_fraction(noise_level_for_priors)
+        for metric in metrics:
+            if metric == 'throughput':
+                metric_value = 1/runtime
+            elif metric == 'swim_distance':
+                metric_value = self.swim_distance(noise_level=noise_level_for_priors)
+            elif metric == 'min_defect_height':
+                metric_value = self.min_defect_height()
+            elif metric == 'unclustered_edge_fraction':
+                metric_value = self.unclustered_edge_fraction(noise_level_for_priors)
+            elif metric == 'min_active_layer':
+                metric_value = self.min_active_layer()
+                self.min_active_layers[metric_value] += 1
             else:
-                raise ValueError(f'Unknown confidence score: {confidence_score}')
-            self.confidence_score_history[confidence_score].append(dcs_value)
+                raise ValueError(f'Unknown metric: {metric}.')
+            if metric != 'min_active_layer':
+                self.confidence_score_history[metric].append(metric_value)
         return runtime
     
     def min_defect_height(self):
         """Calculate the minimum defect height DCS in the current decoding window."""
         return min(
             (coordinate[self.CODE.TIME_AXIS] for coordinate in self.syndrome),
+            default=self.CODE.SCHEME.WINDOW_HEIGHT,
+        )
+    
+    def min_active_layer(self):
+        """Calculate the height of the lowest active layer in the current decoding window."""
+        return min(
+            (coordinate[self.CODE.TIME_AXIS] for coordinate, node
+            in self.NODES.items() if node.active),
             default=self.CODE.SCHEME.WINDOW_HEIGHT,
         )
     

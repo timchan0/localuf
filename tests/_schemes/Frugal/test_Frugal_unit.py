@@ -216,7 +216,7 @@ class TestRun:
                     decoder,
                     exclude_future_boundary=False,
                     log_history=False,
-                    confidence_scores=(),
+                    metrics=(),
                     noise_level_for_priors=noise_level,
                     time_only='merging',
                 )] \
@@ -225,7 +225,7 @@ class TestRun:
                     decoder,
                     exclude_future_boundary=True,
                     log_history=False,
-                    confidence_scores=(),
+                    metrics=(),
                     noise_level_for_priors=noise_level,
                     time_only='merging',
                 )] \
@@ -234,7 +234,7 @@ class TestRun:
                     decoder,
                     exclude_future_boundary=False,
                     log_history=False,
-                    confidence_scores=(),
+                    metrics=(),
                     noise_level_for_priors=noise_level,
                     time_only='merging',
                 )]

@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover
 
 from localuf import constants
 from localuf.noise import CodeCapacity
-from localuf.type_aliases import Edge, Node, ConfidenceScoreName
+from localuf.type_aliases import Edge, Node, MetricName
 from localuf._pairs import LogicalCounter, Pairs
 from localuf._determinants import Determinant, SpaceDeterminant, SpaceTimeDeterminant
 
@@ -571,7 +571,7 @@ class Frugal(_Streaming):
             n: int,
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
-            confidence_scores: Iterable[ConfidenceScoreName] = (),
+            metrics: Iterable[MetricName] = (),
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
             **kwargs_for_draw_decode,
     ):
@@ -584,8 +584,9 @@ class Frugal(_Streaming):
             For Snowflake, there is 1 decoding cycle per stabiliser measurement round.
         :param draw: Whether to draw.
         :param log_history: Whether to populate ``history`` attribute.
-        :param confidence_scores: An iterable of DCSs to compute and record after each decoding cycle.
-            Supported values are 'throughput', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height'.
+        :param metrics: An iterable of metrics to compute and record after each decoding cycle.
+            Supported values are 'throughput', 'swim_distance',
+            'unclustered_edge_fraction', 'min_defect_height', 'min_active_layer'.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
             each merging step only ('merging');
@@ -636,7 +637,7 @@ class Frugal(_Streaming):
                     decoder,
                     exclude_future_boundary=exclude_future_boundary,
                     log_history=log_history,
-                    confidence_scores=confidence_scores,
+                    metrics=metrics if time else (),
                     noise_level_for_priors=noise_level,
                     time_only=time_only,
                 )
