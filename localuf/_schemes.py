@@ -549,7 +549,8 @@ class Frugal(_Streaming):
         
         :return syndrome: The incremental syndrome due to ``error``.
         
-        Side effect: Update ``self.error`` and ``self.future_boundary_syndrome``.
+        ## Side effects
+        Update ``self.error`` and ``self.future_boundary_syndrome``.
         """
         self.error |= error
         syndrome = {self._CODE.raise_node(v, delta_t=-self._COMMIT_HEIGHT)

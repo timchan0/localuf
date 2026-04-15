@@ -400,7 +400,6 @@ class Code(abc.ABC):
     def make_error(self, noise_level: float, exclude_future_boundary: bool = False):
         """Sample edges from freshly discovered region.
         
-        
         :param noise_level: characteristic noise level if circuit-level noise;
             else, bitflip probability.
             Should be in [0, 1], though no check is done to ensure this.
@@ -410,7 +409,6 @@ class Code(abc.ABC):
             where the data qubits are measured and the last syndrome sheet is obtained
             from classically taking parities of these measurement outcomes
             (so there is no measurement error).
-        
         
         :return error: The set of bitflipped edges in the freshly discovered region.
             Each edge bitflips with probability defined by its multiplicity
@@ -429,9 +427,7 @@ class Code(abc.ABC):
     def get_syndrome(self, error: set[Edge]):
         """Get syndrome from error configuration.
         
-        
         :param error: a set of bitflipped edges.
-        
         
         :returns syndrome: a set of defects.
         """
@@ -440,9 +436,7 @@ class Code(abc.ABC):
     def get_verbose_syndrome(self, error: set[Edge]):
         """Get syndrome, treating boundary nodes as detectors too.
         
-        
         :param error: a set of bitflipped edges.
-        
         
         :returns verbose_syndrome: a set of defects.
         """
@@ -461,7 +455,6 @@ class Code(abc.ABC):
         
         :param errors: a tuple (error1, error2, ...) where each
             error is a set of bitflipped edges.
-        
         
         :returns composition: A set of edges representing
             the sequential composition of all errors in ``errors``.
