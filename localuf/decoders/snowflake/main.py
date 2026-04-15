@@ -688,7 +688,7 @@ class Snowflake(BaseUF):
             for the repetition code, the purely timelike edges in the last layer
             are excluded from ``self._LOWEST_EDGES``; the spacelike edges are ordered from west to east.
         
-        ## Side effects
+        Side effects:
         * If ``output_to_csv_file`` is not None, the input and output of Snowflake
             are saved in a CSV file at path ``output_to_csv_file``.
         * If ``draw`` is True, the decoding process is drawn.
