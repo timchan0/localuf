@@ -586,7 +586,7 @@ class Frugal(_Streaming):
         :param log_history: Whether to populate ``history`` attribute.
         :param metrics: An iterable of metrics to compute and record after each decoding cycle.
             Supported values are 'throughput', 'swim_distance',
-            'unclustered_edge_fraction', 'min_defect_height', 'min_active_layer'.
+            'unclustered_edge_fraction', 'min_defect_height', 'activity_depth'.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
             each merging step only ('merging');

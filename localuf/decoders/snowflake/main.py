@@ -124,8 +124,10 @@ class Snowflake(BaseUF):
         self.confidence_score_history: defaultdict[
             ConfidenceScoreName, list[float]] = defaultdict(list)
         """A map from DCS name to a list of values after each decoding cycle."""
-        self.min_active_layers: Counter[int] = Counter()
-        """A counter of the minimum active layer after each decoding cycle."""
+        self.log_activity_depth: bool = False
+        """Whether to log activity depth after each merging step."""
+        self.activity_depths: Counter[int] = Counter()
+        """A counter of the activity layer before each merging step."""
     
     def __repr__(self) -> str:
         return f'decoders.Snowflake({self.CODE})'
@@ -211,7 +213,8 @@ class Snowflake(BaseUF):
         try: del self.floor_history
         except AttributeError: pass
         self.confidence_score_history = defaultdict(list)
-        self.min_active_layers = Counter()
+        self.log_activity_depth = False
+        self.activity_depths = Counter()
     
     @override
     def decode(
@@ -234,7 +237,7 @@ class Snowflake(BaseUF):
         :param log_floor_history: Whether to populate ``floor_history`` attribute.
         :param metrics: An iterable of metric names to record after the decoding cycle.
             Supported values are 'throughput', 'swim_distance',
-            'unclustered_edge_fraction', 'min_defect_height', 'min_active_layer'.
+            'unclustered_edge_fraction', 'min_defect_height'.
         :param noise_level_for_priors: Noise level to use when computing some DCSs.
         :param time_only: Whether runtime includes a timestep
             for each drop, each grow, and each merging step ('all');
@@ -271,13 +274,9 @@ class Snowflake(BaseUF):
                 metric_value = self.min_defect_height()
             elif metric == 'unclustered_edge_fraction':
                 metric_value = self.unclustered_edge_fraction(noise_level_for_priors)
-            elif metric == 'min_active_layer':
-                metric_value = self.min_active_layer()
-                self.min_active_layers[metric_value] += 1
             else:
                 raise ValueError(f'Unknown metric: {metric}.')
-            if metric != 'min_active_layer':
-                self.confidence_score_history[metric].append(metric_value)
+            self.confidence_score_history[metric].append(metric_value)
         return runtime
     
     def min_defect_height(self):
@@ -287,9 +286,13 @@ class Snowflake(BaseUF):
             default=self.CODE.SCHEME.WINDOW_HEIGHT,
         )
     
-    def min_active_layer(self):
-        """Calculate the height of the lowest active layer in the current decoding window."""
-        return min(
+    def activity_depth(self):
+        """Calculate the depth of the deepest active sheet in the current decoding window.
+        
+        Depth here is a positive number and is 0 for no active sheets,
+        1 if only the top sheet is active, etc.
+        """
+        return self.CODE.SCHEME.WINDOW_HEIGHT - min(
             (coordinate[self.CODE.TIME_AXIS] for coordinate, node
             in self.NODES.items() if node.active),
             default=self.CODE.SCHEME.WINDOW_HEIGHT,
@@ -340,6 +343,8 @@ class Snowflake(BaseUF):
         runtime = -1 if time_only == 'merging' else 1 if time_only == 'all' else 0
 
         while True:
+            if self.log_activity_depth:
+                self.activity_depths[self.activity_depth()] += 1
             for node in self.NODES.values():
                 node.merging(whole)
             for node in self.NODES.values():
