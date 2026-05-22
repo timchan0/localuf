@@ -3,6 +3,7 @@ from abc import abstractmethod
 from collections.abc import Iterable
 import itertools
 import math
+import sys
 from typing import Literal, TYPE_CHECKING
 
 try:
@@ -571,8 +572,10 @@ class Frugal(_Streaming):
             n: int,
             draw: Literal[False, 'fine', 'coarse'] = False,
             log_history: Literal[False, 'fine', 'coarse'] = False,
+            log_activity_depth: bool = False,
             metrics: Iterable[MetricName] = (),
             time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
+            print_progress: bool = False,
             **kwargs_for_draw_decode,
     ):
         """Simulate ``n*d`` decoding cycles (in the steady state).
@@ -597,6 +600,7 @@ class Frugal(_Streaming):
             in the case of Snowflake with the 1:1 schedule.
             In the case of the 2:1 schedule, the increase of each step count is 3d.
             This can be done post-run via ``add_ignored_timesteps``.
+        :param print_progress: Whether to print progress updates.
         :param kwargs_for_draw_decode: passed to ``decoder.draw_decode``
             e.g. ``margins=(0.1, 0.1)``.
         
@@ -614,6 +618,8 @@ class Frugal(_Streaming):
             log_history = draw
         if log_history:
             decoder.init_history()
+        if log_activity_depth:
+            decoder.log_activity_depth = True
         m = 0
         transient_count = math.ceil(self.WINDOW_HEIGHT / self._COMMIT_HEIGHT)
         # require `transient_count` decoding cycles to reach steady state
@@ -623,6 +629,8 @@ class Frugal(_Streaming):
         # TODO: tighten this bound
         # Note: cleanse_count = math.ceil(self.WINDOW_HEIGHT / self._COMMIT_HEIGHT) does NOT work
         # as the committed correction will be incomplete
+        total_advance_count = transient_count + (n+1)*d + cleanse_count
+        completed_advance_count = 0
         for instantaneous_noise_level, advance_count, time, exclude_future_boundary in itertools.chain(
             ((noise_level, transient_count, False, False),),
             itertools.repeat((noise_level, d, True, False), n),
@@ -644,6 +652,13 @@ class Frugal(_Streaming):
                 m += self.get_logical_error()
             if time:
                 self.step_counts.append(step_count)
+            
+            if print_progress:
+                completed_advance_count += advance_count
+                sys.stdout.write('\r')
+                sys.stdout.write(f"{completed_advance_count}/{total_advance_count} decoding cycles completed.")
+                sys.stdout.flush()
+        
         if draw:
             decoder.draw_decode(**kwargs_for_draw_decode)
         return m, transient_count / d + n + 1
