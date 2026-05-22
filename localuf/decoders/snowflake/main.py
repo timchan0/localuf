@@ -124,9 +124,9 @@ class Snowflake(BaseUF):
         self.confidence_score_history: defaultdict[
             ConfidenceScoreName, list[float]] = defaultdict(list)
         """A map from DCS name to a list of values after each decoding cycle."""
-        self.log_activity_depth: bool = False
-        """Whether to log activity depth after each merging step."""
-        self.activity_depths: Counter[int] = Counter()
+        self.log_active_depth: bool = False
+        """Whether to log active depth after each merging step."""
+        self.active_depths: Counter[int] = Counter()
         """A counter of the activity layer before each merging step."""
     
     def __repr__(self) -> str:
@@ -213,8 +213,8 @@ class Snowflake(BaseUF):
         try: del self.floor_history
         except AttributeError: pass
         self.confidence_score_history = defaultdict(list)
-        self.log_activity_depth = False
-        self.activity_depths = Counter()
+        self.log_active_depth = False
+        self.active_depths = Counter()
     
     @override
     def decode(
@@ -286,7 +286,7 @@ class Snowflake(BaseUF):
             default=self.CODE.SCHEME.WINDOW_HEIGHT,
         )
     
-    def activity_depth(self):
+    def active_depth(self):
         """Calculate the depth of the deepest active sheet in the current decoding window.
         
         Depth here is a positive number and is 0 for no active sheets,
@@ -343,8 +343,8 @@ class Snowflake(BaseUF):
         runtime = -1 if time_only == 'merging' else 1 if time_only == 'all' else 0
 
         while True:
-            if self.log_activity_depth:
-                self.activity_depths[self.activity_depth()] += 1
+            if self.log_active_depth:
+                self.active_depths[self.active_depth()] += 1
             for node in self.NODES.values():
                 node.merging(whole)
             for node in self.NODES.values():
