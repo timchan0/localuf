@@ -14,7 +14,7 @@ import networkx as nx
 from localuf import constants, Repetition
 from localuf.decoders.snowflake.constants import RESET, Stage
 from localuf.noise import CodeCapacity
-from localuf.type_aliases import ConfidenceScoreName, Edge, Node, Coord, MetricName
+from localuf.type_aliases import Edge, Node, Coord, MetricName
 from localuf.constants import Growth
 from localuf.decoders.policies import DecodeDrawer
 from localuf._base_classes import Code
@@ -122,8 +122,8 @@ class Snowflake(BaseUF):
         The order of the bits is given by ``self._LOWEST_EDGES``.
         """
         self.confidence_score_history: defaultdict[
-            ConfidenceScoreName, list[float]] = defaultdict(list)
-        """A map from DCS name to a list of values after each decoding cycle."""
+            MetricName, list[float]] = defaultdict(list)
+        """A map from metric name to a list of values after each decoding cycle."""
         self.log_active_depth: bool = False
         """Whether to log active depth after each merging step."""
         self.active_depths: Counter[int] = Counter()

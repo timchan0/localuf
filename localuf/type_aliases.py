@@ -70,8 +70,5 @@ MultiplicityVector = npt.NDArray[np.int_]
 FloatSequence = Sequence[float] | npt.NDArray[np.float64]
 IntSequence = Sequence[int] | npt.NDArray[np.int_]
 
-ConfidenceScoreName = Literal['throughput', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height']
-"""Supported confidence score name."""
-
-MetricName = ConfidenceScoreName
+MetricName = Literal['throughput', 'swim_distance', 'unclustered_edge_fraction', 'min_defect_height']
 """Supported metric name."""
