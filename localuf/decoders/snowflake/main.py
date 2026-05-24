@@ -1361,10 +1361,9 @@ class _Unrooter(abc.ABC):
     def flooding_whole(self):
         """Update ``pointer, cid, unrooted, grown`` depending on access."""
 
+    @abc.abstractmethod
     def flooding_half(self):
         """Update ``pointer, cid`` depending on access."""
-        for pointer, neighbor in self._NODE.access.items():
-            self._compare_cid(pointer, neighbor)
 
     def _compare_cid(self, pointer: direction, neighbor: _Node):
         """Update ``next_cid`` depending on ``neighbor.cid``."""
@@ -1413,6 +1412,10 @@ class _FullUnrooter(_Unrooter):
                     self._compare_cid(pointer, neighbor)
                 self._check_grown(neighbor)
 
+    def flooding_half(self):
+        for pointer, neighbor in self._NODE.access.items():
+            self._compare_cid(pointer, neighbor)
+
 
 class _SimpleUnrooter(_Unrooter):
     """Simple unrooting process where the node at breaking point only establishes the shortest path to a boundary.
@@ -1443,8 +1446,15 @@ class _SimpleUnrooter(_Unrooter):
                     self._compare_cid(pointer, neighbor)
                 self._check_grown(neighbor)
 
+    def flooding_half(self):
+        if self._NODE.cid != RESET:
+            for pointer, neighbor in self._NODE.access.items():
+                if neighbor.cid != RESET:
+                    self._compare_cid(pointer, neighbor)
+
     def _wave(self):
         """Propagate unroot wave toward nearest boundary."""
+        self._NODE.busy = True
         self._NODE.next_unrooted = True
         self._NODE.pointer = self._CLOSEST_BOUNDARY_DIRECTION
         e, index = self._NODE.NEIGHBORS[self._NODE.pointer]
