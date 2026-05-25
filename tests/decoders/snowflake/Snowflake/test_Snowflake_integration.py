@@ -41,7 +41,7 @@ def snowflake5():
         noise='phenomenological',
         scheme='frugal',
     )
-    return Snowflake(rp, schedule='1:1')
+    return Snowflake(rp, schedule='1:1', eager_unroot=True)
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def test_nonroot_boundary_defect_kept(snowflake4: Snowflake):
     snowflake4._SCHEDULE.grow()
     for _ in itertools.repeat(None, 5):
         for node in snowflake4.NODES.values():
-            node.merging(whole)
+            node.MERGER.merging(whole)
         for node in snowflake4.NODES.values():
             node.update_after_merging()
         assert snowflake4.NODES[-1, 0].defect
@@ -119,7 +119,7 @@ def test_decode_fine(snowflake5: Snowflake):
         snowflake5._SCHEDULE.grow()
         while True:
             for node in snowflake5.NODES.values():
-                node.merging(whole)
+                node.MERGER.merging(whole)
             for node in snowflake5.NODES.values():
                 node.update_after_merging()
             assert_no_standoff(snowflake5)
@@ -241,7 +241,7 @@ def test_no_infinite_unroot_cycle(snowflake5: Snowflake):
     helper_infinite_due_to_unroot(snowflake5)
     for _ in itertools.repeat(None, 10):  # prevent infinite loop
         for node in snowflake5.NODES.values():
-            node.merging(whole)
+            node.MERGER.merging(whole)
         for node in snowflake5.NODES.values():
             node.update_after_merging()
         if not any(node.busy for node in snowflake5.NODES.values()):
@@ -265,7 +265,7 @@ def test_no_unroot_pointer_cycle(snowflake5: Snowflake):
     helper_infinite_due_to_unroot(snowflake5)
     for _ in itertools.repeat(None, 10):  # prevent infinite loop
         for node in snowflake5.NODES.values():
-            node.merging(whole)
+            node.MERGER.merging(whole)
         for node in snowflake5.NODES.values():
             node.update_after_merging()
         assert not all((
@@ -296,7 +296,7 @@ def test_no_infinite_loop(snowflake7: Snowflake):
     snowflake7._SCHEDULE.grow()
     for cycle_index in range(1, 11):
         for node in snowflake7.NODES.values():
-            node.merging(whole)
+            node.MERGER.merging(whole)
         for node in snowflake7.NODES.values():
             node.update_after_merging()
         if cycle_index == 11:

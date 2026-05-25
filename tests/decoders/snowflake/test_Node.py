@@ -8,7 +8,7 @@ from localuf.constants import Growth
 from localuf.decoders.snowflake.constants import RESET
 from localuf.type_aliases import Node
 from localuf.decoders import Snowflake
-from localuf.decoders.snowflake import _Node, NothingFriendship, NodeFriendship, TopSheetFriendship
+from localuf.decoders.snowflake import _Node, EagerFriendship, NodeFriendship, TopSheetFriendship
 from localuf.decoders._base_uf import direction
 
 @pytest.mark.parametrize("prop", [
@@ -45,7 +45,7 @@ def test_ID_property(sfn3: _Node):
 def test_FRIENDSHIP_property(snowflake: Snowflake):
     for v, node in snowflake.NODES.items():
         if v[snowflake.CODE.TIME_AXIS] == 0:
-            assert type(node.FRIENDSHIP) is NothingFriendship
+            assert type(node.FRIENDSHIP) is EagerFriendship
         elif v[snowflake.CODE.TIME_AXIS] == snowflake.CODE.SCHEME.WINDOW_HEIGHT-1:
             assert type(node.FRIENDSHIP) is TopSheetFriendship
         else:
@@ -177,7 +177,7 @@ def test_grow(sfn3: _Node, active):
     sfn3.active = active
     with (
         mock.patch("localuf.decoders.snowflake._Node._grow") as mock_grow,
-        mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find,
+        mock.patch("localuf.decoders.snowflake.EagerFriendship.find_broken_pointers") as mock_find,
     ):
         sfn3.grow()
         assert sfn3.busy is False
@@ -195,7 +195,7 @@ def test_grow_whole(sfn3: _Node, active, whole):
     sfn3.whole = whole
     with (
         mock.patch("localuf.decoders.snowflake._Node._grow") as mock_grow,
-        mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find,
+        mock.patch("localuf.decoders.snowflake.EagerFriendship.find_broken_pointers") as mock_find,
     ):
         sfn3.grow_whole()
         assert sfn3.busy is False
@@ -221,7 +221,7 @@ def test_grow_half(sfn3: _Node, active, whole, grown):
     sfn3.next_unrooted = True
     with (
         mock.patch("localuf.decoders.snowflake._Node._grow") as mock_grow,
-        mock.patch("localuf.decoders.snowflake.NothingFriendship.find_broken_pointers") as mock_find,
+        mock.patch("localuf.decoders.snowflake.EagerFriendship.find_broken_pointers") as mock_find,
     ):
         sfn3.grow_half()
         assert not sfn3.unrooted
@@ -272,9 +272,9 @@ def test_merging(sfn3: _Node, whole):
     sfn3.busy = True
     with (
         mock.patch("localuf.decoders.snowflake._Node.syncing") as mock_syncing,
-        mock.patch("localuf.decoders.snowflake._Node.flooding") as mock_flooding,
+        mock.patch("localuf.decoders.snowflake.main._FullUnrooter.flooding") as mock_flooding,
     ):
-        sfn3.merging(whole)
+        sfn3.MERGER.merging(whole)
         assert sfn3.busy is False
         mock_syncing.assert_called_once_with()
         mock_flooding.assert_called_once_with(whole)
@@ -337,21 +337,6 @@ def test_syncing(syncing_flooding_objects: tuple[
     center.syncing()
     assert center.next_active is True
     assert center.busy is True
-
-
-@pytest.mark.parametrize("whole", (False, True))
-def test_flooding(sfn3: _Node, whole):
-    with (
-        mock.patch("localuf.decoders.snowflake.main._FullUnrooter.flooding_whole") as mock_whole,
-        mock.patch("localuf.decoders.snowflake.main._FullUnrooter.flooding_half") as mock_half,
-    ):
-        sfn3.flooding(whole)
-        if whole:
-            mock_whole.assert_called_once_with()
-            mock_half.assert_not_called()
-        else:
-            mock_whole.assert_not_called()
-            mock_half.assert_called_once_with()
 
 
 def test_update_after_merging(sfn3: _Node):

@@ -532,16 +532,17 @@ direction LR
     NodeFriendship --|> Friendship
     NodeFriendship: Node DROPEE
     TopSheetFriendship --|> Friendship
-    NothingFriendship --|> Friendship
+    EagerFriendship --|> Friendship
+    LazyFriendship --|> Friendship
     IFriendship <|.. NodeFriendship
     IFriendship <|.. TopSheetFriendship
-    IFriendship <|.. NothingFriendship
+    IFriendship <|.. EagerFriendship
+    IFriendship <|.. LazyFriendship
 
     class IUnrooter{
         <<interface>>
         start()
-        flooding_whole()
-        flooding_half()
+        flooding()
     }
     class _Unrooter{<<abstract>>}
     _Node "1" *--* "1" IUnrooter

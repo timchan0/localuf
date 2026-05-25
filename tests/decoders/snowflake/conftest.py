@@ -21,7 +21,7 @@ def _rp_frugal(request):
 
 @pytest.fixture
 def snowflake(rp_frugal: Repetition):
-    return Snowflake(rp_frugal)
+    return Snowflake(rp_frugal, eager_unroot=True)
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def frugal_rep_3():
 
 @pytest.fixture
 def snowflake3(frugal_rep_3: Repetition):
-    return Snowflake(frugal_rep_3)
+    return Snowflake(frugal_rep_3, eager_unroot=True)
 
 
 @pytest.fixture

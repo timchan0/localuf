@@ -43,6 +43,7 @@ class Snowflake(BaseUF):
             code: Code,
             merger: Literal['fast', 'slow'] = 'fast',
             schedule: Literal['2:1', '1:1'] = '2:1',
+            eager_unroot: bool = False,
             unrooter: Literal['full', 'simple'] = 'full',
             _neighbor_order: Iterable[direction] | None = None,
             _include_timelike_lowest_edges: bool = True,
@@ -52,6 +53,9 @@ class Snowflake(BaseUF):
         :param merger: decides whether nodes flood before syncing (fast) or vice versa (slow) in a merging step.
             Setting this to ``'slow'`` helps break down merging for visualisation.
         :param schedule: the cluster growth schedule.
+        :param eager_unroot: whether to eagerly unroot nodes.
+            If ``True``, unrooting occurs at each broken pointer.
+            If ``False``, unrooting occurs only if a defect is about to be pushed along a broken pointer.
         :param unrooter: the type of unrooting process to use.
             If ``'full'``, each node in the amputated cluster resets its CID and pointer
             so that the pointer tree structure can be rebuilt from scratch,
@@ -93,6 +97,7 @@ class Snowflake(BaseUF):
             self,
             v,
             merger=merger,
+            eager_unroot=eager_unroot,
             unrooter=unrooter,
         ) for v in self.CODE.NODES
         if v[self.CODE.TIME_AXIS] < window_height}
@@ -346,7 +351,7 @@ class Snowflake(BaseUF):
             if self.log_active_depth:
                 self.active_depths[self.active_depth()] += 1
             for node in self.NODES.values():
-                node.merging(whole)
+                node.MERGER.merging(whole)
             for node in self.NODES.values():
                 node.update_after_merging()
             runtime += (time_only!='unrooting') or any(node.cid==RESET for node in self.NODES.values())
@@ -933,20 +938,28 @@ class _Node(NodeEdgeMixin):
             snowflake: Snowflake,
             index: Node,
             merger: Literal['fast', 'slow'] = 'fast',
+            eager_unroot: bool = False,
             unrooter: Literal['full', 'simple'] = 'full',
         ) -> None:
         """
         :param snowflake: the decoder the node belongs to.
         :param index: index of node.
         :param merger: decides whether to flood before syncing (fast) or vice versa (slow) in a merging step.
+        :param eager_unroot: whether to eagerly unroot.
         :param unrooter: the type of unrooting process to use.
         """
         self._SNOWFLAKE = snowflake
         self._INDEX = index
         self._ID = snowflake.index_to_id(index)
-        self._FRIENDSHIP = NothingFriendship(self) if index[snowflake.CODE.TIME_AXIS] == 0 \
-            else TopSheetFriendship(self) if index[snowflake.CODE.TIME_AXIS] == snowflake.CODE.SCHEME.WINDOW_HEIGHT-1 \
-            else NodeFriendship(self)
+        
+        if index[snowflake.CODE.TIME_AXIS] == 0:
+            friendship = EagerFriendship if eager_unroot else LazyFriendship
+        elif index[snowflake.CODE.TIME_AXIS] == snowflake.CODE.SCHEME.WINDOW_HEIGHT-1:
+            friendship = TopSheetFriendship
+        else:
+            friendship = NodeFriendship
+        self._FRIENDSHIP = friendship(self)
+        
         if isinstance(snowflake.CODE, Repetition):
             j, t = index
             provisional_neighbors: dict[direction, tuple[Edge, int]] = {
@@ -977,7 +990,7 @@ class _Node(NodeEdgeMixin):
             if provisional_neighbors[pointer][0] in snowflake.EDGES
         }
         self._IS_BOUNDARY = snowflake.CODE.is_boundary(index)
-        self._MERGER = _FastMerger(self) if merger == 'fast' else _SlowMerger(self)
+        self.MERGER = _FastMerger(self) if merger == 'fast' else _SlowMerger(self)
         self._UNROOTER = _FullUnrooter(self) if unrooter == 'full' else _SimpleUnrooter(self)
         self.reset()
 
@@ -1099,20 +1112,15 @@ class _Node(NodeEdgeMixin):
             if self.SNOWFLAKE.EDGES[e].growth is Growth.FULL
         }
 
-    def merging(self, whole: bool):
-        """Advance 1 merging timestep.
-        
-        The emergent effect of each node running this method repeatedly
-        is the merging of clusters.
-        """
-        self.busy = False
-        self._MERGER.merging(whole)
-
     def syncing(self):
         """Update ``active`` depending on, and push defect to, pointee."""
         detector_defect = not self._IS_BOUNDARY and self.defect
         if self.pointer == 'C':
             self.next_active = detector_defect
+        elif self.FRIENDSHIP.pointing_to_nothing:
+            if detector_defect:  # start unrooting `self`
+                self.busy = True
+                self.UNROOTER.start()
         else:
             self.next_active = self.access[self.pointer].active
             if detector_defect:  # PUSH DEFECT
@@ -1125,13 +1133,6 @@ class _Node(NodeEdgeMixin):
                 self.SNOWFLAKE.EDGES[e].correction ^= True
         if self.active != self.next_active:
             self.busy = True
-
-    def flooding(self, whole: bool):
-        """Update ``pointer, cid, unrooted, grown`` depending on access."""
-        if whole:
-            self.UNROOTER.flooding_whole()
-        else:
-            self.UNROOTER.flooding_half()
 
     def update_after_merging(self):
         """``next_{cid, defect, active, unrooted, grown}`` -> ``{cid, defect, active, unrooted, grown}``."""
@@ -1171,7 +1172,14 @@ class Friendship(abc.ABC):
         self.NODE.next_unrooted = False
 
     def find_broken_pointers(self):
-        """Start unrooting if in bottom sheet of viewing window and point downward."""
+        """Start unrooting during grow_whole
+        if in bottom sheet of viewing window and point downward.
+        """
+
+    @property
+    def pointing_to_nothing(self):
+        """Whether the node points to a nonexistent neighbor during syncing."""
+        return False
 
 
 class NodeFriendship(Friendship):
@@ -1204,7 +1212,7 @@ class NodeFriendship(Friendship):
         r.next_whole = self.NODE.whole
 
 class TopSheetFriendship(NodeFriendship):
-    """Friendship for nodes in top sheet of viewing window.
+    """Friendship for nodes in top sheet of decoding window.
     
     Extends ``NodeFriendship``.
     After a drop, these nodes must reset ``next_active`` and ``next_defect``.
@@ -1216,16 +1224,30 @@ class TopSheetFriendship(NodeFriendship):
         self.NODE.next_active = False
 
 
-class NothingFriendship(Friendship):
-    """Friendship with nothing immediately below.
+class EagerFriendship(Friendship):
+    """'Eager' friendship for nodes in the bottom sheet of the decoding window.
     
     Extends ``Friendship``.
     Only nodes whose time index is 0 have this friendship.
+    'Eager' because it eagerly unroots.
     """
 
     def find_broken_pointers(self):
         if 'D' in self.NODE.pointer:
             self.NODE.UNROOTER.start()
+
+
+class LazyFriendship(Friendship):
+    """'Lazy' friendship for nodes in the bottom sheet of the decoding window.
+    
+    Extends ``Friendship``.
+    Only nodes whose time index is 0 have this friendship.
+    'Lazy' because it lazily unroots.
+    """
+
+    @property
+    def pointing_to_nothing(self):
+        return 'D' in self.NODE.pointer
 
 
 class _Merger(abc.ABC):
@@ -1235,8 +1257,12 @@ class _Merger(abc.ABC):
         self._NODE = node
 
     @abc.abstractmethod
-    def merging(self):
-        """See ``_Node.merging``."""
+    def merging(self, whole: bool):
+        """Advance 1 merging timestep.
+        
+        The emergent effect of each node running this method repeatedly
+        is the merging of clusters.
+        """
 
 
 class _SlowMerger(_Merger):
@@ -1245,9 +1271,10 @@ class _SlowMerger(_Merger):
     Extends ``_Merger``.
     """
 
-    def merging(self, whole: bool):
+    def merging(self, whole):
+        self._NODE.busy = False
         self._NODE.syncing()
-        self._NODE.flooding(whole)
+        self._NODE.UNROOTER.flooding(whole)
 
 
 class _FastMerger(_Merger):
@@ -1256,8 +1283,9 @@ class _FastMerger(_Merger):
     Extends ``_Merger``.
     """
 
-    def merging(self, whole: bool):
-        self._NODE.flooding(whole)
+    def merging(self, whole):
+        self._NODE.busy = False
+        self._NODE.UNROOTER.flooding(whole)
         self._NODE.syncing()
 
 
@@ -1358,12 +1386,11 @@ class _Unrooter(abc.ABC):
         """Start unrooting the node."""
 
     @abc.abstractmethod
-    def flooding_whole(self):
-        """Update ``pointer, cid, unrooted, grown`` depending on access."""
-
-    @abc.abstractmethod
-    def flooding_half(self):
-        """Update ``pointer, cid`` depending on access."""
+    def flooding(self, whole: bool):
+        """Update ``pointer, cid`` depending on access.
+        
+        :param whole: If true, additionally update ``unrooted`` and ``grown``.
+        """
 
     def _compare_cid(self, pointer: direction, neighbor: _Node):
         """Update ``next_cid`` depending on ``neighbor.cid``."""
@@ -1394,8 +1421,8 @@ class _FullUnrooter(_Unrooter):
         # NEED NOT RESET...
         # `next_cid` as always overwritten in `NODE.flooding`
         # `next_pointer` as always overwritten in `drop` before next used in `NODE.update_after_drop`
-
-    def flooding_whole(self):
+    
+    def flooding(self, whole):
         if self._NODE.cid == RESET:  # finish unrooting `self._NODE`
             self._NODE.busy = True
             self._NODE.next_cid = self._NODE.ID
@@ -1410,11 +1437,8 @@ class _FullUnrooter(_Unrooter):
                         break
                 else:
                     self._compare_cid(pointer, neighbor)
-                self._check_grown(neighbor)
-
-    def flooding_half(self):
-        for pointer, neighbor in self._NODE.access.items():
-            self._compare_cid(pointer, neighbor)
+                if whole:
+                    self._check_grown(neighbor)
 
 
 class _SimpleUnrooter(_Unrooter):
@@ -1436,7 +1460,7 @@ class _SimpleUnrooter(_Unrooter):
         self._NODE.cid = RESET
         self._NODE.next_cid = RESET
 
-    def flooding_whole(self):
+    def flooding(self, whole):
         if self._NODE.cid == RESET:
             if not self._NODE.unrooted and not self._NODE._IS_BOUNDARY:
                 self._wave()
@@ -1444,13 +1468,8 @@ class _SimpleUnrooter(_Unrooter):
             for pointer, neighbor in self._NODE.access.items():
                 if neighbor.cid != RESET:
                     self._compare_cid(pointer, neighbor)
-                self._check_grown(neighbor)
-
-    def flooding_half(self):
-        if self._NODE.cid != RESET:
-            for pointer, neighbor in self._NODE.access.items():
-                if neighbor.cid != RESET:
-                    self._compare_cid(pointer, neighbor)
+                if whole:
+                    self._check_grown(neighbor)
 
     def _wave(self):
         """Propagate unroot wave toward nearest boundary."""

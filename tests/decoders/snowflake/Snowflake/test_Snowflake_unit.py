@@ -172,7 +172,7 @@ def test_drop(snowflake: Snowflake):
         mock.patch(f"{tds}.FloorContact.drop") as gc,
         mock.patch(f"{tds}._Edge.update_after_drop") as euu,
         mock.patch(f"{tds}.NodeFriendship.drop") as node_f,
-        mock.patch(f"{tds}.NothingFriendship.drop") as nothing_f,
+        mock.patch(f"{tds}.EagerFriendship.drop") as nothing_f,
         mock.patch(f"{tds}._Node.update_after_drop") as nuu,
         mock.patch(f"{tds}.Snowflake._load") as mock_load,
     ):
@@ -205,7 +205,7 @@ def test_merge(snowflake: Snowflake):
 
     with (
         mock.patch(f"{tds}.Snowflake.append_history") as mock_ah,
-        mock.patch(f"{tds}._Node.merging") as mock_merging,
+        mock.patch(f"{tds}._FastMerger.merging") as mock_merging,
         mock.patch(f"{tds}._Node.update_after_merging") as mock_uam,
     ):
         assert snowflake.merge(whole, 'fine') == t
