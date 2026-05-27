@@ -145,6 +145,7 @@ def frugal(
         time_only: Literal['all', 'merging', 'unrooting'] = 'merging',
         get_commit_height: Callable[[int], int] | None = None,
         get_buffer_height: Callable[[int], int] | None = None,
+        print_progress: Literal[False, 'fine', 'coarse'] = False,
         **kwargs_for_Snowflake,
 ):
     """Make runtime data Snowflake.
@@ -163,6 +164,7 @@ def frugal(
         If ``None``, commit height is ``1``.
     :param get_buffer_height: a function with input ``d`` that outputs buffer height.
         If ``None``, buffer height is ``2*(d//2)``.
+    :param print_progress: whether to print progress.
     :param kwargs_for_Snowflake: passed to Snowflake
         e.g. ``merger`` decides whether Snowflake's nodes
         flood before syncing (fast) or vice versa (slow) in a merging step.
@@ -192,7 +194,16 @@ def frugal(
         frugal: Frugal = code.SCHEME # type: ignore
         decoder = Snowflake(code, **kwargs_for_Snowflake)
         for noise_level in noise_levels:
-            frugal.run(decoder, noise_level, n, time_only=time_only)
+            if print_progress:
+                print("\r")
+                print(f"(d, p) = ({d}, {noise_level})")
+            frugal.run(
+                decoder,
+                noise_level,
+                n,
+                time_only=time_only,
+                print_progress=print_progress=='fine',
+            )
             dc[d, noise_level] = tuple(frugal.step_counts)
     data = DataFrame(dc).sort_index(axis=1)
     data.columns.set_names(['d', 'p'], inplace=True)
