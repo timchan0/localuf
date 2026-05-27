@@ -7,7 +7,7 @@ from localuf.decoders._base_uf import direction
 
 def test_start(sfn3: _Node):
     sfn3.pointer = 'D'
-    sfn3.UNROOTER.start()
+    sfn3.UNROOTER.start_in_grow()
     assert sfn3.cid == RESET
     assert sfn3.pointer == 'C'
 

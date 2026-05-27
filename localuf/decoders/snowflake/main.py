@@ -1120,7 +1120,7 @@ class _Node(NodeEdgeMixin):
         elif self.FRIENDSHIP.pointing_to_nothing:
             if detector_defect:  # start unrooting `self`
                 self.busy = True
-                self.UNROOTER.start()
+                self.UNROOTER.start_in_merging()
         else:
             self.next_active = self.access[self.pointer].active
             if detector_defect:  # PUSH DEFECT
@@ -1234,7 +1234,7 @@ class EagerFriendship(Friendship):
 
     def find_broken_pointers(self):
         if 'D' in self.NODE.pointer:
-            self.NODE.UNROOTER.start()
+            self.NODE.UNROOTER.start_in_grow()
 
 
 class LazyFriendship(Friendship):
@@ -1382,8 +1382,12 @@ class _Unrooter(abc.ABC):
         self._NODE = node
 
     @abc.abstractmethod
-    def start(self):
-        """Start unrooting the node."""
+    def start_in_merging(self):
+        """Start unrooting the node in the merging stage."""
+
+    @abc.abstractmethod
+    def start_in_grow(self):
+        """Start unrooting the node in the grow stage."""
 
     @abc.abstractmethod
     def flooding(self, whole: bool):
@@ -1415,7 +1419,15 @@ class _FullUnrooter(_Unrooter):
     Extends ``_Unrooter``.
     """
 
-    def start(self):
+    def start_in_merging(self):
+        # TODO: move self._NODE.busy into here
+        self._NODE.next_cid = RESET
+        self._NODE.pointer = 'C'
+        # NEED NOT RESET...
+        # `next_cid` as always overwritten in `NODE.flooding`
+        # `next_pointer` as always overwritten in `drop` before next used in `NODE.update_after_drop`
+
+    def start_in_grow(self):
         self._NODE.cid = RESET
         self._NODE.pointer = 'C'
         # NEED NOT RESET...
@@ -1432,8 +1444,7 @@ class _FullUnrooter(_Unrooter):
                 if neighbor.cid == RESET:
                     if not self._NODE.unrooted:  # start unrooting `self._NODE`
                         self._NODE.busy = True
-                        self._NODE.next_cid = RESET
-                        self._NODE.pointer = 'C'
+                        self.start_in_merging()
                         break
                 else:
                     self._compare_cid(pointer, neighbor)
@@ -1456,9 +1467,12 @@ class _SimpleUnrooter(_Unrooter):
         code = node.SNOWFLAKE.CODE
         self._CLOSEST_BOUNDARY_DIRECTION = 'W' if node.INDEX[code.LONG_AXIS] < (code.D-1)/2 else 'E'
 
-    def start(self):
+    def start_in_merging(self):
         self._NODE.cid = RESET
         self._NODE.next_cid = RESET
+
+    def start_in_grow(self):
+        self.start_in_merging()
 
     def flooding(self, whole):
         if self._NODE.cid == RESET:

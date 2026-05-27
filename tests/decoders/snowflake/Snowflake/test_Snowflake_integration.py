@@ -278,6 +278,35 @@ def test_no_unroot_pointer_cycle(snowflake5: Snowflake):
             break
 
 
+class TestLazyUnroot:
+
+    @pytest.fixture
+    def snowflake4(self):
+        d = 5
+        rp = Repetition(
+            d,
+            noise='phenomenological',
+            scheme='frugal',
+        )
+        return Snowflake(rp, schedule='2:1', eager_unroot=False)
+    
+    def test_no_lost_defect_lazy_unroot(self, snowflake4: Snowflake):
+        """This fails if start unroot sets CID, rather than next CID, to RESET."""
+        code = snowflake4.CODE
+        h = code.SCHEME.WINDOW_HEIGHT
+        for syndrome in itertools.chain(
+            [
+                {(0, h-1)},
+                {(1, h-1)},
+                set(),
+                {(1, h-1)},
+            ],
+            itertools.repeat(set(), 3),
+        ):
+            snowflake4.decode(syndrome)
+        assert snowflake4.syndrome == {(1, 2)}
+
+
 def test_no_infinite_loop(snowflake7: Snowflake):
     """Test infinite loop scenario avoided.
     
